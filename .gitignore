@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+artifacts/
+dev.local.json
+.vs/
+.idea/
+*.user
+*.suo
+Environment.props

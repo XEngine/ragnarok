@@ -1,0 +1,9 @@
+<Project>
+  <Target Name="DeployDevelopmentPlugin" AfterTargets="Build" Condition="'$(DeployOnBuild)' == 'true'">
+    <Error Condition="Exists('$(GamePath)/BepInEx/plugins/Ragnarok/Ragnarok.dll')" Text="Remove the plugins copy of Ragnarok before deploying to ScriptEngine." />
+    <MakeDir Directories="$(GamePath)/BepInEx/scripts" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(GamePath)/BepInEx/scripts" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GamePath)/BepInEx/scripts" />
+    <Message Importance="high" Text="Ragnarok deployed. Press F6 in Valheim to reload." />
+  </Target>
+</Project>
