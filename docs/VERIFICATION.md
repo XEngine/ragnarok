@@ -39,3 +39,14 @@ these checks are absent from Release builds.
 The smoke test uses the same reload method as F6 through ScriptEngine's file
 watcher. Actual F6/F7/F8 keyboard interaction and badge appearance still need a
 manual check in the visible game. Multiplayer is not tested.
+
+
+## Module refactor, 2026-10-18
+
+- Source reorganized into HUD, UI shared/windows, Features, Configuration, Networking and Development; earlier HUD changes retained.
+- Debug and Release builds passed with zero warnings/errors.
+- Regression suite passed: 45,562 allocation assertions, death-penalty boundaries, and configuration migration/legacy-wire-name checks.
+- `scripts/check-config.ps1` passed against the installed BepInEx reader using temporary files: custom values, repeat migration, new-format precedence, unknown entries and original-backup preservation.
+- Fixed partial-startup cleanup, dedicated-server equipment initialization, server-only config packet acceptance/RPC cleanup, atomic file-watcher notifications and owned UI texture/material cleanup.
+- No in-game or multiplayer test was performed for this refactor. The development game was running and was not interrupted. Reload with F6 after deployment; inspect the new settings groups and verify host/client locking and unload behavior.
+- See [ARCHITECTURE.md](ARCHITECTURE.md) for module ownership and configuration compatibility.

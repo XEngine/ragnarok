@@ -1,0 +1,249 @@
+using System.Collections.Generic;
+using BepInEx.Configuration;
+using HarmonyLib;
+using UnityEngine;
+
+namespace Ragnarok.Configuration;
+
+// Dotted sections ("HUD.Vitals") appear as sub-pages under their parent in the F10 window.
+internal sealed class InterfaceSettings
+{
+    internal const string HudSection = "HUD", VitalsSection = "HUD.Vitals", StatusSection = "HUD.Status", KeysSection = "HUD.Keys";
+    internal const string MinimapSection = "HUD.Minimap";
+
+    internal readonly ConfigEntry<KeyboardShortcut> WindowKey;
+    internal readonly ConfigEntry<float> Scale;
+    internal readonly ConfigEntry<float> ScrollSpeed;
+    internal readonly ConfigEntry<FrameEdges> Edges;
+    internal readonly ConfigEntry<bool> FollowSystemScroll;
+    internal readonly ConfigEntry<HudStyle> Hud;
+    internal readonly ConfigEntry<float> HudScale;
+    internal readonly ConfigEntry<bool> HudNumbers;
+    internal readonly ConfigEntry<bool> HudFood;
+    internal readonly ConfigEntry<bool> HudPower;
+    internal readonly ConfigEntry<bool> HudStatus;
+    internal readonly ConfigEntry<bool> StatusLabels;
+    internal readonly ConfigEntry<KeyboardShortcut> StatusLabelsKey;
+    internal readonly HudPlacement Character, Power, SkillToast;
+    internal readonly ConfigEntry<bool> CharacterPortrait, PortraitHelmet;
+    internal readonly ConfigEntry<bool> Party;
+    internal readonly HudPlacement Vitals;
+    internal readonly HudPlacement Status;
+    internal readonly ConfigEntry<bool> HudKeys;
+    internal readonly HudPlacement Keys;
+    internal readonly ConfigEntry<InventoryStyle> Inventory;
+    internal readonly ConfigEntry<float> InventoryOpacity;
+    internal readonly ConfigEntry<float> InventoryScale;
+    internal readonly ConfigEntry<bool> ChestPreview;
+    internal readonly ConfigEntry<float> ChestPreviewX, ChestPreviewY, ChestPreviewScale;
+    internal readonly ConfigEntry<int> ChestPreviewColumns;
+    internal readonly ConfigEntry<bool> ActionBar;
+    internal readonly ConfigEntry<PanelStyle> WeaponDialStyle;
+    internal readonly ConfigEntry<float> ActionBarScale, ActionBarX, ActionBarBottom;
+    internal readonly ConfigEntry<float> ActionBarSpacing, ActionBarPaddingX, ActionBarPaddingY;
+    internal readonly ConfigEntry<bool> ProvisionBar;
+    internal readonly ConfigEntry<bool> MinimapInfo;
+    internal readonly ConfigEntry<bool> Clock24h;
+    internal readonly ConfigEntry<PanelStyle> MinimapStyle;
+    internal readonly ConfigEntry<PanelStyle> NotificationStyle;
+    internal readonly ConfigEntry<PanelStyle> CompendiumStyle;
+    internal readonly ConfigEntry<PanelStyle> SkillsStyle;
+    internal readonly ConfigEntry<PanelStyle> TrophiesStyle;
+    internal readonly ConfigEntry<PanelStyle> AchievementsStyle;
+    internal readonly ConfigEntry<PanelStyle> CraftingStyle;
+    internal readonly HudPlacement Notifications;
+    internal readonly ConfigEntry<bool> Compass, CompassHome, CompassPortals, CompassShips, CompassPlayers;
+    internal readonly ConfigEntry<float> CompassPortalRange;
+    internal readonly ConfigEntry<HudBackground> CompassBackground, MinimapBackground;
+    internal readonly ConfigEntry<float> CompassBackgroundOpacity, MinimapBackgroundOpacity;
+
+    internal readonly FeatureSettings Features;
+
+    internal InterfaceSettings(ConfigFile config)
+    {
+        Features = new FeatureSettings(config);
+        WeaponDialStyle = config.Bind("HUD.WeaponDial", "Style", PanelStyle.FollowHud,
+            "Ragnarok: obsidian and crimson with a gold halo. Vanilla: dark glass with Valheim's orange highlight and font. FollowHud matches the HUD style.");
+        const string actionBar = "HUD.Hotbar";
+        ActionBar = config.Bind(actionBar, "Enabled", true, "Use the Ragnarök action-bar panel while the Ragnarök HUD is selected. Vanilla HUD keeps the original hotbar.");
+        ActionBarScale = config.Bind(actionBar, "Scale", 1f, new ConfigDescription("Size of the action-bar panel.", new AcceptableValueRange<float>(0.5f, 1.5f)));
+        ActionBarX = config.Bind(actionBar, "OffsetX", 0f, new ConfigDescription("Horizontal offset from bottom centre, in HUD pixels.", new AcceptableValueRange<float>(-1000f, 1000f)));
+        ActionBarBottom = config.Bind(actionBar, "BottomMargin", 24f, new ConfigDescription("Distance above the bottom edge, in HUD pixels.", new AcceptableValueRange<float>(0f, 1000f)));
+        ActionBarSpacing = config.Bind(actionBar, "SlotSpacing", 4f, new ConfigDescription("Space between hotbar slots, in unscaled HUD pixels.", new AcceptableValueRange<float>(0f, 30f)));
+        ActionBarPaddingX = config.Bind(actionBar, "HorizontalPadding", 8f, new ConfigDescription("Inner left and right margins of the hotbar background, in unscaled HUD pixels.", new AcceptableValueRange<float>(2f, 40f)));
+        ActionBarPaddingY = config.Bind(actionBar, "VerticalPadding", 10f, new ConfigDescription("Inner top and bottom margins of the hotbar background. Allows room for the raised equipped slot.", new AcceptableValueRange<float>(6f, 24f)));
+        const string preview = "HUD.ChestPreview";
+        ChestPreview = config.Bind(preview, "Enabled", true, "Show a read-only item grid when aiming at an accessible chest within normal interaction range.");
+        ChestPreviewX = config.Bind(preview, "OffsetX", 80f, new ConfigDescription("Horizontal offset from screen centre; positive moves right, in HUD pixels. With the Ragnarök HUD the action prompt (\"[E] Open\") shares this left edge.", new AcceptableValueRange<float>(-2000f, 2000f)));
+        ChestPreviewY = config.Bind(preview, "OffsetY", 80f, new ConfigDescription("Vertical offset from screen centre; positive moves down, in HUD pixels.", new AcceptableValueRange<float>(-1200f, 1200f)));
+        ChestPreviewScale = config.Bind(preview, "Scale", 1f, new ConfigDescription("Size of the compact chest preview.", new AcceptableValueRange<float>(0.5f, 2f)));
+        ChestPreviewColumns = config.Bind(preview, "Columns", 6, new ConfigDescription("Item columns in the compact preview. Empty inventory slots are omitted.", new AcceptableValueRange<int>(1, 12)));
+        WindowKey = config.Bind("HUD.Window", "ConfigWindowKey", new KeyboardShortcut(KeyCode.F10),
+            "Open or close the Ragnarök configuration window.");
+        Scale = config.Bind("HUD.Window", "Scale", 1f, new ConfigDescription(
+            "Size of Ragnarök windows relative to a 1080p screen.", new AcceptableValueRange<float>(0.75f, 1.5f)));
+        Edges = config.Bind("HUD.Window", "FrameEdges", FrameEdges.Solid,
+            "Edges of Ragnarök's frames, bars, slots and buttons: Solid (clean square edges) or Chipped (worn, jagged metal).");
+        FollowSystemScroll = config.Bind("HUD.Window", "FollowWindowsScroll", true,
+            "Scroll lists as far per mouse-wheel notch as Windows does (Mouse settings: lines to scroll each time). " +
+            "Off, or when there is no Windows setting, ScrollSpeed is used.");
+        ScrollSpeed = config.Bind("HUD.Window", "ScrollSpeed", 3f, new ConfigDescription(
+            "How far one mouse-wheel notch scrolls Ragnarök's lists (crafting, Compendium, this window), in rows of about " +
+            "40 pixels. Also applies to Valheim's recipe list while the Ragnarök crafting filters are on.",
+            new AcceptableValueRange<float>(1f, 8f)));
+
+        Hud = config.Bind(HudSection, "Style", HudStyle.Vanilla,
+            "Vanilla keeps Valheim's HUD. Ragnarok replaces health, stamina, eitr, food and status effects with the Ragnarök HUD.");
+        HudScale = config.Bind(HudSection, "Scale", 1f, new ConfigDescription(
+            "Size of every part of the Ragnarök HUD.", new AcceptableValueRange<float>(0.6f, 1.6f)));
+
+        HudNumbers = config.Bind(VitalsSection, "ShowNumbers", true, "Show current and maximum values beside the bars.");
+        HudFood = config.Bind(VitalsSection, "ShowFood", true, "Show active foods and their remaining time above the bars.");
+        HudPower = config.Bind(VitalsSection, "ShowForsakenPower", true,
+            "Show your Forsaken power as the emblem beside the bars, replacing Valheim's power box.");
+        Vitals = new HudPlacement(config, VitalsSection, "health, stamina and eitr", ScreenAnchor.BottomCenter, 0f, 118f);
+
+        NotificationStyle = config.Bind("HUD.Notifications", "Style", PanelStyle.FollowHud,
+            "Ragnarok shows unlocks, pickups and small messages as plain text lines with inline quantities; " +
+            "Vanilla keeps Valheim's. FollowHud uses the Ragnarök notifications whenever the Ragnarök HUD is on. " +
+            "Skill gains use their own toast; other centre messages stay Valheim's.");
+        Notifications = new HudPlacement(config, "HUD.Notifications", "notifications", ScreenAnchor.BottomLeft, 40f, 140f);
+
+        CraftingStyle = config.Bind("HUD.Crafting", "Style", PanelStyle.FollowHud,
+            "Ragnarok shows the crafting panel in Ragnarök style with a search box and category filters; Vanilla keeps " +
+            "Valheim's. FollowHud uses the Ragnarök panel whenever the Ragnarök HUD is on. Crafting itself is Valheim's either way.");
+
+
+        CompendiumStyle = config.Bind("HUD.Compendium", "Style", PanelStyle.FollowHud,
+            "Ragnarok shows the Compendium (the texts dialog: journal, Hugin's lessons, runestones) as a Ragnarök screen with " +
+            "chapters and an art panel; Vanilla keeps Valheim's. FollowHud uses the Ragnarök screen whenever the Ragnarök HUD is on.");
+        SkillsStyle = config.Bind("HUD.Skills", "Style", PanelStyle.FollowHud,
+            "Ragnarok shows the skills dialog as a Ragnarök screen in the Compendium's frame (every skill with its level, the chosen " +
+            "one's bonus, progress and description); Vanilla keeps Valheim's. FollowHud uses the Ragnarök screen whenever the Ragnarök HUD is on.");
+        TrophiesStyle = config.Bind("HUD.Trophies", "Style", PanelStyle.FollowHud,
+            "Ragnarok shows the trophies as a Ragnarök screen in the Compendium's frame (every trophy in the game, the ones you have taken lit, " +
+            "the chosen one's lore beside them); Vanilla keeps Valheim's. FollowHud uses the Ragnarök screen whenever the Ragnarök HUD is on.");
+        AchievementsStyle = config.Bind("HUD.Achievements", "Style", PanelStyle.FollowHud,
+            "Ragnarok shows the achievements as a Ragnarök screen in the Compendium's frame (every badge, the unlocked ones lit, the chosen " +
+            "one's conditions beside them); Vanilla keeps Valheim's. FollowHud uses the Ragnarök screen whenever the Ragnarök HUD is on.");
+
+        HudStatus = config.Bind(StatusSection, "Enabled", true,
+            "Show buffs and debuffs in the Ragnarök status strip. Off brings back Valheim's top-right list.");
+        StatusLabels = config.Bind(StatusSection, "ShowLabels", false,
+            "Name each effect beside its icon (\"Rested 8:29\"). Off shows only the icons and their time left. The labels key flips this in game.");
+        StatusLabelsKey = config.Bind(StatusSection, "LabelsKey", new KeyboardShortcut(KeyCode.B),
+            "Show or hide the status effect names. B by default (V is Valheim's auto-pickup and Ragnarök's weapon dial).");
+        Status = new HudPlacement(config, StatusSection, "status effect strip", ScreenAnchor.TopLeft, 150f, 72f);
+
+        HudKeys = config.Bind(KeysSection, "Enabled", true,
+            "Show the context key guide (building, combat, inventory, fishing) as a compact vertical list. Off brings back Valheim's bottom bar.");
+        Keys = new HudPlacement(config, KeysSection, "key guide", ScreenAnchor.MiddleRight, 24f, 0f);
+
+        Inventory = config.Bind("HUD.Inventory", "Style", InventoryStyle.FollowHud,
+            "Ragnarok shows the Ragnarök inventory grid and item card; Vanilla keeps Valheim's. FollowHud uses the Ragnarök inventory " +
+            "whenever the Ragnarök HUD is on. Clicks, Shift-split, Ctrl-move and right-click use work as in Valheim.");
+        InventoryScale = config.Bind("HUD.Inventory", "Scale", 1f, new ConfigDescription(
+            "Size of the Ragnarök inventory and its character column (Valheim's inventory keeps its own size), growing from the top-left into the free space " +
+            "before the info board and crafting panel (it stops short of them and of the screen's edges). In either style. " +
+            "1 is Valheim's own size.", new AcceptableValueRange<float>(0.75f, 1.3f)));
+        InventoryOpacity = config.Bind("HUD.Inventory", "BackgroundOpacity", 0.95f, new ConfigDescription(
+            "Opacity of the Ragnarök inventory and character panels' metal background.", new AcceptableValueRange<float>(0.2f, 1f)));
+
+
+        ProvisionBar = config.Bind("HUD.Provisions", "ShowInHud", true,
+            "Show the filled provision slots beside the food in the Ragnarök HUD, with their hotkeys.");
+        MinimapInfo = config.Bind(MinimapSection, "Enabled", true,
+            "Show the day and clock above the minimap, and the current and next weather below it (with either HUD style).");
+        Clock24h = config.Bind(MinimapSection, "TwentyFourHourClock", true, "24-hour clock (14:30). Off: 12-hour (2:30 PM).");
+        MinimapStyle = config.Bind(MinimapSection, "Style", PanelStyle.FollowHud,
+            "Ragnarok frames the minimap in Ragnarök style (dark plate, gold rim, crimson north mark) and restyles the biome " +
+            "name; Vanilla keeps Valheim's frame. FollowHud uses the Ragnarök frame whenever the Ragnarök HUD is on.");
+        (MinimapBackground, MinimapBackgroundOpacity) = Backdrop(config, MinimapSection, "day, clock and weather strips");
+
+        Compass = config.Bind("HUD.Compass", "Enabled", true,
+            "Show a compass strip at the top centre of the screen (with either HUD style). It follows the camera.");
+        (CompassBackground, CompassBackgroundOpacity) = Backdrop(config, "HUD.Compass", "compass");
+        CompassHome = config.Bind("HUD.Compass", "ShowHome", true, "Mark your bed (your spawn point) on the compass, at any distance.");
+        CompassPortals = config.Bind("HUD.Compass", "ShowPortals", true, "Mark portals on the compass, the nearest six within PortalRange.");
+        CompassPortalRange = config.Bind("HUD.Compass", "PortalRange", 800f, new ConfigDescription(
+            "How far away (metres) a portal can be and still show on the compass.", new AcceptableValueRange<float>(100f, 5000f)));
+        CompassPlayers = config.Bind("HUD.Compass", "ShowPlayers", true,
+            "Mark other players on the compass with their names, only those who chose to be visible on the map.");
+        CompassShips = config.Bind("HUD.Compass", "ShowShips", true,
+            "Mark ships near you on the compass (not the one you are aboard).");
+
+
+
+        CharacterPortrait = config.Bind("HUD.Character", "ShowPortrait", true,
+            "Show a front-facing portrait of your character inside the rune circle. Disable to use the rune glyph.");
+        PortraitHelmet = config.Bind("HUD.Character", "ShowHelmet", true,
+            "Show the equipped helmet in the character portrait. Turn off to show the face and normal hair. Only affects the portrait.");
+        Character = new HudPlacement(config, "HUD.Character", "character and food panel", ScreenAnchor.TopLeft, 40f, 34f);
+        Power = new HudPlacement(config, "HUD.Power", "Forsaken power", ScreenAnchor.BottomLeft, 40f, 34f);
+        SkillToast = new HudPlacement(config, "HUD.SkillToast", "skill improved toast", ScreenAnchor.MiddleRight, 40f, -190f);
+        Party = config.Bind("HUD.Character", "ShowPlayers", true,
+            "Show up to three players sharing their map position. Health is shown only for loaded characters; no party membership is inferred.");
+        MigrateFrom03(config);
+        var layoutVersion = config.Bind("HUD", "LayoutVersion", 0, "Internal layout migration version.");
+        if (layoutVersion.Value < 1)
+        {
+            // Only relocate the old defaults; retain custom placements.
+            MigratePlacement(Vitals, ScreenAnchor.BottomLeft, 40, 40);
+            MigratePlacement(Status, ScreenAnchor.BottomRight, 40, 40);
+            MigratePlacement(Notifications, ScreenAnchor.MiddleLeft, 40, 0);
+            layoutVersion.Value = 1;
+        }
+        if (layoutVersion.Value < 2)
+        {
+            // Adopt the reference's timer-only tiles once; B still toggles names afterward.
+            StatusLabels.Value = false;
+            layoutVersion.Value = 2;
+        }
+        if (layoutVersion.Value < 3)
+        {
+            MigratePlacement(Vitals, ScreenAnchor.BottomCenter, 0, 144);
+            layoutVersion.Value = 3;
+        }
+        if (layoutVersion.Value < 4)
+        {
+            if (ActionBarSpacing.Value == 7f) ActionBarSpacing.Value = 4f;
+            layoutVersion.Value = 4;
+        }
+    }
+
+    private static void MigratePlacement(HudPlacement placement, ScreenAnchor old, float x, float y)
+    {
+        if (placement.Position.Value != old || placement.MarginX.Value != x || placement.MarginY.Value != y) return;
+        placement.Position.Value = (ScreenAnchor)placement.Position.DefaultValue;
+        placement.MarginX.Value = (float)placement.MarginX.DefaultValue;
+        placement.MarginY.Value = (float)placement.MarginY.DefaultValue;
+    }
+
+    // Same backdrop choice as the vitals and status strip.
+    private static (ConfigEntry<HudBackground>, ConfigEntry<float>) Backdrop(ConfigFile config, string section, string what) =>
+        (config.Bind(section, "Background", HudBackground.Shade,
+                $"Backdrop behind the {what}. Shade is a soft feathered field; Plate is a chamfered plate with a gold rim."),
+            config.Bind(section, "BackgroundOpacity", 0.5f, new ConfigDescription(
+                $"Opacity of the backdrop behind the {what}.", new AcceptableValueRange<float>(0f, 1f))));
+
+    // 0.3.0 kept every HUD setting in [HUD]; carry those values into the new sub-sections once.
+    private void MigrateFrom03(ConfigFile config)
+    {
+        var moves = new (string OldKey, ConfigEntryBase Entry)[]
+        {
+            ("ShowNumbers", HudNumbers), ("ShowFood", HudFood), ("ShowStatusEffects", HudStatus),
+            ("VitalsPosition", Vitals.Position), ("VitalsMarginX", Vitals.MarginX), ("VitalsMarginY", Vitals.MarginY),
+            ("StatusPosition", Status.Position), ("StatusMarginX", Status.MarginX), ("StatusMarginY", Status.MarginY)
+        };
+        if (AccessTools.Property(typeof(ConfigFile), "OrphanedEntries")?.GetValue(config, null) is not Dictionary<ConfigDefinition, string> orphans)
+            return;
+
+        foreach ((string oldKey, ConfigEntryBase entry) in moves)
+        {
+            ConfigDefinition old = new(HudSection, oldKey);
+            if (!orphans.TryGetValue(old, out string value)) continue;
+            entry.SetSerializedValue(value);
+            orphans.Remove(old);
+        }
+    }
+}

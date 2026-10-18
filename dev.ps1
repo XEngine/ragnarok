@@ -49,7 +49,7 @@ switch ($Action) {
         Push-Location $projectRoot
         try {
             & $sdk run --project (Join-Path $projectRoot 'tests/Ragnarok.Tests/Ragnarok.Tests.csproj')
-            if ($LASTEXITCODE -ne 0) { throw 'Resource allocation tests failed.' }
+            if ($LASTEXITCODE -ne 0) { throw 'Regression tests failed.' }
         } finally { Pop-Location }
     }
     'build' { Build-Mod }

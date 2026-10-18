@@ -5,14 +5,14 @@
 F10 → Quality of Life → Sailing / Ballista. All settings below are synchronized and locked by the server when Server.LockSettings is enabled. Install the mod on the host/server and every client because physics and turret AI may be owned by a client.
 
 ```ini
-[QoL.Sailing]
+[Gameplay.Sailing]
 ForwardPropulsionMultiplier = 1
 ReversePropulsionMultiplier = 1
 RudderSpeedMultiplier = 1
 SteeringStrengthMultiplier = 1
 WaterImpactDamageMultiplier = 1
 
-[QoL.Ballista]
+[Gameplay.Ballista]
 IgnorePlayers = false
 InfiniteAmmo = false
 FireRateMultiplier = 1
@@ -39,7 +39,7 @@ Verification: build and game startup/reload verify patch installation against th
 F10 → Quality of Life → Stamina & Eitr. Server-synchronized settings:
 
 ```ini
-[QoL.ResourceCosts]
+[Gameplay.ResourceCosts]
 RunStaminaModifierPercent = 0
 AttackStaminaModifierPercent = 0
 JumpStaminaModifierPercent = 0
@@ -53,7 +53,7 @@ Each defaults to 0 (normal). -50 halves the cost, -100 removes the cost, +50 add
 F10 → Quality of Life → Skill Experience, or server config:
 
 ```ini
-[QoL.Skills]
+[Gameplay.Skills]
 ExperienceGainModifierPercent = 50
 ```
 
@@ -64,7 +64,7 @@ Default 0 means normal XP. +50 awards 1.5x, +100 awards 2x, -50 awards half, and
 F10 → Quality of Life → Death Penalty, or the server config:
 
 ```ini
-[QoL.Death]
+[Gameplay.Death]
 SkillLossModifierPercent = -50
 ```
 
@@ -73,14 +73,14 @@ Default 0 preserves normal loss. -50 halves the normal level penalty, -100 disab
 Configure these in F10 under Quality of Life, or in `BepInEx/config/com.kernelpanic.ragnarok.cfg` on the host/server:
 
 ```ini
-[QoL.ForsakenPowers]
+[Gameplay.ForsakenPowers]
 DurationMinutes = 10
 CooldownMinutes = 15
 
-[QoL.Harvesting]
+[Gameplay.Harvesting]
 YieldMultiplier = 3
 
-[Server]
+[Gameplay.Server]
 LockSettings = true
 ```
 
@@ -97,7 +97,7 @@ Manual multiplayer checks: set 3x on the host, confirm the client setting is loc
 Each station has a separate F10 Quality of Life page and server-synchronized config section. Example:
 
 ```ini
-[QoL.Smelter]
+[Gameplay.Smelter]
 FuelCapacity = 50
 InputCapacity = 40
 SpeedMultiplier = 2
@@ -107,12 +107,12 @@ Capacity is an absolute item count (1–1000); **0 preserves the original capaci
 
 | Section | Capacity settings | Speed |
 | --- | --- | --- |
-| QoL.Smelter, QoL.BlastFurnace, QoL.EitrRefinery | FuelCapacity, InputCapacity | SpeedMultiplier |
-| QoL.CharcoalKiln, QoL.Windmill, QoL.SpinningWheel | InputCapacity | SpeedMultiplier |
-| QoL.SapExtractor, QoL.Beehive | OutputCapacity | SpeedMultiplier |
-| QoL.Fermenter | None (one batch) | SpeedMultiplier |
-| QoL.Oven | FuelCapacity | SpeedMultiplier |
-| QoL.CookingStations | None (model-defined slots) | SpeedMultiplier |
+| Gameplay.Smelter, Gameplay.BlastFurnace, Gameplay.EitrRefinery | FuelCapacity, InputCapacity | SpeedMultiplier |
+| Gameplay.CharcoalKiln, Gameplay.Windmill, Gameplay.SpinningWheel | InputCapacity | SpeedMultiplier |
+| Gameplay.SapExtractor, Gameplay.Beehive | OutputCapacity | SpeedMultiplier |
+| Gameplay.Fermenter | None (one batch) | SpeedMultiplier |
+| Gameplay.Oven | FuelCapacity | SpeedMultiplier |
+| Gameplay.CookingStations | None (model-defined slots) | SpeedMultiplier |
 
 Wind, roof, smoke, fire and root-resource requirements remain in effect. Smelter fuel cost per product is unchanged. Oven fuel burn rate remains unchanged; cooking and burning deadlines both accelerate. Fermenter yield is unchanged. Beehive production speed and storage are separate from the harvesting yield multiplier.
 

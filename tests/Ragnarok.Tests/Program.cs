@@ -1,4 +1,4 @@
-using Ragnarok.NearbyStorage;
+using Ragnarok.Features.NearbyStorage;
 
 int checks = 0;
 void Check(bool condition, string message)
@@ -41,9 +41,11 @@ for (int iteration = 0; iteration < 5000; iteration++)
 }
 Console.WriteLine($"PASS: {checks} allocation checks, including 5,000 randomized multi-inventory transactions.");
 
-Check(Math.Abs(Ragnarok.DeathPenalty.Scale(0.05f, -50) - 0.025f) < 0.00001f, "Half penalty should turn 5% loss into 2.5%");
-Check(Ragnarok.DeathPenalty.Scale(0.05f, -100) == 0f, "No-loss setting");
-Check(Ragnarok.DeathPenalty.Scale(0.05f, 0) == 0.05f, "Unchanged penalty");
-Check(Ragnarok.DeathPenalty.Scale(0f, 100) == 0f, "Cannot introduce level loss where world settings disable it");
-Check(Ragnarok.DeathPenalty.Scale(0.8f, 100) == 1f, "Increased penalties cannot produce negative skill levels");
+Check(Math.Abs(Ragnarok.Features.Gameplay.DeathPenalty.Scale(0.05f, -50) - 0.025f) < 0.00001f, "Half penalty should turn 5% loss into 2.5%");
+Check(Ragnarok.Features.Gameplay.DeathPenalty.Scale(0.05f, -100) == 0f, "No-loss setting");
+Check(Ragnarok.Features.Gameplay.DeathPenalty.Scale(0.05f, 0) == 0.05f, "Unchanged penalty");
+Check(Ragnarok.Features.Gameplay.DeathPenalty.Scale(0f, 100) == 0f, "Cannot introduce level loss where world settings disable it");
+Check(Ragnarok.Features.Gameplay.DeathPenalty.Scale(0.8f, 100) == 1f, "Increased penalties cannot produce negative skill levels");
 Console.WriteLine("PASS: death penalty scaling and boundaries.");
+
+ConfigSchemaChecks.Run(Check);

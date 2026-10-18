@@ -5,8 +5,8 @@ using System.Linq;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
-using Ragnarok.NearbyStorage;
-using Ragnarok.Ui;
+using Ragnarok.Features.NearbyStorage;
+using Ragnarok.UI;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -60,42 +60,65 @@ public sealed class Plugin : BaseUnityPlugin
     private ConfigEntry<KeyboardShortcut> reloadConfigKey = null!;
     private ConfigEntry<KeyboardShortcut> toggleBadgeKey = null!;
 
+    private bool disposed;
+
     private void Awake()
     {
-        showBadge = Config.Bind("Development", "ShowBadge", false,
+        bool saveOnChange = Config.SaveOnConfigSet;
+        Config.SaveOnConfigSet = false;
+        try
+        {
+            ConfigMigration.Upgrade(Config);
+            Initialize();
+            Config.Save();
+        }
+        catch
+        {
+            enabled = false;
+            OnDestroy();
+            throw;
+        }
+        finally { Config.SaveOnConfigSet = saveOnChange; }
+    }
+
+    private void Initialize()
+    {
+        showBadge = Config.Bind("HUD.Development", "ShowBadge", false,
             "Show the development status badge. F8 toggles it.");
-        badgeText = Config.Bind("Development", "BadgeText", "Ragnarök loaded",
+        badgeText = Config.Bind("HUD.Development", "BadgeText", "Ragnarök loaded",
             "Text shown in the badge. Edit this file and press F7 to test live configuration.");
-        reloadConfigKey = Config.Bind("Development", "ReloadConfigKey",
+        reloadConfigKey = Config.Bind("HUD.Development", "ReloadConfigKey",
             new KeyboardShortcut(KeyCode.F7), "Reload this plugin's configuration.");
-        toggleBadgeKey = Config.Bind("Development", "ToggleBadgeKey",
+        toggleBadgeKey = Config.Bind("HUD.Development", "ToggleBadgeKey",
             new KeyboardShortcut(KeyCode.F8), "Toggle the development status badge.");
 
         ui = new InterfaceSettings(Config);
-        PlantHoverStatus.Enabled = () => ui.PlantStatus.Value;
-        var qualityOfLife = new QualityOfLife(Config);
-        QualityOfLife.Current = qualityOfLife;
+        Equipment.CharacterSlots.Enabled = () => ui.Features.CharacterSlots.Value;
+        Equipment.CharacterSlots.ExtraUtilityEnabled = () => ui.Features.ExtraUtilitySlots.Value;
+        Equipment.ProvisionKeys.Keys = ui.Features.ProvisionKeys;
+        PlantHoverStatus.Enabled = () => ui.Features.PlantStatus.Value;
+        var gameplay = new GameplaySettings(Config);
+        GameplaySettings.Current = gameplay;
         var sailingAndTurrets = new SailingAndTurrets(Config);
         SailingAndTurrets.Current = sailingAndTurrets;
         stationModifiers = new StationModifiers(Config);
         StationModifiers.Current = stationModifiers;
-        Equipment.TombstoneRecovery.Enabled = () => ui.AutoEquipOnReclaim.Value;
+        Equipment.TombstoneRecovery.Enabled = () => ui.Features.AutoEquipOnReclaim.Value;
         StorageRuntime.Settings = new StorageSettings(Config);
         containers = new ContainerRegistry(StorageRuntime.Settings);
         StorageRuntime.Registry = containers;
         serverConfig = new ServerConfig(Config, Logger, PluginVersion, new ConfigEntryBase[]
         {
             StorageRuntime.Settings.Enabled, StorageRuntime.Settings.Range, StorageRuntime.Settings.Crafting,
-            StorageRuntime.Settings.Building, StorageRuntime.Settings.Stations, ui.QuickStack, ui.CharacterSlots, ui.ExtraUtilitySlots,
-            ui.AutoEquipOnReclaim, qualityOfLife.PowerDuration, qualityOfLife.PowerCooldown, qualityOfLife.HarvestMultiplier,
-            qualityOfLife.SkillLossModifier, qualityOfLife.SkillXpModifier,
-            qualityOfLife.RunCost, qualityOfLife.AttackCost, qualityOfLife.JumpCost, qualityOfLife.EitrCost,
-            ui.ChestSearch, ui.ChestSearchRange
+            StorageRuntime.Settings.Building, StorageRuntime.Settings.Stations, ui.Features.QuickStack, ui.Features.CharacterSlots, ui.Features.ExtraUtilitySlots,
+            ui.Features.AutoEquipOnReclaim, gameplay.PowerDuration, gameplay.PowerCooldown, gameplay.HarvestMultiplier,
+            gameplay.SkillLossModifier, gameplay.SkillXpModifier,
+            gameplay.RunCost, gameplay.AttackCost, gameplay.JumpCost, gameplay.EitrCost,
+            ui.Features.ChestSearch, ui.Features.ChestSearchRange
         }.Concat(stationModifiers.Synced).Concat(sailingAndTurrets.Synced));
         // A dedicated server has no screen: it runs the gameplay side and the settings sync only.
         if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null) BuildInterface();
         harmony = new Harmony(PluginGuid + "." + Guid.NewGuid().ToString("N"));
-        try
         {
             harmony.PatchAll(typeof(Plugin).Assembly);
             containers.Initialize();
@@ -104,7 +127,7 @@ public sealed class Plugin : BaseUnityPlugin
             string[] args = Environment.GetCommandLineArgs();
             if (Array.IndexOf(args, "-ragnarok-inventory-checks") >= 0)
             {
-                RuntimeChecks.Run(Logger);
+                StorageRuntimeChecks.Run(Logger);
                 StationRuntimeChecks.Run(Logger);
                 SkillExperienceChecks.Run(Logger);
             }
@@ -120,12 +143,6 @@ public sealed class Plugin : BaseUnityPlugin
                 else Logger.LogError("Inventory preview needs -ragnarok-preview-saves <dir>; refusing to touch real saves.");
             }
 #endif
-        }
-        catch
-        {
-            harmony.UnpatchSelf();
-            containers.Dispose();
-            throw;
         }
         Logger.LogInfo($"Ragnarok {PluginVersion} loaded. {ui.WindowKey.Value}: settings; HUD: {ui.Hud.Value}; nearby chests range {StorageRuntime.Settings.Range.Value}m.");
     }
@@ -162,14 +179,11 @@ public sealed class Plugin : BaseUnityPlugin
         hotbarRows = new HotbarRows(ui);
         vanillaProvisions = new VanillaProvisionBar(ui, () => hud.Active);
         // The filters apply to Valheim's recipe list whenever a panel shows them.
-        CraftFilter.Enabled = () => craftPanel.Wanted || ui.CraftFilters.Value;
+        CraftFilter.Enabled = () => craftPanel.Wanted || ui.Features.CraftFilters.Value;
         Theme.ChipEdges = () => ui.Edges.Value == FrameEdges.Chipped;
         Ugui.ScrollRows = () => (ui.FollowSystemScroll.Value ? SystemScroll.Lines() : null) ?? ui.ScrollSpeed.Value;
         compass = new CompassStrip(ui, theme);
         // Both inventories draw the slots: the Ragnarök panel, or the vanilla-style character panel.
-        Equipment.CharacterSlots.Enabled = () => ui.CharacterSlots.Value;
-        Equipment.CharacterSlots.ExtraUtilityEnabled = () => ui.ExtraUtilitySlots.Value;
-        Equipment.ProvisionKeys.Keys = ui.ProvisionKeys;
         window = new ConfigWindow(Config, ui, theme, PluginVersion, ChestsInRange);
         window.AddAction("HUD.Notifications", "Test notifications",
             "Sends a sample unlock and two small messages through Valheim, so they show in the style that is on. In a world only.",
@@ -297,6 +311,9 @@ public sealed class Plugin : BaseUnityPlugin
 
     private void OnDestroy()
     {
+        if (disposed) return;
+        disposed = true;
+        StopAllCoroutines();
         chestSearch?.Dispose();
         weaponDial?.Dispose();
         PlantHoverStatus.Enabled = () => false;
@@ -307,7 +324,7 @@ public sealed class Plugin : BaseUnityPlugin
         foreach (var turret in UnityEngine.Object.FindObjectsByType<Turret>(FindObjectsSortMode.None))
             if (turret.m_marker) turret.m_marker.m_radius = turret.m_viewDistance;
         stationModifiers?.Dispose();
-        QualityOfLife.Current = null;
+        GameplaySettings.Current = null;
         Equipment.TombstoneRecovery.Reset();
         serverConfig?.Dispose();
         harmony?.UnpatchSelf();
@@ -347,6 +364,10 @@ public sealed class Plugin : BaseUnityPlugin
         hud?.Dispose();
         theme?.Dispose();
         ResourceScope.Current = null;
+        StorageRuntime.Registry = null!;
+        Equipment.ProvisionKeys.Keys = Array.Empty<ConfigEntry<KeyboardShortcut>>();
+        Theme.ChipEdges = () => false;
+        Ugui.ScrollRows = () => 3f;
         Logger.LogInfo("Ragnarok unloaded.");
     }
 }

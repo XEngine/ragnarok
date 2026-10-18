@@ -11,7 +11,7 @@ closes it. The key and the window size are under **Interface**.
 
 The style ("Forge & Animus") mixes God of War's obsidian, gold filigree and ember with
 Assassin's Creed's hairlines, chamfered corners and crimson selection. Theme colours,
-generated sprites and Valheim's TextMeshPro fonts live in `src/Ragnarok/Ui/Theme.cs`.
+generated sprites and Valheim's TextMeshPro fonts live in `src/Ragnarok/Ui/Shared/Theme.cs`.
 Everything is built in code with Unity UI (uGUI); there are no asset bundles.
 While the window is open, game actions and camera input are blocked and clicks cannot
 reach game UI behind it.
@@ -21,7 +21,7 @@ the vanilla health, stamina, eitr and food display with a bottom-left cluster; s
 back at any time. It is parented to Valheim's HUD, so it follows the game's UI scale
 and hides with Ctrl+F3. Other vanilla HUD elements are unchanged.
 
-**Weapon dial** (`[HUD.WeaponDial]`, `Ui/WeaponDial.cs`): hold the dial key (V by default; the side
+**Weapon dial** (`[HUD.WeaponDial]`, `Features/QualityOfLife/WeaponDial.cs`): hold the dial key (V by default; the side
 mouse buttons can be bound in F10). Every weapon, shield, bow, tool and torch you carry is laid out in
 a ring at the screen's centre, hotbar first, up to 12. Move the mouse (or the right stick) towards one
 and release the key to take it in hand; release with the pointer in the middle to cancel. While the
@@ -65,7 +65,7 @@ Chests and crafting still use Valheim's panels.
 **Quick Stack** (right of the grid) puts carried items into chests within the nearby-chest
 range that already hold the same item, nearest first, like Valheim's "Stack all" for every
 chest at once. Equipped and quest items never move. The **Keep** chips (also
-`[Inventory.QuickStack]`) leave weapons/shields/ammo, food and consumables, and tools/torches
+`[QualityOfLife.QuickStack]`) leave weapons/shields/ammo, food and consumables, and tools/torches
 in your inventory; all three are on by default. The same ward, ownership and multiplayer rules
 as nearby crafting apply. With the vanilla inventory, the same button and chips appear in
 Valheim's own style right of the armour and weight plaques.
@@ -104,7 +104,7 @@ portals within `PortalRange` (blue ring, from `ZDOMan.GetPortalList`), and ships
 are not aboard (longship), and other players with their names (yellow figure), only those who share
 their position on the map (`ZNet.GetPlayerList`, `m_publicPosition`).
 
-**Crafting panel** (`[Inventory.Crafting] Style`, FollowHud by default): drawn over Valheim's crafting
+**Crafting panel** (`[HUD.Crafting] Style`, FollowHud by default): drawn over Valheim's crafting
 panel, which keeps running unseen (list, selection, requirements, timing, multi-craft, upgrade, repair).
 Station header with Craft / Upgrade tabs, a search box (game keys are ignored while it has focus),
 category chips (weapons, armour, ammo, tools, food & meads, materials, other; none lit = all) and a
@@ -112,42 +112,42 @@ category chips (weapons, armour, ammo, tools, food & meads, materials, other; no
 (progress bar while crafting) on the right.
 
 With Valheim's crafting panel the same search and filters sit above its recipe list in Valheim's style
-(`[Inventory.Crafting] VanillaFilters`). Both panels share one filter state (`Ui/CraftFilter.cs`), which
+(`[QualityOfLife.Crafting] VanillaFilters`). Both panels share one filter state (`Features/QualityOfLife/CraftFilter.cs`), which
 filters Valheim's own recipe list after it is built. With the vanilla HUD, filled provision slots show
-as Valheim hotbar slots just past the hotbar, with their keys (`Ui/VanillaProvisionBar.cs`).
+as Valheim hotbar slots just past the hotbar, with their keys (`Features/QualityOfLife/VanillaProvisionBar.cs`).
 
 **Info panel** (follows the inventory style): the wooden board above the inventory, with the character
 name and the Compendium, Skills, Trophies, Achievements and PvP buttons, redrawn as a Ragnarök plate
-over the hidden original (`Ui/InfoPanel.cs`). Each Valheim button gets a twin with its glyph and tooltip
+over the hidden original (`Ui/Windows/InfoPanel.cs`). Each Valheim button gets a twin with its glyph and tooltip
 that presses the original, so buttons added by other mods appear too.
 
-**Compendium** (`[Inventory.Compendium] Style`, FollowHud by default): Valheim's texts dialog redrawn
+**Compendium** (`[HUD.Compendium] Style`, FollowHud by default): Valheim's texts dialog redrawn
 as a Ragnarök screen over the (hidden, still running) original. Tabs to Skills and Trophies on top;
 chapters on the left (Journal: active effects, log, stats; Hugin's Lessons; Runestones; Notes), the
 open one expanded and the rest fading; the entry in the middle; a diagonally cut art panel on the
 right with rising embers and the glyph of the boss the entry mentions (else your Forsaken power).
 
-**Skills** (`[Inventory.Skills] Style`, FollowHud by default): Valheim's skills dialog in the same frame
-(`Ui/BookWindow.cs`, shared with the Compendium). Every skill on the left with its level and a mastery
+**Skills** (`[HUD.Skills] Style`, FollowHud by default): Valheim's skills dialog in the same frame
+(`Ui/Windows/BookWindow.cs`, shared with the Compendium). Every skill on the left with its level and a mastery
 line; the chosen one in the middle with its level large, the bonus from gear and food, progress to the
 next level, mastery towards 100 and its description; its glyph in the art panel.
 
-**Trophies** (`[Inventory.Trophies] Style`, FollowHud by default): Valheim's trophy panel in the same
-frame (`Ui/TrophiesBook.cs`). Every trophy in the game as a tile wall in Valheim's order: the ones you
+**Trophies** (`[HUD.Trophies] Style`, FollowHud by default): Valheim's trophy panel in the same
+frame (`Ui/Windows/TrophiesBook.cs`). Every trophy in the game as a tile wall in Valheim's order: the ones you
 have taken in colour, the rest as dark shapes. The chosen one's name, lore and use in the middle, with
 a collection bar (taken / total); its glyph in the art panel.
 
-**Achievements** (`[Inventory.Achievements] Style`, FollowHud by default): Valheim's achievements panel
-in the same frame (`Ui/AchievementsBook.cs`), with a fourth tab. Every badge as a tile wall in Valheim's
+**Achievements** (`[HUD.Achievements] Style`, FollowHud by default): Valheim's achievements panel
+in the same frame (`Ui/Windows/AchievementsBook.cs`), with a fourth tab. Every badge as a tile wall in Valheim's
 tier order, unlocked ones lit. The chosen one's name, description and conditions are in the middle, read
 from the same player stats Valheim's details use. Valheim's secrecy is kept: a locked secret stays hidden
 and an unmet condition shows as ???. Valheim's "cheated" note shows bottom left when it applies.
 
-**Sort** (under Quick Stack, both inventories; `[Inventory.Sort]`): A-Z, Type or Weight. Partial
+**Sort** (under Quick Stack, both inventories; `[QualityOfLife.InventorySort]`): A-Z, Type or Weight. Partial
 stacks of the same item are merged first, then the grid is laid out in reading order. The hotbar row
 stays as it is by default (`KeepHotbar`); character, provision and quiver slots never move.
 
-**Provision bar** (`[Inventory.Provisions]`): filled provision slots show beside the food diamonds
+**Provision bar** (`[QualityOfLife.Provisions]`): filled provision slots show beside the food diamonds
 in the Ragnarök HUD with their hotkeys (default Left Alt+1…6, rebindable in the settings window).
 A key eats or drinks from its slot like a hotbar key; Valheim's hotbar does not also fire on it.
 
@@ -170,9 +170,9 @@ Debug builds can capture a preview from the main menu, then quit:
 ## Server settings
 
 The server (a dedicated server, or the player hosting) decides the gameplay settings for everyone
-who joins: `[NearbyChests]` Enabled, Range, Crafting, Building and Stations; `[Inventory.QuickStack]
+who joins: `[QualityOfLife.NearbyChests]` Enabled, Range, Crafting, Building and Stations; `[QualityOfLife.QuickStack]
 Enabled`; `[Inventory]` CharacterSlots and ExtraUtilitySlots. It sends its values after each
-player's handshake and again whenever one changes. While its `[Server] LockSettings` is on (the
+player's handshake and again whenever one changes. While its `[Gameplay.Server] LockSettings` is on (the
 default), players use the server's values. Their F10 window shows those rows dimmed with "SET BY
 SERVER" and they cannot change them. Off: everyone uses their own.
 
@@ -204,10 +204,10 @@ This prevents writing to another player's stale chest inventory. The server deci
 settings (see Server settings). Each chest owner checks its configured
 range and permissions before granting access. Multiplayer gameplay still needs testing.
 
-Edit the `[NearbyChests]` section in the config and press **F7**:
+Edit the `[QualityOfLife.NearbyChests]` section in the config and press **F7**:
 
 ```ini
-[NearbyChests]
+[QualityOfLife.NearbyChests]
 Enabled = true
 Range = 20
 Crafting = true
@@ -315,3 +315,17 @@ Ideas go in [docs/INSPIRATION.md](docs/INSPIRATION.md).
 - [Jötunn development guide](https://valheim-modding.github.io/Jotunn/guides/quickstart.html)
 
 See [docs/VERIFICATION.md](docs/VERIFICATION.md) for completed checks and the runtime smoke-test command.
+
+
+## Source modules and settings
+
+See [module architecture and configuration migration](docs/ARCHITECTURE.md) for ownership, settings groups, migration behavior and verification commands.
+
+- `src/Ragnarok/HUD`: live HUD elements and their vanilla replacement/restoration logic.
+- `src/Ragnarok/Ui/Shared` and `Ui/Windows`: shared rendering and inventory/crafting/book windows.
+- `src/Ragnarok/Features`: gameplay modifiers, quality-of-life tools, equipment and nearby storage.
+- `src/Ragnarok/Configuration`: presentation/feature settings, schema migration and settings window.
+- `src/Ragnarok/Networking`: server configuration authority and transport.
+- `src/Ragnarok/Development`: opt-in runtime checks and isolated preview helpers.
+
+The F10 settings window now groups options under **Gameplay**, **Quality Of Life**, and **HUD**. Window and inventory appearance belong to HUD; convenience behaviors have their own Quality Of Life pages. Existing configuration values migrate automatically with a `.before-modules.bak` backup.
