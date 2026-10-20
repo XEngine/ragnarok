@@ -36,6 +36,8 @@ internal sealed class StatusStrip : IDisposable
         internal TextOutline TimerOutline = null!, NameOutline = null!;
         internal CanvasGroup Fade = null!;
         internal float Born;
+        internal float NextTooltip;
+        internal GuideTooltip Tooltip = null!;
     }
 
     internal StatusStrip(Theme theme, MonochromeIcons icons, Transform parent)
@@ -83,11 +85,11 @@ internal sealed class StatusStrip : IDisposable
             if (added)
             {
                 tile = new Tile { Root = Ugui.Node(root, "Buff"), Born = Time.unscaledTime };
-                tile.Plate = Ugui.Image(tile.Root, "Plate", theme.HudTile, Palette.Hex(0x0D1415)).At(0, 0, 34, 34);
+                tile.Plate = Ugui.Image(tile.Root, "Plate", theme.HudTile, Palette.HudGlass).At(0, 0, 34, 34);
                 tile.Edge = Ugui.Image(tile.Root, "Rim", theme.HudTileEdge, Palette.Moss).At(0, 0, 34, 34);
                 tile.Icon = Ugui.Image(tile.Root, "Icon", null, Palette.GoldBright).At(9, 9, 16, 16);
                 tile.Icon.preserveAspect = true;
-                tile.Timer = Ugui.Text(tile.Root, "Timer", "", theme.Strong, 9, Palette.Bone, TextAlignmentOptions.Center).At(2, 20, 30, 12);
+                tile.Timer = Ugui.Text(tile.Root, "Timer", "", theme.Numbers, 9, Palette.Bone, TextAlignmentOptions.Center).At(2, 20, 30, 12);
                 tile.Timer.enableAutoSizing = true;
                 tile.Timer.fontSizeMin = 8;
                 tile.Timer.fontSizeMax = 9;
@@ -103,7 +105,9 @@ internal sealed class StatusStrip : IDisposable
                 tile.TimerOutline = new TextOutline(tile.Timer);
                 tile.NameOutline = new TextOutline(tile.Name);
                 tile.Fade = tile.Root.gameObject.AddComponent<CanvasGroup>();
-                tile.Fade.blocksRaycasts = false;
+                tile.Fade.blocksRaycasts = true;
+                tile.Plate.raycastTarget = true;
+                tile.Tooltip = GuideTooltip.Attach(theme, tile.Root);
                 tiles.Add(status.Key, tile);
             }
             if (added || layoutChanged)
@@ -124,13 +128,23 @@ internal sealed class StatusStrip : IDisposable
                 : wet ? theme.IconDrop : icons.Get(status.Icon) ?? theme.GlyphEffect;
             Color accent = freezing ? Palette.Bone : rested ? Palette.Gold : fire ? Palette.Hex(0xE8A052) : wet ? Palette.Frost : Palette.Bone;
             tile.Icon.color = status.Flash ? accent.WithAlpha(0.7f + 0.3f * Mathf.Sin(Time.unscaledTime * 8)) : accent;
-            tile.Edge.color = freezing ? Palette.Health : shelter ? Palette.Bone : rested ? Palette.Gold : wet ? Palette.Frost.WithAlpha(0.7f) : Palette.Hex(0x4D5551);
-            tile.Plate.color = freezing ? Palette.Health : wet ? Palette.Hex(0x1C3546) : Palette.Hex(0x0D1415);
+            tile.Edge.color = (freezing ? Palette.Health : shelter ? Palette.Bone : rested ? Palette.Gold : wet ? Palette.Frost : Palette.Hex(0x4D5551)).WithAlpha(0.65f);
+            tile.Plate.color = freezing ? Palette.Hex(0x2D100D, Palette.HudGlassOpacity) : wet ? Palette.HudWetGlass : Palette.HudGlass;
             tile.Timer.color = wet ? Palette.Frost : Palette.Bone;
             tile.Timer.text = status.Key == SEMan.s_statusEffectResting ? comfort.ToString()
                 : string.IsNullOrEmpty(status.Value) ? "\u2014" : status.Value;
             tile.Name.gameObject.SetActive(labels);
             tile.Name.text = Localization.instance != null ? Localization.instance.Localize(status.Name) : status.Name;
+            if (Time.unscaledTime >= tile.NextTooltip)
+            {
+                tile.NextTooltip = Time.unscaledTime + 1;
+                StatusEffect? effect = Player.m_localPlayer ? Player.m_localPlayer.GetSEMan().GetStatusEffect(status.Key) : null;
+                string description = effect ? effect!.GetTooltipString() : "";
+                if (Localization.instance != null) description = Localization.instance.Localize(description);
+                string duration = string.IsNullOrEmpty(status.Value) ? "" : status.Value + "\n\n";
+                tile.Tooltip.Set(tile.Name.text, wet || freezing ? "STATUS · DEBUFF" : rested ? "STATUS · BUFF" : "STATUS EFFECT",
+                    duration + description);
+            }
             tile.TimerOutline.Sync();
             tile.NameOutline.Sync();
             tile.Fade.alpha = Mathf.Clamp01((Time.unscaledTime - tile.Born) / 0.3f);

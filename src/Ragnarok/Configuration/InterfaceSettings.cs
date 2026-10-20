@@ -106,7 +106,7 @@ internal sealed class InterfaceSettings
         NotificationStyle = config.Bind("HUD.Notifications", "Style", PanelStyle.FollowHud,
             "Ragnarok shows unlocks, pickups and small messages as plain text lines with inline quantities; " +
             "Vanilla keeps Valheim's. FollowHud uses the Ragnarök notifications whenever the Ragnarök HUD is on. " +
-            "Skill gains use their own toast; other centre messages stay Valheim's.");
+            "Includes compact skill pills, milestone banners and outlined centre messages.");
         Notifications = new HudPlacement(config, "HUD.Notifications", "notifications", ScreenAnchor.BottomLeft, 40f, 140f);
 
         CraftingStyle = config.Bind("HUD.Crafting", "Style", PanelStyle.FollowHud,
@@ -140,14 +140,14 @@ internal sealed class InterfaceSettings
         Keys = new HudPlacement(config, KeysSection, "key guide", ScreenAnchor.MiddleRight, 24f, 0f);
 
         Inventory = config.Bind("HUD.Inventory", "Style", InventoryStyle.FollowHud,
-            "Ragnarok shows the Ragnarök inventory grid and item card; Vanilla keeps Valheim's. FollowHud uses the Ragnarök inventory " +
+            "Ragnarok shows the Ragnarök grid and item card; Vanilla uses Valheim's wood, native slots and tooltips with the same categories, Quick Stack and character dashboard. FollowHud uses the Ragnarök inventory " +
             "whenever the Ragnarök HUD is on. Clicks, Shift-split, Ctrl-move and right-click use work as in Valheim.");
         InventoryScale = config.Bind("HUD.Inventory", "Scale", 1f, new ConfigDescription(
-            "Size of the Ragnarök inventory and its character column (Valheim's inventory keeps its own size), growing from the top-left into the free space " +
-            "before the info board and crafting panel (it stops short of them and of the screen's edges). In either style. " +
+            "Size of the Ragnarök inventory and its character column, growing from the top-left into the free space " +
+            "before the info board and crafting panel. Vanilla uses its native size and shrinks only as needed to fit the new panels. " +
             "1 is Valheim's own size.", new AcceptableValueRange<float>(0.75f, 1.3f)));
-        InventoryOpacity = config.Bind("HUD.Inventory", "BackgroundOpacity", 0.95f, new ConfigDescription(
-            "Opacity of the Ragnarök inventory and character panels' metal background.", new AcceptableValueRange<float>(0.2f, 1f)));
+        InventoryOpacity = config.Bind("HUD.Inventory", "BackgroundOpacity", 0.85f, new ConfigDescription(
+            "Smoked-glass opacity of the Ragnarök inventory, chest and character panels.", new AcceptableValueRange<float>(0.2f, 1f)));
 
 
         ProvisionBar = config.Bind("HUD.Provisions", "ShowInHud", true,
@@ -180,7 +180,7 @@ internal sealed class InterfaceSettings
             "Show the equipped helmet in the character portrait. Turn off to show the face and normal hair. Only affects the portrait.");
         Character = new HudPlacement(config, "HUD.Character", "character and food panel", ScreenAnchor.TopLeft, 40f, 34f);
         Power = new HudPlacement(config, "HUD.Power", "Forsaken power", ScreenAnchor.BottomLeft, 40f, 34f);
-        SkillToast = new HudPlacement(config, "HUD.SkillToast", "skill improved toast", ScreenAnchor.MiddleRight, 40f, -190f);
+        SkillToast = new HudPlacement(config, "HUD.SkillToast", "skill improved toast (default docks above the health/vitals panel)", ScreenAnchor.BottomCenter, 0f, 228f);
         Party = config.Bind("HUD.Character", "ShowPlayers", true,
             "Show up to three players sharing their map position. Health is shown only for loaded characters; no party membership is inferred.");
         MigrateFrom03(config);
@@ -209,6 +209,35 @@ internal sealed class InterfaceSettings
             if (ActionBarSpacing.Value == 7f) ActionBarSpacing.Value = 4f;
             layoutVersion.Value = 4;
         }
+        if (layoutVersion.Value < 5)
+        {
+            MigratePlacement(SkillToast, ScreenAnchor.MiddleRight, 40, -190);
+            layoutVersion.Value = 5;
+        }
+        if (layoutVersion.Value < 6)
+        {
+            if (Mathf.Approximately(InventoryOpacity.Value, 0.95f))
+                InventoryOpacity.Value = Palette.HudGlassOpacity;
+            layoutVersion.Value = 6;
+        }
+        if (layoutVersion.Value < 7)
+        {
+            if (Mathf.Approximately(InventoryOpacity.Value, Palette.HudGlassOpacity))
+                InventoryOpacity.Value = 0.42f;
+            layoutVersion.Value = 7;
+        }
+        if (layoutVersion.Value < 8)
+        {
+            if (Mathf.Approximately(InventoryOpacity.Value, 0.42f))
+                InventoryOpacity.Value = 0.72f;
+            layoutVersion.Value = 8;
+        }
+        if (layoutVersion.Value < 9)
+        {
+            if (Mathf.Approximately(InventoryOpacity.Value, 0.72f))
+                InventoryOpacity.Value = (float)InventoryOpacity.DefaultValue;
+            layoutVersion.Value = 9;
+        }
     }
 
     private static void MigratePlacement(HudPlacement placement, ScreenAnchor old, float x, float y)
@@ -219,12 +248,12 @@ internal sealed class InterfaceSettings
         placement.MarginY.Value = (float)placement.MarginY.DefaultValue;
     }
 
-    // Same backdrop choice as the vitals and status strip.
+    // Retain old local keys without rendering or exposing the removed backdrop feature.
     private static (ConfigEntry<HudBackground>, ConfigEntry<float>) Backdrop(ConfigFile config, string section, string what) =>
-        (config.Bind(section, "Background", HudBackground.Shade,
-                $"Backdrop behind the {what}. Shade is a soft feathered field; Plate is a chamfered plate with a gold rim."),
+        (config.Bind(section, "Background", HudBackground.None,
+                "Legacy backdrop setting, retained for compatibility. HUD backdrops have been removed."),
             config.Bind(section, "BackgroundOpacity", 0.5f, new ConfigDescription(
-                $"Opacity of the backdrop behind the {what}.", new AcceptableValueRange<float>(0f, 1f))));
+                "Legacy backdrop opacity; ignored.", new AcceptableValueRange<float>(0f, 1f))));
 
     // 0.3.0 kept every HUD setting in [HUD]; carry those values into the new sub-sections once.
     private void MigrateFrom03(ConfigFile config)

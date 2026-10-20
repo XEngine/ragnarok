@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,6 +10,10 @@ namespace Ragnarok.HUD;
 // from loaded characters. Distant players have a distance, never an invented health value.
 internal sealed class CharacterHud : IDisposable
 {
+    internal const float PortraitSize = 92, FoodSize = 46;
+    private const float StatsLeft = 12;
+    internal const float FoodLeft = StatsLeft, FoodLabelLeft = StatsLeft;
+    private readonly List<TextOutline> outlines = new();
     private readonly InterfaceSettings settings;
     private readonly RectTransform root, roster;
     internal readonly RectTransform FoodRoot;
@@ -25,10 +30,14 @@ internal sealed class CharacterHud : IDisposable
         this.settings = settings;
         root = Ugui.Node(parent, "Ragnarok Character");
         root.sizeDelta = new Vector2(310, 436);
-        Ugui.Image(root, "Portrait", theme.Disc, Palette.Hex(0x182321)).At(4, 4, 84, 84);
+        // A continuous dark silhouette supports the decorative rim on bright scenery.
+        // Keep the captured face at 84 units; fill the annulus behind it separately.
+        Ugui.Image(root, "Portrait silhouette", theme.Disc, Palette.Hex(0x080C0D)).At(-1, -1, PortraitSize + 2, PortraitSize + 2);
+        Ugui.Image(root, "Portrait", theme.Disc, Palette.Hex(0x182321)).At(0, 0, PortraitSize, PortraitSize);
         Ugui.Image(root, "Portrait Rim", theme.HudPortraitRing, Color.white).At(0, 0, 92, 92);
-        Image rune = Ugui.Image(root, "Rune", theme.HudRune, Palette.Gold).At(27, 28, 38, 38);
+        TextMeshProUGUI rune = Ugui.Text(root, "Rune", "ᚱ", theme.Runic, 38, Palette.Gold, TextAlignmentOptions.Center).At(27, 24, 38, 46);
         portrait = new CharacterPortrait(theme, root, rune);
+        outlines.Add(new TextOutline(rune));
         name = Ugui.Text(root, "Name", "", theme.Heading, 26, Palette.Bone).At(110, -5, 205, 43);
         name.richText = false;
         name.overflowMode = TextOverflowModes.Overflow;
@@ -36,10 +45,10 @@ internal sealed class CharacterHud : IDisposable
         name.fontSizeMin = 16;
         name.fontSizeMax = 26;
         // Compact stats under the rune: brass glyphs and parchment figures, without a frame.
-        Ugui.Image(root, "Armor icon", theme.GlyphShield, Palette.Gold).At(12, 99, 14, 14);
-        armor = Ugui.Text(root, "Armor", "", theme.Strong, 14, Palette.Bone).At(34, 95, 64, 22);
-        weightIcon = Ugui.Image(root, "Carry weight icon", theme.GlyphWeight, Palette.Gold).At(12, 121, 14, 14);
-        weight = Ugui.Text(root, "Carry weight", "", theme.Strong, 13, Palette.Bone).At(34, 117, 112, 22);
+        Ugui.Image(root, "Armor icon", theme.InventoryShield, Palette.Gold).At(StatsLeft, 99, 14, 14);
+        armor = Ugui.Text(root, "Armor", "", theme.Numbers, 14, Palette.Bone).At(34, 95, 64, 22);
+        weightIcon = Ugui.Image(root, "Carry weight icon", theme.GlyphWeight, Palette.Gold).At(StatsLeft, 121, 14, 14);
+        weight = Ugui.Text(root, "Carry weight", "", theme.Numbers, 13, Palette.Bone).At(34, 117, 112, 22);
         weight.overflowMode = TextOverflowModes.Overflow;
         FoodRoot = Ugui.Node(root, "Food").At(0, 156, 310, 110);
         roster = Ugui.Node(root, "Visible players").At(0, 240, 270, 145);
@@ -50,15 +59,21 @@ internal sealed class CharacterHud : IDisposable
             rows[i] = row.gameObject;
             Ugui.Image(row, "Badge", theme.HudTile, Palette.Hex(0x182321)).At(0, 0, 42, 42);
             Ugui.Image(row, "Badge Rim", theme.HudTileEdge, Palette.Moss).At(0, 0, 42, 42);
-            Ugui.Image(row, "Rune", theme.HudRune, Palette.Bone).At(11, 10, 20, 22);
-            names[i] = Ugui.Text(row, "Name", "", theme.Strong, 14, Palette.Bone).At(54, 4, 130, 24);
+            Ugui.Text(row, "Rune", "ᚱ", theme.Runic, 22, Palette.Bone, TextAlignmentOptions.Center).At(9, 6, 24, 30);
+            names[i] = Ugui.Text(row, "Name", "", theme.Heading, 14, Palette.Bone).At(54, 4, 130, 24);
             names[i].richText = false;
             names[i].overflowMode = TextOverflowModes.Truncate;
-            distances[i] = Ugui.Text(row, "Distance", "", theme.Strong, 12, Palette.Muted, TextAlignmentOptions.MidlineRight).At(185, 4, 55, 24);
+            distances[i] = Ugui.Text(row, "Distance", "", theme.Numbers, 12, Palette.Muted, TextAlignmentOptions.MidlineRight).At(185, 4, 55, 24);
+            outlines.Add(new TextOutline(names[i]));
+            outlines.Add(new TextOutline(distances[i]));
             health[i] = Ugui.Image(row, "Health", theme.White, Palette.Health).At(54, 30, 186, 4);
             health[i].type = Image.Type.Filled;
             health[i].fillMethod = Image.FillMethod.Horizontal;
         }
+        outlines.Add(new TextOutline(name));
+        outlines.Add(new TextOutline(armor));
+        outlines.Add(new TextOutline(weight));
+        outlines.Add(new TextOutline(partyTitle));
     }
 
     internal void SetVisible(bool visible) => root.gameObject.SetActive(visible);
@@ -72,8 +87,16 @@ internal sealed class CharacterHud : IDisposable
         float foodY = Mathf.Max(156, 40 + StatusStrip.HeightFor(statusCount, settings.StatusLabels.Value));
         FoodRoot.anchoredPosition = new Vector2(0, -foodY);
         roster.anchoredPosition = new Vector2(0, -foodY - 104 - (settings.ProvisionBar.Value ? 44 : 0));
-        if (Time.unscaledTime < refresh) return;
-        refresh = Time.unscaledTime + 0.5f;
+        if (Time.unscaledTime >= refresh)
+        {
+            refresh = Time.unscaledTime + 0.5f;
+            Refresh(preview);
+        }
+        foreach (TextOutline outline in outlines) outline.Sync();
+    }
+
+    private void Refresh(bool preview)
+    {
         Player player = Player.m_localPlayer;
         armor.text = (preview ? 93 : player ? Mathf.RoundToInt(player.GetBodyArmor()) : 0).ToString();
         float carried = preview ? 67 : player ? player.GetInventory().GetTotalWeight() : 0;

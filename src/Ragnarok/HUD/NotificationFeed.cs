@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using HarmonyLib;
 using TMPro;
 using UnityEngine;
@@ -8,22 +9,20 @@ using UnityEngine.UI;
 
 namespace Ragnarok.HUD;
 
-// Ragnarök notifications: Valheim's unlock messages (new recipe, piece, station, material, trophy,
-// item) and small top-left messages (pickups, toggles) become plain text rows, stacked where
-// [HUD.Notifications] places them. Skill gains use their own toast; other centre messages stay vanilla. Both still go to the message log.
+// Guide 02: four glass cards, semantic accents, merged pickups, separate skill
+// pills/milestones and a non-interactive centre-message channel. Native log stays intact.
 internal sealed class NotificationFeed : IDisposable
 {
-    private const float CardWidth = 320, CardHeight = 58, RowHeight = 28, Spacing = 6;
-    private const float CardLife = 5.5f, RowLife = 3.5f, FadeIn = 0.2f, FadeOut = 0.45f;
-    private const int MaxShown = 7;
-
-    internal static NotificationFeed? Instance;
-
+    private const float Width = 360, Height = 46, Spacing = 6, Life = 4;
+    private const float CardOpacity = Palette.HudGlassOpacity;
     private readonly InterfaceSettings settings;
     private readonly Theme theme;
     private readonly List<Entry> entries = new();
     private GameObject? hudRoot;
     private RectTransform? root, skillRoot;
+    private Entry? skill;
+    private CentreMessages? centre;
+    internal static NotificationFeed? Instance;
 
     internal NotificationFeed(InterfaceSettings settings, Theme theme)
     {
@@ -32,7 +31,6 @@ internal sealed class NotificationFeed : IDisposable
         Instance = this;
     }
 
-    // Valheim's messages are taken over only while this is true (and a HUD exists to draw them in).
     internal bool Active
     {
         get
@@ -53,205 +51,241 @@ internal sealed class NotificationFeed : IDisposable
     internal void Tick()
     {
         GameObject? parent = global::Hud.instance ? global::Hud.instance.m_rootObject : null;
-        if (parent != hudRoot)
-        {
-            Dispose();
-            hudRoot = parent;
-        }
-        if (!hudRoot || !Wanted)
-        {
-            Dispose();
-            return;
-        }
+        if (parent != hudRoot) { Dispose(); hudRoot = parent; }
+        if (!hudRoot || !Wanted) { Dispose(); return; }
         if (!root)
         {
             root = Ugui.Node(hudRoot!.transform, "Ragnarok Notifications");
-            root.sizeDelta = new Vector2(CardWidth, 0);
             skillRoot = Ugui.Node(hudRoot.transform, "Ragnarok Skill Toasts");
-            skillRoot.sizeDelta = new Vector2(CardWidth, 200);
+            skillRoot.sizeDelta = new Vector2(Width, 52);
+            centre = new CentreMessages(theme, hudRoot.transform);
         }
-        float feedHeight = 0;
-        float time = Time.unscaledTime;
+        float now = Time.unscaledTime;
         for (int i = entries.Count - 1; i >= 0; i--)
-            if (time - entries[i].Born <= (entries[i].Card ? CardLife : RowLife) + FadeOut && entries.Count - i <= MaxShown && !entries[i].Skill)
-                feedHeight += entries[i].Height + Spacing;
-        root!.sizeDelta = new Vector2(CardWidth, Mathf.Max(0, feedHeight - Spacing));
-        settings.Notifications.Apply(root!);
+            if (now - entries[i].Born >= Life) { entries[i].Destroy(); entries.RemoveAt(i); }
+        float feedHeight = Mathf.Max(0, entries.Count * (Height + Spacing) - Spacing);
+        root!.sizeDelta = new Vector2(Width, feedHeight);
+        settings.Notifications.Apply(root);
         settings.SkillToast.Apply(skillRoot!);
-        skillRoot!.localScale = Vector3.one * settings.HudScale.Value;
-        root!.localScale = Vector3.one * settings.HudScale.Value;
-
-        // Newest nearest the chosen edge; entries ease towards their slots and fade by age.
-        float now = Time.unscaledTime, y = 0, skillY = 0;
-        for (int i = entries.Count - 1; i >= 0; i--)
+        root.localScale = skillRoot!.localScale = Vector3.one * settings.HudScale.Value;
+        if (hudRoot!.transform is RectTransform canvas)
+            skillRoot.localScale = Vector3.one * Mathf.Min(settings.HudScale.Value,
+                Mathf.Max(1, canvas.rect.width - 32) / skillRoot.rect.width);
+        RectTransform? vitals = RagnarokHud.ShownVitals;
+        if (vitals && vitals!.gameObject.activeInHierarchy && settings.SkillToast.Position.Value == ScreenAnchor.BottomCenter &&
+            settings.SkillToast.MarginX.Value == 0 && settings.SkillToast.MarginY.Value == 228)
         {
-            Entry e = entries[i];
-            float age = now - e.Born, life = e.Card ? CardLife : RowLife;
-            if (age > life + FadeOut || entries.Count - i > MaxShown)
-            {
-                e.Destroy();
-                entries.RemoveAt(i);
-                continue;
-            }
-            float alpha = Mathf.Clamp01(age / FadeIn) * (1f - Mathf.Clamp01((age - life) / FadeOut));
-            float slide = (1f - Mathf.Clamp01(age / FadeIn)) * -24f;
-            if (e.Skill)
-            {
-                e.Place(-slide, skillY, alpha, settings.SkillToast);
-                skillY += e.Height + Spacing;
-            }
-            else
-            {
-                bool bottom = (int)settings.Notifications.Position.Value >= 6;
-                e.Place(slide, bottom ? root.sizeDelta.y - y - e.Height : y, alpha, settings.Notifications);
-                y += e.Height + Spacing;
-            }
+            skillRoot.position = vitals.TransformPoint(new Vector3(vitals.rect.center.x, vitals.rect.yMax, 0));
+            skillRoot.position += vitals.TransformVector(new Vector3(0, 12, 0));
+            Utils.ClampUIToScreen(skillRoot);
         }
+        root.gameObject.SetActive(!global::Hud.IsUserHidden());
+        skillRoot.gameObject.SetActive(!global::Hud.IsUserHidden());
+        // Oldest at the top; newest at the bottom for the default bottom-left stack.
+        for (int i = 0; i < entries.Count; i++) entries[i].Place(i * (Height + Spacing), now, settings.Notifications);
+        if (skill != null)
+        {
+            if (now - skill.Born >= Life) { skill.Destroy(); skill = null; }
+            else skill.Place(0, now, settings.SkillToast);
+        }
+        centre!.Tick(settings.HudScale.Value);
     }
 
     public void Dispose()
     {
-        foreach (Entry e in entries) e.Destroy();
+        foreach (Entry entry in entries) entry.Destroy();
         entries.Clear();
-        if (root) UnityEngine.Object.Destroy(root!.gameObject);
-        root = null;
-        if (skillRoot) UnityEngine.Object.Destroy(skillRoot.gameObject);
-        skillRoot = null;
+        skill?.Destroy();
+        skill = null;
+        centre?.Dispose();
+        centre = null;
+        if (root) { root!.gameObject.SetActive(false); UnityEngine.Object.Destroy(root.gameObject); }
+        if (skillRoot) { skillRoot!.gameObject.SetActive(false); UnityEngine.Object.Destroy(skillRoot.gameObject); }
+        root = skillRoot = null;
+    }
+
+    private void Add(Entry entry)
+    {
+        if (entries.Count == 4) { entries[0].Destroy(); entries.RemoveAt(0); }
+        entries.Add(entry);
     }
 
     internal void Unlock(Sprite? icon, string topic, string name)
     {
-        if (!root) return;
-        Message(icon, topic + ": " + Highlight(name), 0);
+        if (root) Add(Entry.Card(theme, root!, icon ?? theme.IconHammer, topic.ToUpperInvariant(), name,
+            InventoryCategories.Gold, Palette.Hex(0x0C0F11, CardOpacity), 0));
     }
 
-    internal static string Highlight(string text) => "<color=#C5A65C>" + text + "</color>";
+    internal static string Highlight(string text) => "<b>" + text + "</b>";
 
-    internal void SkillImproved(Sprite? icon, string text)
+    internal void SkillImproved(Sprite? icon, string raw)
     {
         if (!skillRoot) return;
-        Entry entry = Entry.MakeCard(theme, skillRoot, icon,
-            Localization.instance.Localize("$msg_skillup"), text);
-        entry.Skill = true;
-        entries.Add(entry);
-    }
-
-    // A repeat of a recent row (same text and icon) adds to its amount instead of stacking up.
-    internal void Message(Sprite? icon, string text, int amount)
-    {
-        if (!root) return;
-        foreach (Entry e in entries)
-            if (!e.Card && e.Text == text && e.Icon == icon && e.HasAmount == (amount > 0) && Time.unscaledTime - e.Born < RowLife)
-            {
-                e.Bump(amount);
-                return;
-            }
-        entries.Add(Entry.MakeRow(theme, root!, icon, text, amount));
-    }
-
-    // The settings window's test button: through Valheim's own calls, so it shows whichever style is on.
-    internal static void Test()
-    {
-        if (!MessageHud.instance)
+        string localized = Localization.instance.Localize(raw);
+        Match match = Regex.Match(raw, @"\$skill_(\w+):\s*(\d+)");
+        if (match.Success && int.TryParse(match.Groups[2].Value, out int level) && level > 0 && level % 10 == 0)
         {
-            Debug.Log("[Ragnarok] Test notification: no game HUD yet (load a world first).");
+            string name = Localization.instance.Localize("$skill_" + match.Groups[1].Value);
+            string description = "";
+            if (Enum.TryParse(match.Groups[1].Value, true, out Skills.SkillType type) && Player.m_localPlayer)
+            {
+                Skills.SkillDef? definition = Player.m_localPlayer.GetSkills().m_skills.Find(s => s.m_skill == type);
+                if (definition != null) description = Localization.instance.Localize(definition.m_description);
+            }
+            centre!.Skill(name, level, description);
+            skill?.Destroy();
+            skill = null;
             return;
         }
+        skill?.Destroy();
+        skill = Entry.Pill(theme, skillRoot!, localized);
+    }
+
+    internal void Centre(string raw) => centre?.System(raw);
+
+    internal void Preview(string kind)
+    {
+        string Local(string raw) => Localization.instance.Localize(raw);
+        switch (kind)
+        {
+            case "clear":
+                foreach (Entry entry in entries) entry.Destroy();
+                entries.Clear();
+                skill?.Destroy();
+                skill = null;
+                centre?.Clear();
+                break;
+            case "pickup":
+                ItemDrop.ItemData? wood = ObjectDB.instance?.GetItemPrefab("Wood")?.GetComponent<ItemDrop>()?.m_itemData;
+                string text = "Picked up " + Highlight(Local(wood?.m_shared.m_name ?? "Wood"));
+                Message(wood?.GetIcon(), text, 2);
+                Message(wood?.GetIcon(), text, 3);
+                break;
+            case "unlock": Unlock(null, "New recipe", "Bronze Mace · Forge"); break;
+            case "rested": Message(null, "You feel rested", 0, "rested"); break;
+            case "wet": Message(null, "You are wet", 0, "wet"); break;
+            case "warning": Message(null, "Inventory full", 0, "inventoryfull"); break;
+            case "skill": SkillImproved(null, "$skill_run: 42"); break;
+            case "milestone": SkillImproved(null, "$skill_run: 40"); break;
+            case "system": Centre("Your bed is too far from a fire"); break;
+            case "blocked": Centre("Building blocked · enemies nearby"); break;
+            case "failure": centre?.System("Not enough stamina", failure: true); break;
+            default: centre?.Preview(kind); break;
+        }
+    }
+
+    internal void Message(Sprite? icon, string text, int amount, string raw = "")
+    {
+        if (!root) return;
+        foreach (Entry entry in entries)
+            if (entry.Text == text && entry.Icon == icon && entry.HasAmount == (amount > 0) && Time.unscaledTime - entry.Born < Life)
+            { entry.Bump(amount); return; }
+        bool wet = raw.IndexOf("wet", StringComparison.OrdinalIgnoreCase) >= 0;
+        bool danger = raw.Contains("inventoryfull") || raw.Contains("noroom") || raw.Contains("freez");
+        bool rested = raw.IndexOf("rested", StringComparison.OrdinalIgnoreCase) >= 0;
+        Color accent = danger ? Palette.Hex(0xD64A3E) : wet ? Palette.Hex(0x8FC1E8) : rested ? InventoryCategories.Gold : Palette.Hex(0x626B64);
+        Color surface = danger ? Palette.Hex(0x2D100D, CardOpacity) : wet ? Palette.Hex(0x17252D, CardOpacity) : Palette.Hex(0x0C0F11, CardOpacity);
+        Entry next = Entry.Card(theme, root!, icon ?? (wet ? theme.IconDrop : rested ? theme.HudMoon : danger ? theme.GlyphAlert : null), "", text, accent, surface, amount);
+        next.Icon = icon; // Merge by the source identity, not its presentation fallback.
+        Add(next);
+    }
+
+    internal static void Test()
+    {
+        if (!MessageHud.instance) { Debug.Log("[Ragnarok] Load a world before testing notifications."); return; }
         ItemDrop.ItemData? sword = ObjectDB.instance?.GetItemPrefab("SwordIron")?.GetComponent<ItemDrop>()?.m_itemData;
         ItemDrop.ItemData? wood = ObjectDB.instance?.GetItemPrefab("Wood")?.GetComponent<ItemDrop>()?.m_itemData;
         MessageHud.instance.QueueUnlockMsg(sword?.GetIcon(), "$msg_newrecipe", sword?.m_shared.m_name ?? "Iron sword");
         MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, wood?.m_shared.m_name ?? "Wood", 3, wood?.GetIcon());
-        MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, "$msg_walk $hud_on");
+        MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, wood?.m_shared.m_name ?? "Wood", 2, wood?.GetIcon());
+        MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "The path ahead is clear");
         MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, "$msg_skillup $skill_run: 42");
     }
 
     private sealed class Entry
     {
-        internal readonly bool Card;
-        internal bool Skill;
         internal readonly string Text;
-        internal readonly Sprite? Icon;
+        internal Sprite? Icon;
         internal float Born;
-        internal readonly float Height;
-        private readonly RectTransform rect;
-        private readonly CanvasGroup group;
-        private readonly HudBackdrop? backdrop;
-        private readonly TextMeshProUGUI? rowText;
         internal bool HasAmount => amount > 0;
+        private readonly RectTransform rect;
+        private readonly CanvasGroup fade;
+        private readonly TextMeshProUGUI? count;
         private int amount;
 
-        private Entry(bool card, string text, Sprite? icon, RectTransform rect, HudBackdrop? backdrop, float height,
-            TextMeshProUGUI? rowText, int amount)
+        private Entry(Theme theme, RectTransform rect, string text, Sprite? icon, TextMeshProUGUI? count, int amount)
         {
-            Card = card;
+            this.rect = rect;
             Text = text;
             Icon = icon;
-            Born = Time.unscaledTime;
-            Height = height;
-            this.rect = rect;
-            this.backdrop = backdrop;
-            this.rowText = rowText;
+            this.count = count;
             this.amount = amount;
-            group = rect.gameObject.AddComponent<CanvasGroup>();
-            group.alpha = 0;
-            group.blocksRaycasts = false;
-        }
-
-        internal static Entry MakeCard(Theme theme, RectTransform parent, Sprite? icon, string topic, string name)
-        {
-            RectTransform rect = Ugui.Node(parent, "Unlock").At(0, 0, CardWidth, CardHeight);
-            HudBackdrop backdrop = new(theme, rect, new Vector4(14, 6, 14, 6));
-            Ugui.Image(rect, "Surface", theme.Minimal, Color.white).Stretch();
-            Ugui.Image(rect, "Accent", theme.White, Palette.GoldBright).At(0, 8, 3, CardHeight - 16);
-            Ugui.Image(rect, "Rim", theme.Slot, Color.white).At(12, 7, 44, 44);
-
-            Image picture = Ugui.Image(rect, "Icon", icon, Color.white).At(22, 17, 24, 24);
-            Ugui.ItemIcon(picture);
-            picture.enabled = icon;
-            // Small gold category over a parchment title.
-            Ugui.Text(rect, "Topic", topic.ToUpperInvariant(), theme.Strong, 11, Palette.GoldBright).At(66, 4, CardWidth - 76, 21);
-            Ugui.Text(rect, "Name", name, theme.Heading, 18, Palette.Bone).At(66, 22, CardWidth - 76, 27);
-            return new Entry(true, name, icon, rect, backdrop, CardHeight, null, 0);
-        }
-
-        internal static Entry MakeRow(Theme theme, RectTransform parent, Sprite? icon, string text, int amount)
-        {
-            RectTransform rect = Ugui.Node(parent, "Message").At(0, 0, CardWidth, RowHeight);
-            TextMeshProUGUI label = Ugui.Text(rect, "Text", text, theme.Strong, 16, Palette.Bone)
-                .At(0, 0, CardWidth, RowHeight);
-            Entry entry = new(false, text, icon, rect, null, RowHeight, label, amount);
-            entry.ShowAmount();
-            return entry;
-        }
-
-        internal void Bump(int more)
-        {
-            amount += Mathf.Max(0, more);
-            Born = Time.unscaledTime - FadeIn; // Stay fully shown, restart the clock.
+            Born = Time.unscaledTime;
+            fade = rect.gameObject.AddComponent<CanvasGroup>();
+            fade.blocksRaycasts = fade.interactable = false;
+            fade.alpha = 0;
             ShowAmount();
         }
 
-        private void ShowAmount()
+        internal static Entry Card(Theme theme, Transform parent, Sprite? icon, string topic, string text, Color accent, Color surface, int amount)
         {
-            if (rowText != null) rowText.text = Text + (amount > 0 ? " x" + amount : "");
+            RectTransform rect = Ugui.Node(parent, "Notification").At(0, 0, Width, Height);
+            Ugui.Image(rect, "Glass", theme.PackSurface, surface).Stretch();
+            Ugui.Image(rect, "Edge", theme.PackEdge, accent.WithAlpha(0.45f)).Stretch();
+            Ugui.Image(rect, "Icon well", theme.HudKeySurface, Palette.Hex(0x0C0F11, 0.4f)).At(8, 8, 30, 30);
+            Ugui.Image(rect, "Icon rim", theme.HudKeyEdge, accent.WithAlpha(0.65f)).At(8, 8, 30, 30);
+            Image picture = Ugui.Image(rect, "Icon", icon ?? theme.Diamond, icon ? Color.white : Palette.Muted).At(15, 15, 16, 16);
+            Ugui.ItemIcon(picture);
+            if (topic.Length > 0)
+                Ugui.Text(rect, "Topic", topic, theme.Strong, 10, accent, spacing: 1.5f).At(48, 5, Width - 60, 15);
+            TextMeshProUGUI label = Ugui.Text(rect, "Text", text, theme.Strong, 13, Palette.Bone, wrap: true)
+                .At(48, topic.Length > 0 ? 20 : 5, Width - 100, topic.Length > 0 ? 22 : 36);
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 10;
+            label.fontSizeMax = 13;
+            TextMeshProUGUI count = Ugui.Text(rect, "Amount", "", theme.Numbers, 13, InventoryCategories.Gold, TextAlignmentOptions.MidlineRight)
+                .At(Width - 48, 0, 36, Height);
+            return new Entry(theme, rect, text, icon, count, amount);
         }
 
-        internal void Place(float x, float y, float alpha, HudPlacement placement)
+        internal static Entry Pill(Theme theme, RectTransform parent, string text)
         {
-            Vector2 target = new(x, -y);
-            rect.anchoredPosition = Vector2.Lerp(rect.anchoredPosition, target, 0.35f);
-            group.alpha = alpha;
-            backdrop?.Apply(placement);
+            const float height = 52;
+            RectTransform rect = Ugui.Node(parent, "Skill improved").At(0, 0, Width, height);
+            Ugui.Image(rect, "Glass", theme.SkillPill, Palette.Hex(0x0C0F11, CardOpacity)).Stretch();
+            Ugui.Image(rect, "Edge", theme.SkillPillEdge, Palette.Hex(0x626B64, 0.55f)).Stretch();
+            Ugui.Image(rect, "Badge", theme.Disc, InventoryCategories.Gold).At(11, 11, 30, 30);
+            Ugui.Image(rect, "Arrow", theme.SkillUp, Palette.Hex(0x101719)).At(18, 18, 16, 16).preserveAspect = true;
+            TextMeshProUGUI caption = Ugui.Text(rect, "Caption", Localization.instance.Localize("$msg_skillup"), theme.Body, 14, Palette.Muted);
+            float captionWidth = Mathf.Clamp(caption.preferredWidth, 60, 180);
+            caption.At(53, 0, captionWidth, height);
+            caption.enableAutoSizing = true;
+            caption.fontSizeMin = 11;
+            caption.fontSizeMax = 14;
+            TextMeshProUGUI name = Ugui.Text(rect, "Skill", text.Replace(": ", " "), theme.Heading, 18, Palette.Bone,
+                TextAlignmentOptions.MidlineRight);
+            float nameX = 53 + captionWidth + 20;
+            float width = Mathf.Min(nameX + name.preferredWidth + 20, 560);
+            rect.sizeDelta = parent.sizeDelta = new Vector2(width, height);
+            name.At(nameX, 0, width - nameX - 20, height);
+            name.enableAutoSizing = true;
+            name.fontSizeMin = 12;
+            name.fontSizeMax = 18;
+            return new Entry(theme, rect, text, null, null, 0);
         }
 
-        internal void Destroy()
+        internal void Bump(int more) { amount += Mathf.Max(0, more); Born = Time.unscaledTime - 0.15f; ShowAmount(); }
+        private void ShowAmount() { if (count) count!.text = amount > 0 ? "×" + amount : ""; }
+        internal void Place(float y, float now, HudPlacement placement)
         {
-            if (rect) UnityEngine.Object.Destroy(rect.gameObject);
+            rect.anchoredPosition = Vector2.Lerp(rect.anchoredPosition, new Vector2(0, -y), 1 - Mathf.Exp(-18 * Time.unscaledDeltaTime));
+            float age = now - Born;
+            fade.alpha = Mathf.Clamp01(age / 0.15f) * Mathf.Clamp01((Life - age) / 0.3f);
         }
+        internal void Destroy() { if (rect) { rect.gameObject.SetActive(false); UnityEngine.Object.Destroy(rect.gameObject); } }
     }
 }
-
-// Unlock messages become Ragnarök text rows while the feed is active; the log still records them.
+// Unlock cards keep the native message log; their visual queue belongs to the feed.
 [HarmonyPatch(typeof(MessageHud), nameof(MessageHud.QueueUnlockMsg))]
 internal static class UnlockMessagePatch
 {
@@ -268,7 +302,8 @@ internal static class UnlockMessagePatch
     }
 }
 
-// Top-left messages become Ragnarök rows; centre messages are left to Valheim.
+// Route native notifications and centre messages without changing their source
+// events or log behavior. Explicit messages over a hidden HUD stay native.
 [HarmonyPatch(typeof(MessageHud), nameof(MessageHud.ShowMessage))]
 internal static class TopLeftMessagePatch
 {
@@ -279,10 +314,11 @@ internal static class TopLeftMessagePatch
     {
         NotificationFeed? feed = NotificationFeed.Instance;
         bool skill = text.StartsWith("$msg_skillup ", StringComparison.Ordinal);
-        if ((!skill && type != MessageHud.MessageType.TopLeft) || feed == null || !feed.Active) return true;
-        if (global::Hud.IsUserHidden() && !showDespiteHiddenHUD) return false;
+        if ((type != MessageHud.MessageType.TopLeft && type != MessageHud.MessageType.Center) || feed == null || !feed.Active) return true;
+        if (global::Hud.IsUserHidden()) return showDespiteHiddenHUD;
         string localized = Localization.instance.Localize(text);
-        if (skill) feed.SkillImproved(icon, Localization.instance.Localize(text.Substring("$msg_skillup ".Length)));
+        if (skill) feed.SkillImproved(icon, text.Substring("$msg_skillup ".Length));
+        else if (type == MessageHud.MessageType.Center) feed.Centre(text);
         else
         {
             string styled = text;
@@ -294,7 +330,7 @@ internal static class TopLeftMessagePatch
                 string item = text.Substring(itemStart, itemEnd - itemStart);
                 styled = text.Substring(0, itemStart) + NotificationFeed.Highlight(Localization.instance.Localize(item)) + text.Substring(itemEnd);
             }
-            feed.Message(icon, Localization.instance.Localize(styled), amount);
+            feed.Message(icon, Localization.instance.Localize(styled), amount, text);
         }
         if (log) AddLog?.Invoke(__instance, new object[] { localized });
         return false;

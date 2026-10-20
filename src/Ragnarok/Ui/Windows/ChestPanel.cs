@@ -15,7 +15,7 @@ namespace Ragnarok.UI.Windows;
 // before. Follows the Inventory style.
 internal sealed class ChestPanel : IDisposable
 {
-    private const float Pad = 16, Gap = 6, Footer = 28, MinWidth = 470;
+    private const float Pad = 12, Gap = 6, Footer = 28, MinWidth = 470, HeaderHeight = 90;
 
     private static readonly AccessTools.FieldRef<InventoryGrid, Vector2i> GamepadSelection =
         AccessTools.FieldRefAccess<InventoryGrid, Vector2i>("m_selected");
@@ -33,8 +33,9 @@ internal sealed class ChestPanel : IDisposable
     private RectTransform? root;
     private Image? frame;
     private ItemCard? card;
-    private TextMeshProUGUI? title;
-    private StatLine? stats;
+    private InventoryGuide.Summary? summary;
+    private readonly List<InventoryGuide.Tab> categoryChips = new();
+    private PackCategory category;
     private int builtWidth, builtHeight;
     private float builtSize;
     private SlotView? hovered;
@@ -52,14 +53,7 @@ internal sealed class ChestPanel : IDisposable
         InventoryGui current = InventoryGui.instance;
         if (current != gui)
         {
-            // New game scene: the previous objects went with the old one.
-            undo.Clear();
-            maskedChildren.Clear();
-            maskedGroups.Clear();
-            vanillaBackground = null;
-            slots.Clear();
-            root = null;
-            card = null;
+            Restore();
             gui = current;
         }
         if (!gui) return;
@@ -105,6 +99,7 @@ internal sealed class ChestPanel : IDisposable
         root = null;
         card = null;
         slots.Clear();
+        categoryChips.Clear();
         hovered = null;
     }
 
@@ -118,53 +113,51 @@ internal sealed class ChestPanel : IDisposable
         builtSize = size;
         int cols = builtWidth, rows = builtHeight;
 
-        // After the style guide: the slots on a plain board, the chest's name and its actions along the foot,
-        // its weight on a tab hanging under the left edge.
         float gridHeight = rows * size + (rows - 1) * Gap;
-        float width = Mathf.Max(Pad * 2 + cols * size + (cols - 1) * Gap, MinWidth);
-        float footerY = Pad + gridHeight + 10, height = footerY + Footer + Pad;
+        float gridWidth = cols * size + (cols - 1) * Gap;
+        float width = Mathf.Max(Pad * 2 + gridWidth, MinWidth);
+        float boardHeight = Pad * 2 + gridHeight;
+        float footerY = HeaderHeight + boardHeight, height = footerY + Footer + Pad;
+        float gridX = (width - gridWidth) / 2;
 
         root = Ugui.Node(panel, "Ragnarok Chest").At(0, 0, width, height);
-        // Raycast target: clicks on the frame must not fall through to Valheim's "drop item" area.
-        frame = Ugui.Image(root, "Frame", theme.Board, Color.white, raycast: true).Stretch();
-        stats = new StatLine(theme, root, 0, height, withArmor: false, hang: true, left: 14);
+        frame = Ugui.Image(root, "Frame", theme.PackSurface, Palette.HudGlass, raycast: true)
+            .Stretch();
+        Ugui.Image(root, "Frame Edge", theme.PackEdge, Palette.Hex(0x3D4541)).Stretch();
+        summary = new InventoryGuide.Summary(theme, root, width, "STORAGE", withArmor: false);
+        InventoryGuide.Tabs(theme, root, Pad, 50, categoryChips, value => category = value);
 
         InventoryGrid grid = gui!.ContainerGrid;
         for (int y = 0; y < rows; y++)
             for (int x = 0; x < cols; x++)
             {
-                SlotView slot = new(theme, root, new Rect(Pad + x * (size + Gap), Pad + y * (size + Gap), size, size), new Vector2i(x, y), null);
+                SlotView slot = new(theme, root, new Rect(gridX + x * (size + Gap), HeaderHeight + Pad + y * (size + Gap), size, size), new Vector2i(x, y), null, guide: true);
                 slot.Input.Down = button => Click(grid, slot, button);
                 slot.Input.Hover = on => hovered = on ? slot : hovered == slot ? null : hovered;
                 slots.Add(slot);
             }
 
         // Right to left: Place stacks and Take all (Valheim's own buttons, pressed through), then the sort
-        // keys (A-Z, type, weight); the name takes what is left.
-        const float chip = 36, chipGap = 3, take = 78, place = 108;
+        // keys (Name, Kind, Weight). The name and weight now sit in the header.
+        const float chip = 44, chipGap = 3, take = 78, place = 108;
         float right = width - Pad;
         FooterButton("Place stacks", right - place, footerY, place, gui.m_stackAllButton);
         FooterButton("Take all", right - place - 4 - take, footerY, take, gui.m_takeAllButton);
         float sortX = right - place - 4 - take - 12 - chip * 3 - chipGap * 2;
-        SortChip(Equipment.SortMode.Name, "A–Z", sortX, footerY, chip);
-        SortChip(Equipment.SortMode.Category, "Type", sortX + chip + chipGap, footerY, chip);
-        SortChip(Equipment.SortMode.Weight, "Kg", sortX + (chip + chipGap) * 2, footerY, chip);
-        title = Ugui.Text(root, "Title", "", theme.Heading, 19, Palette.Bone).At(Pad + 2, footerY - 1, sortX - Pad - 10, Footer);
-        // Long names ("Black Metal Chest") shrink to fit rather than being cut.
-        title.enableAutoSizing = true;
-        title.fontSizeMin = 13;
-        title.fontSizeMax = 19;
+        SortChip(Equipment.SortMode.Name, "Name", sortX, footerY, chip);
+        SortChip(Equipment.SortMode.Category, "Kind", sortX + chip + chipGap, footerY, chip);
+        SortChip(Equipment.SortMode.Weight, "Weight", sortX + (chip + chipGap) * 2, footerY, chip);
         card = new ItemCard(theme, panel);
     }
 
     private void SortChip(Equipment.SortMode mode, string label, float x, float y, float w) =>
-        Ornaments.Keycap(root!, theme, label, x, y, w, Footer, () =>
+        InventoryGuide.ActionButton(theme, root!, label, x, y, w, Footer, () =>
         {
             if (QuickStackCommand.SortChest(gui!, mode) is { } done) Player.m_localPlayer?.Message(MessageHud.MessageType.TopLeft, done);
         }, 12);
 
     private void FooterButton(string label, float x, float y, float w, Button vanilla) =>
-        Ornaments.Keycap(root!, theme, label, x, y, w, Footer, () =>
+        InventoryGuide.ActionButton(theme, root!, label, x, y, w, Footer, () =>
         {
             if (vanilla) vanilla.onClick.Invoke();
         });
@@ -228,11 +221,11 @@ internal sealed class ChestPanel : IDisposable
             if (index >= 0 && index < slots.Count) slots[index].Item = item;
         }
 
-        Color tint = Color.white.WithAlpha(settings.InventoryOpacity.Value);
+        Color tint = Palette.Hex(0x0C0F11, settings.InventoryOpacity.Value);
         if (frame!.color != tint) frame.color = tint;
-        title!.text = Localization.instance.Localize(inventory.GetName());
-        stats!.Set(null, inventory.GetTotalWeight(), 0);
+        summary!.Set(Localization.instance.Localize(inventory.GetName()), null, inventory.GetTotalWeight(), 0);
 
+        foreach (var chip in categoryChips) chip.Refresh(category);
         InventoryGrid grid = gui!.ContainerGrid;
         bool pad = ZInput.IsGamepadActive() && !ZInput.IsMouseActive() && grid.m_uiGroup && grid.m_uiGroup.IsActive;
         Vector2i selected = GamepadSelection(grid);
@@ -243,6 +236,8 @@ internal sealed class ChestPanel : IDisposable
             bool cursor = pad && slot.Position == selected;
             if (cursor) focus = slot;
             slot.Refresh(player, drag, cursor, slot == hovered);
+            slot.SetEmphasis(drag != null || cursor || slot == hovered || slot.Item == null || category == PackCategory.All ||
+                InventoryCategories.Of(slot.Item.m_shared) == category);
         }
         card!.Show(focus?.Item, player, focus?.Area ?? default);
     }

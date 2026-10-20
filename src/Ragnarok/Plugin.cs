@@ -42,12 +42,12 @@ public sealed class Plugin : BaseUnityPlugin
     private MinimapInfo? minimapInfo;
     private MinimapSkin? minimapSkin;
     private NotificationFeed? notifications;
+    private PopupCommands? popupCommands;
     private Compendium? compendium;
     private SkillsBook? skillsBook;
     private TrophiesBook? trophiesBook;
     private AchievementsBook? achievementsBook;
     private CraftPanel? craftPanel;
-    private ChestFocus? chestFocus;
     private HotbarRows? hotbarRows;
     private VanillaCraftFilter? vanillaCraftFilter;
     private VanillaProvisionBar? vanillaProvisions;
@@ -161,11 +161,12 @@ public sealed class Plugin : BaseUnityPlugin
         weaponDial = new WeaponDial(ui, theme);
         infoPanel = new InfoPanel(ui, theme, () => inventoryPanel.Wanted);
         vanillaQuickStack = new VanillaQuickStack(ui, theme, inventoryPanel);
-        vanillaChestSort = new VanillaChestSort(() => inventoryPanel.Wanted);
-        vanillaCharacter = new VanillaCharacterPanel(ui, inventoryPanel);
+        vanillaChestSort = new VanillaChestSort(theme, () => inventoryPanel.Wanted);
+        vanillaCharacter = new VanillaCharacterPanel(ui, theme, inventoryPanel);
         minimapInfo = new MinimapInfo(ui, theme);
         minimapSkin = new MinimapSkin(ui, theme);
         notifications = new NotificationFeed(ui, theme);
+        popupCommands = new PopupCommands(notifications);
         compendium = new Compendium(ui, theme);
         skillsBook = new SkillsBook(ui, theme);
         trophiesBook = new TrophiesBook(ui, theme);
@@ -173,13 +174,12 @@ public sealed class Plugin : BaseUnityPlugin
         craftPanel = new CraftPanel(ui, theme);
         vanillaCraftFilter = new VanillaCraftFilter(ui, theme, () => craftPanel.Wanted);
         // The key guide moves under the Ragnarök crafting panel while it is open.
-        hud.KeysDock = () => chestFocus!.Hiding ? null : craftPanel.Shown;
-        // An open chest sends the crafting panel aside.
-        chestFocus = new ChestFocus(() => inventoryPanel.Wanted);
+        hud.KeysDock = () => craftPanel.Shown;
         hotbarRows = new HotbarRows(ui);
         vanillaProvisions = new VanillaProvisionBar(ui, () => hud.Active);
         // The filters apply to Valheim's recipe list whenever a panel shows them.
         CraftFilter.Enabled = () => craftPanel.Wanted || ui.Features.CraftFilters.Value;
+        CraftFilter.SortEnabled = () => craftPanel.Wanted;
         Theme.ChipEdges = () => ui.Edges.Value == FrameEdges.Chipped;
         Ugui.ScrollRows = () => (ui.FollowSystemScroll.Value ? SystemScroll.Lines() : null) ?? ui.ScrollSpeed.Value;
         compass = new CompassStrip(ui, theme);
@@ -240,22 +240,29 @@ public sealed class Plugin : BaseUnityPlugin
         chestHoverPreview?.Tick();
         Equipment.TombstoneRecovery.Tick();
         hud?.Tick();
+        // Restore native sizing before the guide panels measure their frames.
+        if (inventoryPanel?.Wanted == true)
+        {
+            vanillaQuickStack?.Dispose();
+            vanillaChestSort?.Dispose();
+            vanillaCharacter?.Dispose();
+        }
         inventoryPanel?.Tick();
         infoPanel?.Tick();
         chestPanel?.Tick();
-        inventoryScale?.Tick();
         vanillaQuickStack?.Tick();
         vanillaChestSort?.Tick();
         vanillaCharacter?.Tick();
+        inventoryScale?.Tick();
         minimapInfo?.Tick();
         minimapSkin?.Tick();
         notifications?.Tick();
+        popupCommands?.Tick();
         compendium?.Tick();
         skillsBook?.Tick();
         trophiesBook?.Tick();
         achievementsBook?.Tick();
         craftPanel?.Tick();
-        chestFocus?.Tick();
         vanillaCraftFilter?.Tick();
         vanillaProvisions?.Tick();
         compass?.Tick();
@@ -344,17 +351,20 @@ public sealed class Plugin : BaseUnityPlugin
         vanillaCharacter?.Dispose();
         minimapInfo?.Dispose();
         minimapSkin?.Dispose();
+        popupCommands?.Dispose();
         notifications?.Dispose();
         compendium?.Dispose();
         skillsBook?.Dispose();
         trophiesBook?.Dispose();
         achievementsBook?.Dispose();
         craftPanel?.Dispose();
-        chestFocus?.Dispose();
         hotbarRows?.Dispose();
         vanillaCraftFilter?.Dispose();
         vanillaProvisions?.Dispose();
         CraftFilter.Enabled = () => false;
+        CraftFilter.SortEnabled = () => false;
+        CraftFilter.Reset();
+        if (InventoryGui.instance && Player.m_localPlayer && InventoryGui.IsVisible()) CraftFilter.Changed();
         NotificationFeed.Instance = null;
         compass?.Dispose();
         infoPanel?.Dispose();

@@ -22,7 +22,8 @@ internal sealed class HoverPrompt : IDisposable
     private readonly InterfaceSettings settings;
     private readonly Theme theme;
     private RectTransform? root;
-    private TextMeshProUGUI? text, shadow;
+    private TextMeshProUGUI? text;
+    private TextOutline? outline;
     private TextMeshProUGUI? source;
     private CanvasGroup? fade;
     private bool addedFade;
@@ -66,12 +67,12 @@ internal sealed class HoverPrompt : IDisposable
             last = value;
             string styled = Style(value);
             text!.text = styled;
-            shadow!.text = Regex.Replace(styled, "<color=[^>]*>|</color>", "");
-            text.spriteAsset = shadow.spriteAsset = source.spriteAsset;
+            text.spriteAsset = source.spriteAsset;
             Vector2 size = text.GetPreferredValues();
             root.sizeDelta = new Vector2(Mathf.Ceil(size.x) + 4, Mathf.Ceil(size.y) + 4);
         }
         Place();
+        outline!.Sync();
     }
 
     // Keys yellow, a line that is all parentheses quiet, the rest bone.
@@ -95,16 +96,12 @@ internal sealed class HoverPrompt : IDisposable
         root = Ugui.Node(parent, "Ragnarok Hover Prompt");
         CanvasGroup group = root.gameObject.AddComponent<CanvasGroup>();
         group.blocksRaycasts = group.interactable = false;
-        shadow = Ugui.Text(root, "Shadow", "", theme.Strong, 15, Color.black.WithAlpha(0.75f));
         text = Ugui.Text(root, "Text", "", theme.Strong, 15, Palette.Bone);
-        foreach (TextMeshProUGUI label in new[] { shadow, text })
-        {
-            label.alignment = TextAlignmentOptions.TopLeft;
-            label.overflowMode = TextOverflowModes.Overflow;
-            label.lineSpacing = 4;
-        }
+        text.alignment = TextAlignmentOptions.TopLeft;
+        text.overflowMode = TextOverflowModes.Overflow;
+        text.lineSpacing = 4;
         text.Stretch(0, 0, 0, 0);
-        shadow.Stretch(1, 1.5f, -1, -1.5f);
+        outline = new TextOutline(text, world: true);
         last = "";
     }
 
@@ -162,7 +159,8 @@ internal sealed class HoverPrompt : IDisposable
         RestoreReticle();
         if (root) UnityEngine.Object.Destroy(root!.gameObject);
         root = null;
-        text = shadow = null;
+        text = null;
+        outline = null;
         Shown = null;
     }
 }

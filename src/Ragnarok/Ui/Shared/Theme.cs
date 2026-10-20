@@ -9,6 +9,9 @@ namespace Ragnarok.UI;
 // Rune & Iron: charcoal, parchment and antique gold, with distinct semantic accents.
 internal static class Palette
 {
+    internal const float HudGlassOpacity = 0.58f;
+    internal static readonly Color HudGlass = Hex(0x0C0F11, HudGlassOpacity);
+    internal static readonly Color HudWetGlass = Hex(0x17252D, HudGlassOpacity);
     internal static readonly Color Backdrop = Hex(0x050505, 0.62f);
     internal static readonly Color Obsidian = Hex(0x101719);
     internal static readonly Color Panel = Hex(0x101719, 0.78f);
@@ -49,12 +52,14 @@ internal static class Palette
 internal sealed class Theme : IDisposable
 {
     private readonly List<UnityEngine.Object> owned = new();
-    private TMP_FontAsset? heading, display, section, body, strong, subtle, serif;
+    private TMP_FontAsset? heading, body, strong, numbers, runic, subtle, serif;
     private float nextFontScan;
 
-    internal readonly Sprite HudRune, HudRing, HudPortraitRing, HudTile, HudTileEdge, HudMoon, HudFlame, HudBowl, HudBottle;
+    internal readonly Sprite InventoryShield, HudRune, HudRing, HudDashedRing, HudPortraitRing, HudTile, HudTileEdge, HudMoon, HudFlame, HudBowl, HudBottle;
     internal readonly Sprite HudBar, HudStag, HudGlow, HudHatch, HudVignette, HudEmptyEdge, HudStar, HudBackpack;
-    internal readonly Sprite HudActionSlot, HudActionEdge, HudActionEmptyEdge;
+    internal readonly Sprite HudActionSlot, HudActionEdge, HudActionEmptyEdge, PackEmptyEdge;
+    internal readonly Sprite PackSurface, PackEdge, PackPill, PackPillEdge, HudKeySurface, HudKeyEdge;
+    internal readonly Sprite SkillPill, SkillPillEdge, SkillUp;
     internal readonly Sprite White;
     internal readonly Sprite Diamond;
     internal readonly Sprite Knot;
@@ -119,6 +124,18 @@ internal sealed class Theme : IDisposable
     {
         Current = this;
         White = Plain(Make(4, 4, (_, _) => Color.white));
+        PackSurface = RoundedPanel(12, false);
+        PackEdge = RoundedPanel(12, true);
+        PackPill = RoundedPanel(14, false);
+        PackPillEdge = RoundedPanel(14, true);
+        SkillPill = RoundedPanel(25, false);
+        SkillPillEdge = RoundedPanel(25, true);
+        SkillUp = Plain(LineIcon(44, 0f, p => Lines(
+            Segment(p, new Vector2(32, 14), new Vector2(32, 50), 0f),
+            Segment(p, new Vector2(16, 34), new Vector2(32, 50), 0f),
+            Segment(p, new Vector2(32, 50), new Vector2(48, 34), 0f))));
+        HudKeySurface = RoundedPanel(5, false);
+        HudKeyEdge = RoundedPanel(5, true);
         // HUD-specific shapes are procedural, independent of font glyph coverage and frame-edge settings.
         HudRune = Plain(LineIcon(96, 0, p => Mathf.Min(
             Segment(p, new Vector2(23, 7), new Vector2(23, 57), 0),
@@ -140,6 +157,15 @@ internal sealed class Theme : IDisposable
         {
             float radius = new Vector2(x + 0.5f - 64, y + 0.5f - 64).magnitude;
             return Color.white.WithAlpha(Mathf.Clamp01(1f - Mathf.Abs(radius - 61f) + 2f));
+        }));
+        HudDashedRing = Plain(Make(128, 128, (x, y) =>
+        {
+            Vector2 p = new(x + 0.5f - 64, y + 0.5f - 64);
+            float ring = Mathf.Clamp01(3f - Mathf.Abs(p.magnitude - 61f));
+            // Sixteen short dashes, with a softened pixel at each end.
+            float phase = Mathf.Repeat(Mathf.Atan2(p.y, p.x) / (Mathf.PI * 2) * 16, 1);
+            float dash = Mathf.Clamp01(Mathf.Min(phase, 0.65f - phase) * 24);
+            return Color.white.WithAlpha(ring * dash);
         }));
         HudPortraitRing = Plain(Make(256, 256, (x, y) =>
         {
@@ -183,6 +209,12 @@ internal sealed class Theme : IDisposable
         {
             float d = ActionSlotDistance(x, y);
             return Color.white.WithAlpha(Mathf.Clamp01(0.5f - d) * Mathf.Clamp01(d + 2) * ((x + y) % 16 < 10 ? 1 : 0));
+        }));
+        // A stronger dashed edge for inventory/chest empty slots at small UI scales.
+        PackEmptyEdge = Plain(Make(116, 116, (x, y) =>
+        {
+            float d = ActionSlotDistance(x, y);
+            return Color.white.WithAlpha(Mathf.Clamp01(0.5f - d) * Mathf.Clamp01(d + 3.5f) * ((x + y) % 20 < 13 ? 1 : 0));
         }));
         Vector2[] star = new Vector2[10];
         for (int i = 0; i < star.Length; i++)
@@ -448,6 +480,8 @@ internal sealed class Theme : IDisposable
             body = Mathf.Max(body, -Mathf.Min(Circle(p, new Vector2(24, 9), 4.6f), Circle(p, new Vector2(40, 9), 4.6f)));
             return Mathf.Max(body, -Mathf.Min(Circle(p, new Vector2(26, 39), 3.4f), Circle(p, new Vector2(38, 39), 3.4f)));
         }));
+        // User-supplied SVG path; sampled cubic curves retain its rounded lower edge.
+        InventoryShield = Plain(MakeInventoryShield());
         GlyphShield = Plain(FillIcon(48, p => Mathf.Max(
             Poly(p, new Vector2(10, 56), new Vector2(54, 56), new Vector2(54, 36), new Vector2(32, 4), new Vector2(10, 36)),
             -Mathf.Min(Segment(p, new Vector2(32, 52), new Vector2(32, 14), 1.6f), Segment(p, new Vector2(18, 44), new Vector2(46, 44), 1.6f)))));
@@ -539,7 +573,7 @@ internal sealed class Theme : IDisposable
             Vector2 p = new(x + 0.5f - 128, y + 0.5f - 128);
             float r = p.magnitude;
             if (r < RingInner - 1 || r > 128) return Color.clear;
-            Color color = Palette.Obsidian.WithAlpha(0.95f);
+            Color color = Palette.HudGlass;
             // Fine radial divisions between two clean brass rings.
             float angle = Mathf.Atan2(p.y, p.x) / (Mathf.PI * 2f);
             float tick = Mathf.Abs(Mathf.Repeat(angle * 60f + 0.5f, 1f) - 0.5f);
@@ -553,7 +587,7 @@ internal sealed class Theme : IDisposable
         {
             float r = new Vector2(x + 0.5f - 32, y + 0.5f - 32).magnitude;
             if (r > 32) return Color.clear;
-            Color color = Palette.Obsidian.WithAlpha(0.92f);
+            Color color = Palette.HudGlass;
             color = Color.Lerp(color, Palette.Gold, Mathf.Clamp01(1.4f - Mathf.Abs(r - 30.2f)));
             color = Color.Lerp(color, Palette.GoldDim, Mathf.Clamp01(1f - Mathf.Abs(r - 26.5f)));
             color.a *= Mathf.Clamp01(31.8f - r);
@@ -637,18 +671,26 @@ internal sealed class Theme : IDisposable
             SpriteMeshType.FullRect, new Vector4(feather, feather, feather, feather)));
     }
 
-    // Alegreya for titles, Scada for everything else (both shipped with the mod, see FontLibrary). If a
-    // file cannot be loaded, Valheim's own Norse and Averia stand in (resolved lazily: they load with the UI).
-    internal TMP_FontAsset? Heading => heading ??= FontLibrary.Get("Alegreya-Bold.ttf", "Alegreya-Bold-Ext.ttf") ?? FindFont("Norsebold", "Norse") ?? Body;
-    // Page titles: Alegreya at a lighter weight.
-    internal TMP_FontAsset? Display => display ??= FontLibrary.Get("Alegreya-Medium.ttf", "Alegreya-Bold-Ext.ttf") ?? Heading;
-    // Section labels ("hotbar - equipment"): Alegreya italic.
-    internal TMP_FontAsset? Section => section ??= FontLibrary.Get("Alegreya-Italic.ttf", "Alegreya-Italic-Ext.ttf") ?? Heading;
-    internal TMP_FontAsset? Body => body ??= FontLibrary.Get("Scada-Regular.ttf") ?? Fallback();
-    // Primary and label type: Scada bold.
-    internal TMP_FontAsset? Strong => strong ??= FontLibrary.Get("Scada-Bold.ttf") ?? Body;
-    // Subtext ("Crafted by", "Light armor"): Scada italic.
-    internal TMP_FontAsset? Subtle => subtle ??= FontLibrary.Get("Scada-Italic.ttf") ?? Body;
+    // Rune & Iron guide: Cinzel 600 names/titles, Barlow Semi Condensed 600 labels,
+    // 700 numbers, and Noto Sans Runic sigils. All are embedded OFL fonts.
+    internal TMP_FontAsset? Heading => heading ??= FontLibrary.Get("Cinzel-SemiBold.ttf") ?? FindFont("Norsebold", "Norse") ?? Body;
+    internal TMP_FontAsset? Display => Heading;
+    internal TMP_FontAsset? Section => Heading;
+    internal TMP_FontAsset? Body => body ??= FontLibrary.Get("BarlowSemiCondensed-Regular.ttf") ?? Fallback();
+    internal TMP_FontAsset? Numbers => numbers ??= FontLibrary.Get("BarlowSemiCondensed-Bold.ttf") ?? Body;
+    internal TMP_FontAsset? Runic => runic ??= FontLibrary.Get("NotoSansRunic-Regular.ttf") ?? Body;
+    internal TMP_FontAsset? Strong
+    {
+        get
+        {
+            if (strong) return strong;
+            strong = FontLibrary.Get("BarlowSemiCondensed-SemiBold.ttf") ?? Body;
+            // Rich text can mix guide-weight numbers into a single, baseline-aligned label.
+            if (strong && Numbers) strong!.fontWeightTable[7].regularTypeface = Numbers;
+            return strong;
+        }
+    }
+    internal TMP_FontAsset? Subtle => subtle ??= FontLibrary.Get("BarlowSemiCondensed-Italic.ttf") ?? Body;
 
     private TMP_FontAsset? Fallback()
     {
@@ -911,6 +953,32 @@ internal sealed class Theme : IDisposable
     }
 
     // White filled glyph: the inside of a shape given as a signed distance in a 64-unit square.
+    private static Texture2D MakeInventoryShield()
+    {
+        // SVG viewBox 0 0 24 24, stroke-width 2, round joins, no fill.
+        List<Vector2> path = new() { new(12, 3), new(19, 6), new(19, 12) };
+        void Curve(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
+        {
+            for (int i = 1; i <= 24; i++)
+            {
+                float t = i / 24f, u = 1 - t;
+                path.Add(u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d);
+            }
+        }
+        Curve(new(19, 12), new(19, 16.5f), new(16, 19.5f), new(12, 21));
+        Curve(new(12, 21), new(8, 19.5f), new(5, 16.5f), new(5, 12));
+        path.Add(new Vector2(5, 6));
+        path.Add(path[0]);
+        return Make(96, 96, (x, y) =>
+        {
+            Vector2 p = new((x + 0.5f) / 4, 24 - (y + 0.5f) / 4);
+            float distance = float.MaxValue;
+            for (int i = 1; i < path.Count; i++)
+                distance = Mathf.Min(distance, Segment(p, path[i - 1], path[i], 1));
+            return Color.white.WithAlpha(Mathf.Clamp01(0.5f - distance * 4));
+        });
+    }
+
     private static Texture2D FillIcon(int size, Func<Vector2, float> shape)
     {
         float scale = 64f / size;
@@ -1002,6 +1070,24 @@ internal sealed class Theme : IDisposable
 
     private Sprite Plain(Texture2D texture) =>
         Track(Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f), 100f));
+
+    // Nine-sliced white surfaces keep corner radius and hairline weight at inventory sizes.
+    private Sprite RoundedPanel(float radius, bool outline)
+    {
+        const int size = 64;
+        Texture2D texture = Make(size, size, (x, y) =>
+        {
+            Vector2 q = new(Mathf.Abs(x + 0.5f - size / 2) - (size / 2 - radius - 1),
+                Mathf.Abs(y + 0.5f - size / 2) - (size / 2 - radius - 1));
+            float d = new Vector2(Mathf.Max(q.x, 0), Mathf.Max(q.y, 0)).magnitude +
+                Mathf.Min(Mathf.Max(q.x, q.y), 0) - radius;
+            float alpha = Mathf.Clamp01(0.5f - d);
+            if (outline) alpha *= Mathf.Clamp01(d + 1.5f);
+            return Color.white.WithAlpha(alpha);
+        });
+        return Track(Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f),
+            100, 0, SpriteMeshType.FullRect, new Vector4(radius + 2, radius + 2, radius + 2, radius + 2)));
+    }
 
     private Sprite Track(Sprite sprite)
     {

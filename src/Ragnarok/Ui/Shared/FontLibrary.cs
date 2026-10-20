@@ -9,7 +9,8 @@ namespace Ragnarok.UI;
 
 // The fonts Ragnarök ships (Assets/Fonts, SIL Open Font License): written out to BepInEx's cache once and
 // turned into dynamic TextMeshPro fonts. The common characters are rendered up front, so text shows even
-// if a later glyph cannot be added; the Latin Extended file (Turkish, Polish...) rides along as a fallback.
+// if a later glyph cannot be added. Guide fonts include Latin Extended glyphs in the main file;
+// earlier fonts can also supply a separate Latin Extended companion as a fallback.
 internal static class FontLibrary
 {
     // Everything typed in English, German, French, Scandinavian, Turkish and the game's own symbols.
@@ -63,7 +64,13 @@ internal static class FontLibrary
                 return null;
             }
             asset.name = "Ragnarok " + Path.GetFileNameWithoutExtension(file);
-            asset.TryAddCharacters(Common, out string missing);
+            string characters = Common;
+            if (file == "NotoSansRunic-Regular.ttf")
+            {
+                characters = "";
+                for (char rune = '\u16A0'; rune <= '\u16F8'; rune++) characters += rune;
+            }
+            asset.TryAddCharacters(characters, out string missing);
             Debug.Log($"[Ragnarok] Font {asset.name} loaded" + (missing.Length > 0 ? $" ({missing.Length} characters not in this file)." : "."));
             return asset;
         }

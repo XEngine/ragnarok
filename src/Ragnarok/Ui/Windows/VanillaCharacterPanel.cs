@@ -7,28 +7,26 @@ using UnityEngine.UI;
 
 namespace Ragnarok.UI.Windows;
 
-// The character slots for Valheim's own inventory: worn gear, then provisions (and Better Archery's quiver
-// and arrows), on a second wooden board hung just under the inventory, lined up with its columns. The
-// board is Valheim's own wood, drawn the way Valheim draws all its boards (the inventory's board is never
-// stretched past its size), and the slots are Valheim's slot prefab, so it reads as part of the game's
-// inventory. While a chest is open it folds away, so the chest sits where it always does.
+// A native wood side board aligned to the inventory, with native slot prefabs,
+// stacked Worn/Provisions and the shared stats/set dashboard below them.
 internal sealed class VanillaCharacterPanel : IDisposable
 {
-    // Gap is the wood between the two boards; both boards' art overhangs its rectangle by Overhang.
-    private const float Top = 6, Caption = 22, Bottom = 12, Gap = 6, Overhang = 10;
+    private const float Caption = 22, Gap = 6, Overhang = 10;
 
     private readonly InterfaceSettings settings;
+    private readonly Theme theme;
     private readonly InventoryPanel ragnarok;
     private readonly List<Cell> cells = new();
-    private readonly Vector3[] corners = new Vector3[4];
     private InventoryGui? gui;
     private RectTransform? root;
     private int built, builtWidth;
-    private bool folded;
+    private Vector2 builtSize;
+    private CharacterDashboard? dashboard;
 
-    internal VanillaCharacterPanel(InterfaceSettings settings, InventoryPanel ragnarok)
+    internal VanillaCharacterPanel(InterfaceSettings settings, Theme theme, InventoryPanel ragnarok)
     {
         this.settings = settings;
+        this.theme = theme;
         this.ragnarok = ragnarok;
     }
 
@@ -38,6 +36,7 @@ internal sealed class VanillaCharacterPanel : IDisposable
         if (current != gui)
         {
             root = null;
+            dashboard = null;
             cells.Clear();
             gui = current;
         }
@@ -50,28 +49,20 @@ internal sealed class VanillaCharacterPanel : IDisposable
         }
         if (!InventoryGui.IsVisible() || !Player.m_localPlayer) return;
         int width = Player.m_localPlayer.GetInventory().GetWidth();
-        if (!root || built != layout || builtWidth != width)
+        if (!root || built != layout || builtWidth != width || builtSize != gui!.m_player.rect.size)
         {
             Dispose();
             Build(gui!, layout, width);
         }
-        Fold(gui!.m_container && gui.m_container.gameObject.activeSelf);
-        if (!folded) Refresh(Player.m_localPlayer);
+        Refresh(Player.m_localPlayer);
     }
 
     public void Dispose()
     {
-        if (root) UnityEngine.Object.Destroy(root!.gameObject);
+        if (root) { root!.gameObject.SetActive(false); UnityEngine.Object.Destroy(root.gameObject); }
         root = null;
+        dashboard = null;
         cells.Clear();
-    }
-
-    // Folded while a chest is open: the board hidden.
-    private void Fold(bool fold)
-    {
-        if (fold == folded) return;
-        folded = fold;
-        root!.gameObject.SetActive(!fold);
     }
 
     private void Build(InventoryGui inventoryGui, int layout, int columns)
@@ -80,76 +71,42 @@ internal sealed class VanillaCharacterPanel : IDisposable
         builtWidth = columns;
         RectTransform player = inventoryGui.m_player;
         InventoryGrid grid = inventoryGui.m_playerGrid;
-        float cell = grid.m_elementSpace, rowWidth = columns * cell;
-        Rect pr = player.rect;
-        float left = GridLeft(grid, player, cell) - pr.xMin;
-
-        List<(Vector2i Position, string Label, bool Worn)> worn = new(), provisions = new();
-        for (int i = 0; i < CharacterSlots.Gear.Length; i++)
-            if (settings.Features.ExtraUtilitySlots.Value || Array.IndexOf(CharacterSlots.ExtraUtility, i) < 0)
-                worn.Add((CharacterSlots.GearSlot(i), Capital(InventoryPanel.GearNames[i]), false));
-        for (int i = 0; i < CharacterSlots.Provisions; i++)
-            provisions.Add((CharacterSlots.ProvisionSlot(i), "Food", true));
-        if (BetterArcheryCompat.Active)
-        {
-            worn.Add((CharacterSlots.GearSlot(CharacterSlots.QuiverIndex), "Quiver", false));
-            for (int i = 0; i < BetterArcheryCompat.ArrowSlots; i++)
-                provisions.Add((BetterArcheryCompat.ArrowSlot(i), "Arrow", true));
-        }
-        // A row longer than the grid gets slightly smaller slots, so it never pokes out of the board.
-        float wornCell = Mathf.Min(cell, rowWidth / worn.Count), provisionCell = Mathf.Min(cell, rowWidth / provisions.Count);
-        float height = Top + Caption + wornCell + Caption + provisionCell + Bottom;
-
-        // Same width as the inventory, hung under it: its top art edge Gap below the inventory's bottom art edge.
-        root = Ugui.Node(player, "Ragnarok Character Vanilla");
-        root.anchorMin = root.anchorMax = Vector2.zero;
-        root.pivot = new Vector2(0, 1);
-        root.anchoredPosition = new Vector2(0, -(Overhang * 2 + Gap));
-        root.sizeDelta = new Vector2(pr.width, height);
-
-        // Valheim's wood board (raycast: clicks on it must not fall through to the "drop item" area).
-        Transform? bkg = player.Find("Bkg");
-        Image? source = bkg ? bkg!.GetComponent<Image>() : null;
-        Image back = Ugui.Image(root, "Bkg", source ? source!.sprite : null, source ? source!.color : new Color(0, 0, 0, 0.75f), raycast: true)
-            .Stretch(-Overhang, -Overhang, -Overhang, -Overhang);
-        if (source)
-        {
-            back.type = source!.type;
-            back.material = source.material;
-            back.pixelsPerUnitMultiplier = source.pixelsPerUnitMultiplier;
-        }
-
+        builtSize = player.rect.size;
+        bool quiver = BetterArcheryCompat.Active;
+        float width = grid.m_elementSpace * 4 + 24, height = builtSize.y;
+        float inner = width - 24;
+        float cell = Mathf.Max(1, Mathf.Floor(Mathf.Min(grid.m_elementSpace,
+            (inner - Gap * 4) / 5, (height - (quiver ? 236 : 204)) / (quiver ? 4 : 3))));
+        root = Ugui.Node(player, "Ragnarok Character Vanilla").At(builtSize.x + Overhang * 2 + Gap, 0, width, height);
+        VanillaInventoryStyle.Board(player, root);
         TMP_Text captionFont = inventoryGui.m_stackAllButton.GetComponentInChildren<TMP_Text>(true);
-        float y = Top;
-        AddCaption(captionFont, "Worn", left, y, rowWidth);
-        y += Caption;
-        for (int i = 0; i < worn.Count; i++)
-            AddCell(grid, worn[i].Position, left + i * wornCell, y, wornCell, worn[i].Label, worn[i].Worn);
-        y += wornCell;
-        AddCaption(captionFont, "Provisions", left, y, rowWidth);
-        y += Caption;
-        for (int i = 0; i < provisions.Count; i++)
-            AddCell(grid, provisions[i].Position, left + i * provisionCell, y, provisionCell, provisions[i].Label, provisions[i].Worn);
-
-        folded = true;
-        root.gameObject.SetActive(false);
-    }
-
-    // Where the grid's first column starts, in the panel's space.
-    private float GridLeft(InventoryGrid grid, RectTransform player, float cell)
-    {
-        Transform gridRoot = grid.m_gridRoot;
-        RectTransform? first = gridRoot && gridRoot.childCount > 0 ? gridRoot.GetChild(0) as RectTransform : null;
-        RectTransform measured = first ? first! : grid.m_gridRoot;
-        measured.GetWorldCorners(corners);
-        float min = float.MaxValue, max = float.MinValue;
-        foreach (Vector3 corner in corners)
+        AddCaption(captionFont, "Worn", 12, 6, inner);
+        const float slotsTop = 30;
+        int[] positions = { 0, 1, 2, 3, 5, 4, 6, 7 };
+        for (int i = 0; i < CharacterSlots.Gear.Length; i++)
         {
-            float x = player.InverseTransformPoint(corner).x;
-            min = Mathf.Min(min, x);
-            max = Mathf.Max(max, x);
+            if (!settings.Features.ExtraUtilitySlots.Value && Array.IndexOf(CharacterSlots.ExtraUtility, i) >= 0) continue;
+            int position = positions[i];
+            AddCell(grid, CharacterSlots.GearSlot(i), 12 + position % 5 * (cell + Gap),
+                slotsTop + position / 5 * (cell + Gap), cell, Capital(InventoryPanel.GearNames[i]), false);
         }
-        return first ? (min + max) / 2 - cell / 2 : min;
+        if (quiver)
+            AddCell(grid, CharacterSlots.GearSlot(CharacterSlots.QuiverIndex), 12 + 3 * (cell + Gap),
+                slotsTop + cell + Gap, cell, "Quiver", false);
+        float provisionTitle = slotsTop + cell * 2 + Gap + 10;
+        AddCaption(captionFont, "Provisions", 12, provisionTitle, inner);
+        float provisionCell = Mathf.Min(cell, (inner - Gap * 5) / 6);
+        float provisionTop = provisionTitle + Caption;
+        for (int i = 0; i < CharacterSlots.Provisions; i++)
+            AddCell(grid, CharacterSlots.ProvisionSlot(i), 12 + i * (provisionCell + Gap), provisionTop, provisionCell, "Food", true);
+        if (quiver)
+        {
+            float arrowTitle = provisionTop + provisionCell + 10;
+            AddCaption(captionFont, "Arrows", 12, arrowTitle, inner);
+            for (int i = 0; i < BetterArcheryCompat.ArrowSlots; i++)
+                AddCell(grid, BetterArcheryCompat.ArrowSlot(i), 12 + i * (cell + Gap), arrowTitle + Caption, cell, "Arrow", true);
+        }
+        dashboard = new CharacterDashboard(theme, root, 12, height - 12 - CharacterDashboard.Height, inner, vanilla: true);
     }
 
     private static string Capital(string name) => name.Substring(0, 1) + name.Substring(1).ToLowerInvariant();
@@ -186,7 +143,7 @@ internal sealed class VanillaCharacterPanel : IDisposable
         placeholder.text = label;
         placeholder.fontSize = 13;
         placeholder.alignment = TextAlignmentOptions.Center;
-        placeholder.color = new Color(1, 1, 1, 0.35f);
+        placeholder.color = new Color(1, 1, 1, 0.7f);
         placeholder.textWrappingMode = TextWrappingModes.NoWrap;
         placeholder.overflowMode = TextOverflowModes.Overflow;
         placeholder.rectTransform.anchorMin = Vector2.zero;
@@ -203,6 +160,7 @@ internal sealed class VanillaCharacterPanel : IDisposable
     private void Refresh(Player player)
     {
         Inventory inventory = player.GetInventory();
+        dashboard?.Refresh(player, inventory);
         ItemDrop.ItemData drag = SlotActions.DragItem(gui!);
         RectTransform anchor = gui!.m_playerGrid.m_tooltipAnchor;
         foreach (Cell c in cells)

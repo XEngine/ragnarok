@@ -72,10 +72,10 @@ internal sealed class HudPlacement
         MarginY = config.Bind(section, "MarginY", marginY, new ConfigDescription(
             $"Vertical distance of the {what} from the chosen screen edge, in pixels at 1080p. " +
             "When centred vertically, positive values move it up.", new AcceptableValueRange<float>(-500f, 500f)));
-        Background = config.Bind(section, "Background", HudBackground.Shade,
-            $"Backdrop behind the {what}. Shade is a soft feathered field; Plate is a chamfered plate with a gold rim.");
+        Background = config.Bind(section, "Background", HudBackground.None,
+            "Legacy backdrop setting, retained for compatibility. HUD backdrops have been removed.");
         BackgroundOpacity = config.Bind(section, "BackgroundOpacity", 0.5f, new ConfigDescription(
-            $"Opacity of the backdrop behind the {what}.", new AcceptableValueRange<float>(0f, 1f)));
+            "Legacy backdrop opacity; ignored.", new AcceptableValueRange<float>(0f, 1f)));
     }
 
     // Anchors, pivots and offsets a HUD element so margins always point inward from the chosen edge.

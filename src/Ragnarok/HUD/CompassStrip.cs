@@ -6,27 +6,30 @@ using UnityEngine.UI;
 
 namespace Ragnarok.HUD;
 
-// A heading strip at the top centre of the screen, like the compass bars of Assassin's Creed: the
-// marks slide as the camera turns, the crimson notch is where you look, the number below is the exact
-// bearing. North is +Z, the top of Valheim's map. Shown with either HUD style.
+// Rune & Iron heading rail. Camera bearings and existing public world targets are read-only;
+// every generated object and text silhouette belongs to this HUD root.
 internal sealed class CompassStrip : IDisposable
 {
-    private const float Width = 560, Height = 30, Field = 180; // degrees visible across the strip
-
+    private const float Width = 720, Height = 94, RailY = 30, Field = 180;
+    private const float CompassScale = 0.85f, EdgeFadeFraction = 0.4f;
     private static readonly string[] Points = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
-
     private readonly InterfaceSettings settings;
     private readonly Theme theme;
-    private readonly List<(float Degrees, Graphic Mark, bool Letter)> marks = new();
-    private GameObject? hudRoot;
-    private RectTransform? root, track;
-    private TextMeshProUGUI? bearing;
-    private HudBackdrop? backdrop;
+    private readonly List<(float Degrees, RectTransform Rect, CanvasGroup Fade)> marks = new();
     private readonly List<Marker> markers = new();
-    // Follow: a loaded character or ship to track every frame; Position is used when it is gone.
-    private readonly List<(Vector3 Position, Sprite Icon, Color Color, string Name, Transform? Follow)> targets = new();
-    private float nextScan;
+    private readonly List<(Vector3 Position, Color Color, string Name, Transform? Follow)> targets = new();
+    private readonly List<(float Left, float Right)> labelBounds = new();
+    private GameObject? hudRoot;
+    private RectTransform? root;
+    internal static RectTransform? Shown { get; private set; }
+    private TextMeshProUGUI? footer;
+    private TextOutline? footerOutline;
+    private Texture2D? railTexture;
+    private Sprite? railSprite;
+    private float nextScan, nextContext;
     private int shownBearing = -1;
+    private string shownContext = "";
+    private string shownDirection = "";
 
     internal CompassStrip(InterfaceSettings settings, Theme theme)
     {
@@ -39,9 +42,7 @@ internal sealed class CompassStrip : IDisposable
         GameObject? parent = global::Hud.instance ? global::Hud.instance.m_rootObject : null;
         if (parent != hudRoot)
         {
-            root = null;
-            marks.Clear();
-            markers.Clear();
+            Dispose();
             hudRoot = parent;
         }
         if (!hudRoot || !settings.Compass.Value || !GameCamera.instance || !Player.m_localPlayer)
@@ -52,41 +53,57 @@ internal sealed class CompassStrip : IDisposable
         }
         if (!root) Build(hudRoot!.transform);
         root!.gameObject.SetActive(true);
-        root.localScale = Vector3.one * settings.HudScale.Value;
-        backdrop!.Apply(settings.CompassBackground, settings.CompassBackgroundOpacity);
+        Shown = root;
+        // Fit narrow HUD canvases while retaining the user's overall HUD scale.
+        float available = ((RectTransform)hudRoot!.transform).rect.width - 32;
+        float scale = settings.HudScale.Value * CompassScale;
+        if (available > 0) scale = Mathf.Min(scale, available / Width);
+        root.localScale = Vector3.one * scale;
 
         Vector3 forward = GameCamera.instance.transform.forward;
         float heading = Mathf.Repeat(Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg, 360f);
         float perDegree = Width / Field;
-        foreach (var (degrees, mark, letter) in marks)
+        foreach (var (degrees, rect, fade) in marks)
         {
             float offset = Mathf.DeltaAngle(heading, degrees);
             bool visible = Mathf.Abs(offset) < Field / 2;
-            if (mark.enabled != visible) mark.enabled = visible;
+            if (rect.gameObject.activeSelf != visible) rect.gameObject.SetActive(visible);
             if (!visible) continue;
-            RectTransform rect = mark.rectTransform;
             rect.anchoredPosition = new Vector2(offset * perDegree, rect.anchoredPosition.y);
-            // Fade towards the ends so marks slide in and out instead of popping.
-            float fade = Mathf.Clamp01((Field / 2 - Mathf.Abs(offset)) / 25f);
-            Color c = mark.color;
-            c.a = (letter ? 1f : 0.7f) * fade;
-            mark.color = c;
+            fade.alpha = SideOpacity(offset / (Field / 2));
         }
-        bool centred = PlaceMarkers(heading, perDegree);
-        // A marker under the notch takes the bearing's place.
-        if (bearing!.enabled == centred) bearing.enabled = !centred;
-        int rounded = Mathf.RoundToInt(heading) % 360;
-        if (rounded != shownBearing)
-        {
-            shownBearing = rounded;
-            bearing.text = rounded + "°";
-        }
+        PlaceMarkers(heading, perDegree);
+        UpdateFooter(heading);
     }
 
-    // Home, portals and ships as icons under the strip at their bearing, with the distance beneath.
-    // The world is scanned twice a second; positions are updated every frame. Returns whether one sits
-    // near the centre.
-    private bool PlaceMarkers(float heading, float perDegree)
+    private void UpdateFooter(float heading)
+    {
+        int rounded = Mathf.RoundToInt(heading) % 360;
+        string direction = Points[Mathf.RoundToInt(heading / 45f) % 8];
+        bool changed = rounded != shownBearing || direction != shownDirection;
+        shownBearing = rounded;
+        shownDirection = direction;
+        if (Time.unscaledTime >= nextContext)
+        {
+            nextContext = Time.unscaledTime + 0.5f;
+            string biome = Player.m_localPlayer.GetCurrentBiomeData().GetName().ToUpperInvariant();
+            string value = "  ·  " + biome;
+            if (EnvMan.instance) value += "  ·  DAY " + EnvMan.instance.GetDay();
+            if (shownContext != value)
+            {
+                shownContext = value;
+                changed = true;
+            }
+        }
+        if (!changed) return;
+        // One TMP line shares a real glyph baseline and handles all spacing itself.
+        // The bold face is Barlow 700, explicitly linked from the label's 600 face.
+        footer!.text = "<color=#" + ColorUtility.ToHtmlStringRGB(Palette.Gold) +
+            "><size=138%><b>" + rounded + "° " + direction + "</b></size></color>" + shownContext;
+        footerOutline!.Sync();
+    }
+
+    private void PlaceMarkers(float heading, float perDegree)
     {
         Vector3 me = Player.m_localPlayer.transform.position;
         if (Time.unscaledTime >= nextScan)
@@ -95,7 +112,7 @@ internal sealed class CompassStrip : IDisposable
             Scan(me);
         }
         while (markers.Count < targets.Count) markers.Add(new Marker(theme, root!));
-        bool centred = false;
+        labelBounds.Clear();
         for (int i = 0; i < markers.Count; i++)
         {
             Marker marker = markers[i];
@@ -104,7 +121,7 @@ internal sealed class CompassStrip : IDisposable
                 marker.Hide();
                 continue;
             }
-            var (position, icon, color, name, follow) = targets[i];
+            var (position, color, name, follow) = targets[i];
             if (follow) position = follow!.position;
             Vector3 to = position - me;
             float offset = Mathf.DeltaAngle(heading, Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg);
@@ -113,11 +130,16 @@ internal sealed class CompassStrip : IDisposable
                 marker.Hide();
                 continue;
             }
-            float fade = Mathf.Clamp01((Field / 2 - Mathf.Abs(offset)) / 25f);
-            marker.Show(icon, color, offset * perDegree, name, Distance(new Vector2(to.x, to.z).magnitude), fade);
-            centred |= Mathf.Abs(offset) < 8f;
+            float x = offset * perDegree;
+            float fade = SideOpacity(offset / (Field / 2));
+            marker.Show(color, x, name + " " + Distance(new Vector2(to.x, to.z).magnitude), fade);
+            float left = x - marker.LabelWidth / 2, right = x + marker.LabelWidth / 2;
+            bool showLabel = left >= -Width / 2 && right <= Width / 2;
+            foreach (var bound in labelBounds)
+                if (left < bound.Right + 6 && right > bound.Left - 6) showLabel = false;
+            marker.ShowLabel(showLabel);
+            if (showLabel) labelBounds.Add((left, right));
         }
-        return centred;
     }
 
     private void Scan(Vector3 me)
@@ -125,7 +147,7 @@ internal sealed class CompassStrip : IDisposable
         targets.Clear();
         PlayerProfile? profile = Game.instance ? Game.instance.GetPlayerProfile() : null;
         if (settings.CompassHome.Value && profile != null && profile.HaveCustomSpawnPoint())
-            targets.Add((profile.GetCustomSpawnPoint(), theme.IconHome, Palette.GoldBright, "", null));
+            targets.Add((profile.GetCustomSpawnPoint(), Palette.Bone, "Home", null));
 
         if (settings.CompassPortals.Value && ZDOMan.instance != null)
         {
@@ -138,19 +160,16 @@ internal sealed class CompassStrip : IDisposable
                 if (distance <= range && distance > 3f) portals.Add((distance, position));
             }
             portals.Sort((a, b) => a.Distance.CompareTo(b.Distance));
-            for (int i = 0; i < portals.Count && i < 6; i++) targets.Add((portals[i].Position, theme.IconPortal, Palette.Eitr, "", null));
+            for (int i = 0; i < portals.Count && i < 6; i++)
+                targets.Add((portals[i].Position, Palette.Eitr, "Portal", null));
         }
-
         if (settings.CompassShips.Value)
         {
             Ship aboard = Ship.GetLocalShip();
             foreach (IMonoUpdater updater in Ship.Instances)
                 if (updater is Ship ship && ship && ship != aboard && Vector3.Distance(me, ship.transform.position) <= 400f)
-                    targets.Add((ship.transform.position, theme.IconShip, Palette.Bone, "", ship.transform));
+                    targets.Add((ship.transform.position, Palette.Bone, "Ship", ship.transform));
         }
-
-        // Other players, only those who share their position ("visible to other players" on the map).
-        // Nearby ones are read from their character, the rest from the server's player list.
         if (settings.CompassPlayers.Value && ZNet.instance != null)
         {
             ZDOID self = Player.m_localPlayer.GetZDOID();
@@ -160,7 +179,7 @@ internal sealed class CompassStrip : IDisposable
                 Transform? follow = null;
                 foreach (Player other in Player.GetAllPlayers())
                     if (other && other.GetZDOID() == info.m_characterID) follow = other.transform;
-                targets.Add((info.m_position, theme.IconPlayer, Palette.Stamina, info.m_name, follow));
+                targets.Add((info.m_position, Palette.Gold, info.m_name, follow));
             }
         }
     }
@@ -168,42 +187,70 @@ internal sealed class CompassStrip : IDisposable
     private static string Distance(float metres) =>
         metres >= 1000f ? (metres / 1000f).ToString("0.0") + "km" : Mathf.RoundToInt(metres) + "m";
 
+    // Full contrast in the middle; smooth, symmetric fade over the outer 20% at each end.
+    // Shared by the moving marks and the rail texture so no hard line remains at the edges.
+    private static float SideOpacity(float normalizedX) =>
+        Mathf.SmoothStep(0, 1, (1 - Mathf.Abs(normalizedX)) / EdgeFadeFraction);
+
+    private void BuildRail()
+    {
+        const int samples = 256;
+        railTexture = new Texture2D(samples, 1, TextureFormat.RGBA32, false)
+        {
+            name = "Ragnarok compass side fade",
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear
+        };
+        Color[] pixels = new Color[samples];
+        for (int x = 0; x < samples; x++)
+            pixels[x] = Color.white.WithAlpha(SideOpacity(2f * x / (samples - 1) - 1));
+        railTexture.SetPixels(pixels);
+        railTexture.Apply(false, true);
+        railSprite = Sprite.Create(railTexture, new Rect(0, 0, samples, 1), new Vector2(0.5f, 0.5f),
+            100, 0, SpriteMeshType.FullRect);
+    }
+
     private sealed class Marker
     {
         private readonly RectTransform rect;
+        private readonly CanvasGroup fade;
         private readonly Image icon;
-        private readonly TextMeshProUGUI distance;
+        private readonly TextMeshProUGUI label;
+        private readonly TextOutline outline;
         private string shown = "";
+        internal float LabelWidth { get; private set; } = 40;
 
         internal Marker(Theme theme, Transform parent)
         {
             rect = Ugui.Node(parent, "Marker");
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1);
-            rect.pivot = new Vector2(0.5f, 1);
-            rect.sizeDelta = new Vector2(44, 34);
-            icon = Ugui.Image(rect, "Icon", null, Color.white);
-            icon.rectTransform.anchorMin = icon.rectTransform.anchorMax = new Vector2(0.5f, 1);
-            icon.rectTransform.pivot = new Vector2(0.5f, 1);
-            icon.rectTransform.sizeDelta = new Vector2(18, 18);
-            icon.rectTransform.anchoredPosition = Vector2.zero;
-            distance = Ugui.Text(rect, "Distance", "", theme.Strong, 10, Palette.Bone, TextAlignmentOptions.Top);
-            distance.rectTransform.anchorMin = distance.rectTransform.anchorMax = new Vector2(0.5f, 1);
-            distance.rectTransform.pivot = new Vector2(0.5f, 1);
-            distance.rectTransform.sizeDelta = new Vector2(90, 24);
-            distance.rectTransform.anchoredPosition = new Vector2(0, -19);
-            distance.overflowMode = TextOverflowModes.Overflow;
+            Top(rect, 0, 36, 110, 34);
+            fade = rect.gameObject.AddComponent<CanvasGroup>();
+            fade.blocksRaycasts = fade.interactable = false;
+            icon = Ugui.Image(rect, "Diamond", theme.Diamond, Palette.Bone);
+            Top(icon.rectTransform, 0, 0, 12, 12);
+            label = Ugui.Text(rect, "Label", "", theme.Strong, 11.5f, Palette.Bone, TextAlignmentOptions.Center);
+            Top(label.rectTransform, 0, 13, 110, 19);
+            label.richText = false; // Player names are plain text, never TMP markup.
+            outline = new TextOutline(label);
         }
 
-        // A named marker (a player) shows the name over the distance.
-        internal void Show(Sprite sprite, Color color, float x, string name, string range, float fade)
+        internal void Show(Color color, float x, string text, float alpha)
         {
-            string label = name.Length == 0 ? range : $"<color=#{ColorUtility.ToHtmlStringRGB(color)}>{name}</color>\n{range}";
             if (!rect.gameObject.activeSelf) rect.gameObject.SetActive(true);
-            rect.anchoredPosition = new Vector2(x, -(Height + 3));
-            if (icon.sprite != sprite) icon.sprite = sprite;
-            icon.color = color.WithAlpha(fade);
-            distance.color = Palette.Bone.WithAlpha(0.85f * fade);
-            if (label != shown) distance.text = shown = label;
+            rect.anchoredPosition = new Vector2(x, -36);
+            icon.color = color;
+            fade.alpha = alpha;
+            if (text != shown)
+            {
+                label.text = shown = text;
+                LabelWidth = Mathf.Clamp(label.GetPreferredValues(text).x + 4, 40, 110);
+            }
+        }
+
+        internal void ShowLabel(bool show)
+        {
+            label.enabled = show;
+            outline.Sync();
         }
 
         internal void Hide()
@@ -216,64 +263,73 @@ internal sealed class CompassStrip : IDisposable
     {
         if (root) UnityEngine.Object.Destroy(root!.gameObject);
         root = null;
+        Shown = null;
+        footer = null;
+        footerOutline = null;
+        if (railSprite) UnityEngine.Object.Destroy(railSprite!);
+        if (railTexture) UnityEngine.Object.Destroy(railTexture!);
+        railSprite = null;
+        railTexture = null;
         marks.Clear();
         markers.Clear();
+        targets.Clear();
+        labelBounds.Clear();
+        shownBearing = -1;
+        shownContext = shownDirection = "";
+        nextScan = nextContext = 0;
     }
 
     private void Build(Transform parent)
     {
         root = Ugui.Node(parent, "Ragnarok Compass");
-        root.anchorMin = root.anchorMax = new Vector2(0.5f, 1);
-        root.pivot = new Vector2(0.5f, 1);
-        root.anchoredPosition = new Vector2(0, -14);
-        root.sizeDelta = new Vector2(Width, Height + 20);
-
-        // The vitals' backdrop (shade or plate, per [HUD.Compass]), behind the strip only.
+        Top(root, 0, 14, Width, Height);
         RectTransform band = Ugui.Node(root, "Band").At(0, 0, Width, Height);
-        backdrop = new HudBackdrop(theme, band, new Vector4(30, 8, 30, 8));
-        Ugui.Image(root, "Rule", theme.White, Palette.Gold.WithAlpha(0.45f)).At(40, Height - 1, Width - 80, 1);
-        track = Ugui.Node(root, "Track").At(0, 0, Width, Height);
+        BuildRail();
+        // A one-pixel rail with a faint dark underlay for bright terrain.
+        Ugui.Image(root, "Rule Shadow", railSprite, Palette.Ink.WithAlpha(0.5f)).At(0, RailY - 0.5f, Width, 2);
+        Ugui.Image(root, "Rule", railSprite, Palette.Bone.WithAlpha(0.7f)).At(0, RailY, Width, 0.75f);
+        RectTransform track = Ugui.Node(root, "Track").At(0, 0, Width, 38);
         track.gameObject.AddComponent<RectMask2D>();
-
-        for (int d = 0; d < 360; d += 15)
+        for (int degrees = 0; degrees < 360; degrees += 5)
         {
-            bool letter = d % 45 == 0;
-            if (letter)
-            {
-                bool cardinal = d % 90 == 0;
-                TextMeshProUGUI text = Ugui.Text(track, Points[d / 45], Points[d / 45], theme.Strong,
-                    cardinal ? 17 : 12, d == 0 ? Palette.Alert : cardinal ? Palette.Gold : Palette.Bone, TextAlignmentOptions.Center);
-                Centre(text.rectTransform, 40, Height, 0);
-                text.overflowMode = TextOverflowModes.Overflow;
-                marks.Add((d, text, true));
-            }
-            else
-            {
-                Image tick = Ugui.Image(track, "Tick " + d, theme.White, Palette.Muted);
-                Centre(tick.rectTransform, 1, 8, -(Height / 2 - 6));
-                marks.Add((d, tick, false));
-            }
+            RectTransform mark = Mark(track, degrees, "Tick " + degrees, 1, 16);
+            float height = degrees % 45 == 0 ? 12 : degrees % 15 == 0 ? 8 : 4;
+            Image tick = Ugui.Image(mark, "Tick", theme.White, Palette.Bone.WithAlpha(0.8f));
+            tick.At(0, RailY - height / 2, 0.75f, height);
+            if (degrees % 45 != 0) continue;
+            RectTransform letter = Mark(track, degrees, Points[degrees / 45], 60, 26);
+            bool cardinal = degrees % 90 == 0;
+            TextMeshProUGUI text = Ugui.Text(letter, "Letter", Points[degrees / 45], theme.Heading,
+                cardinal ? 22 : 16, degrees == 0 ? Palette.Gold : Palette.Bone, TextAlignmentOptions.Center);
+            text.Stretch();
+            text.overflowMode = TextOverflowModes.Overflow;
+            _ = new TextOutline(text);
         }
-
-        // Where you look: a crimson notch over the strip, the exact bearing beneath it.
-        Image notch = Ugui.Image(root, "Notch", theme.Diamond, Palette.GoldBright);
-        notch.rectTransform.anchorMin = notch.rectTransform.anchorMax = new Vector2(0.5f, 1);
-        notch.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        notch.rectTransform.anchoredPosition = new Vector2(0, -Height);
-        notch.rectTransform.sizeDelta = new Vector2(10, 10);
-        bearing = Ugui.Text(root, "Bearing", "", theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Top);
-        bearing.rectTransform.anchorMin = bearing.rectTransform.anchorMax = new Vector2(0.5f, 1);
-        bearing.rectTransform.pivot = new Vector2(0.5f, 1);
-        bearing.rectTransform.anchoredPosition = new Vector2(0, -Height - 6);
-        bearing.rectTransform.sizeDelta = new Vector2(60, 16);
-        bearing.overflowMode = TextOverflowModes.Overflow;
+        footer = Ugui.Text(root, "Bearing Biome Day", "", theme.Strong, 13, Palette.Bone,
+            TextAlignmentOptions.Bottom, spacing: 1.5f);
+        Top(footer.rectTransform, 0, 70, Width, 24);
+        footer.enableAutoSizing = true;
+        footer.fontSizeMin = 10;
+        footer.fontSizeMax = 13;
+        footer.maxVisibleLines = 1;
+        footerOutline = new TextOutline(footer);
     }
 
-    // Mark centred horizontally in the track, vertically offset from its middle.
-    private static void Centre(RectTransform rect, float width, float height, float y)
+    private RectTransform Mark(Transform parent, float degrees, string name, float width, float height)
     {
-        rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
+        RectTransform rect = Ugui.Node(parent, name);
+        Top(rect, 0, 0, width, height);
+        CanvasGroup fade = rect.gameObject.AddComponent<CanvasGroup>();
+        fade.blocksRaycasts = fade.interactable = false;
+        marks.Add((degrees, rect, fade));
+        return rect;
+    }
+
+    private static void Top(RectTransform rect, float x, float y, float width, float height, float pivot = 0.5f)
+    {
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1);
+        rect.pivot = new Vector2(pivot, 1);
         rect.sizeDelta = new Vector2(width, height);
-        rect.anchoredPosition = new Vector2(0, y);
+        rect.anchoredPosition = new Vector2(x, -y);
     }
 }

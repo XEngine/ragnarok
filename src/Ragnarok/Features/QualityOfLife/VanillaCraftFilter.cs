@@ -21,6 +21,7 @@ internal sealed class VanillaCraftFilter : IDisposable
     private float chipStep;
     private InventoryGui? gui;
     private RectTransform? root;
+    private TMP_InputField? search;
 
     internal VanillaCraftFilter(InterfaceSettings settings, Theme theme, Func<bool> ragnarokPanel)
     {
@@ -34,8 +35,7 @@ internal sealed class VanillaCraftFilter : IDisposable
         InventoryGui current = InventoryGui.instance;
         if (current != gui)
         {
-            undo.Clear();
-            root = null;
+            Dispose();
             gui = current;
         }
         if (!gui) return;
@@ -46,6 +46,8 @@ internal sealed class VanillaCraftFilter : IDisposable
         }
         if (!InventoryGui.IsVisible() || !gui!.m_crafting.gameObject.activeInHierarchy) return;
         if (!root) Build(gui);
+        if (search && !search!.isFocused && search.text != CraftFilter.Query) search.SetTextWithoutNotify(CraftFilter.Query);
+        if (CraftFilter.ArmorSlot != CraftArmorSlot.All) CraftFilter.SelectSlot(CraftArmorSlot.All);
         // Only the kinds this station makes (from every recipe you know here) get a chip, side by side;
         // "craftable only" keeps its place at the end.
         float chipX = 0;
@@ -75,6 +77,8 @@ internal sealed class VanillaCraftFilter : IDisposable
         if (root) UnityEngine.Object.Destroy(root!.gameObject);
         root = null;
         chips.Clear();
+        if (search) UiState.TypingFields.Remove(search!);
+        search = null;
     }
 
     private void Build(InventoryGui g)
@@ -123,14 +127,15 @@ internal sealed class VanillaCraftFilter : IDisposable
         RectTransform area = Ugui.Node(field.transform, "Text Area").Stretch(30, 4, 8, 4);
         area.gameObject.AddComponent<RectMask2D>();
         TMP_Text font = g.m_recipeDecription;
-        TextMeshProUGUI placeholder = Ugui.Text(area, "Placeholder", "Search", font.font, 15, new Color(1, 1, 1, 0.35f)).Stretch();
+        TextMeshProUGUI placeholder = Ugui.Text(area, "Placeholder", "Recipes / ingredients", font.font, 15, new Color(1, 1, 1, 0.35f)).Stretch();
         TextMeshProUGUI text = Ugui.Text(area, "Text", "", font.font, 15, new Color(1f, 0.85f, 0.6f)).Stretch();
         TMP_InputField input = field.gameObject.AddComponent<TMP_InputField>();
+        search = input;
         input.textViewport = area;
         input.textComponent = text;
         input.placeholder = placeholder;
         input.targetGraphic = field;
-        input.characterLimit = 40;
+        input.characterLimit = 80;
         input.text = CraftFilter.Query;
         field.gameObject.SetActive(true);
         input.onValueChanged.AddListener(CraftFilter.SetQuery);
@@ -141,21 +146,24 @@ internal sealed class VanillaCraftFilter : IDisposable
         GameObject? tooltip = g.m_craftButton.GetComponent<UITooltip>()?.m_tooltipPrefab;
         (CraftCategory? Category, Sprite Glyph, string Name)[] kinds =
         {
-            (CraftCategory.Weapons, theme.IconSword, "Weapons"), (CraftCategory.Armor, theme.IconHelm, "Armour"),
+            (CraftCategory.Weapons, theme.IconSword, "Weapons"), (CraftCategory.Shields, theme.InventoryShield, "Shields"),
+            (CraftCategory.Armor, theme.IconHelm, "Armour"),
             (CraftCategory.Ammo, theme.IconArrow, "Ammo"), (CraftCategory.Tools, theme.IconHammer, "Tools"),
             (CraftCategory.Health, theme.IconHeart, "Health"), (CraftCategory.Stamina, theme.IconBolt, "Stamina"),
             (CraftCategory.Eitr, theme.IconDrop, "Eitr"), (CraftCategory.Materials, theme.IconIngot, "Materials"),
+            (CraftCategory.Meads, theme.HudBottle, "Meads"),
             (CraftCategory.Other, theme.IconOther, "Other"), (null, theme.IconCheck, "Craftable only")
         };
-        float gap = (width - kinds.Length * ChipSize) / (kinds.Length - 1);
-        chipStep = ChipSize + gap;
+        float chipSize = Mathf.Min(ChipSize, (width - (kinds.Length - 1) * 3) / kinds.Length);
+        float gap = 3;
+        chipStep = chipSize + gap;
         for (int i = 0; i < kinds.Length; i++)
         {
             var (category, glyph, name) = kinds[i];
             Image chip = Ugui.Image(root, name, button.sprite, Color.white, raycast: true)
-                .At(i * (ChipSize + gap), FieldHeight + Spacing, ChipSize, ChipSize);
+                .At(i * chipStep, FieldHeight + Spacing, chipSize, ChipSize);
             chip.type = Image.Type.Sliced;
-            Image icon = Ugui.Image(chip.transform, "Icon", glyph, Color.white).At(3, 3, ChipSize - 6, ChipSize - 6);
+            Image icon = Ugui.Image(chip.transform, "Icon", glyph, Color.white).At(2, (ChipSize - chipSize + 4) / 2, chipSize - 4, chipSize - 4);
             Button b = chip.gameObject.AddComponent<Button>();
             b.targetGraphic = chip;
             CraftCategory? c = category;

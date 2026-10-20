@@ -34,6 +34,7 @@ internal sealed class RagnarokActionBar : IDisposable
     private bool ownsMask, oldBlocks, oldInteractable;
     private float oldAlpha;
     private RectTransform? root;
+    internal static RectTransform? EquippedCard { get; private set; }
     private TMP_Text? inventoryKey, switchKey;
     private GameObject? switcher;
     private Image? upper, lower;
@@ -99,18 +100,22 @@ internal sealed class RagnarokActionBar : IDisposable
         if (switcher!.activeSelf != HotbarRows.Enabled) switcher.SetActive(HotbarRows.Enabled);
         upper!.color = HotbarRows.Row == 0 ? Palette.Key : Palette.GoldDim;
         lower!.color = HotbarRows.Row == 1 ? Palette.Key : Palette.GoldDim;
+        EquippedCard = null;
         for (int i = 0; i < cells.Count; i++)
         {
             Cell cell = cells[i];
             var item = inventory.GetItemAt(i, HotbarRows.Row);
             bool equipped = item != null && player.IsItemEquiped(item);
+            bool breaking = item != null && item.m_shared.m_useDurability && item.GetDurabilityPercentage() < 0.1f;
+            if (equipped && (EquippedCard == null || item == player.GetCurrentWeapon())) EquippedCard = cell.Rect;
             cell.Key.text = gamepad || item == null ? "" : (i + 1).ToString();
             // Keep the button's raycast/input surface while making empty slots transparent.
-            cell.Background.color = item == null ? Color.clear : Color.white;
+            // State fills replace the base well; stacking translucent wells makes them opaque.
+            cell.Background.color = item == null || equipped || breaking ? Color.clear : Color.white;
             cell.Icon.enabled = item != null;
             cell.Icon.sprite = item?.GetIcon();
             cell.Edge.sprite = item == null ? theme.HudActionEmptyEdge : theme.HudActionEdge;
-            cell.Edge.color = item == null ? Palette.Hex(0x64695E, 0.65f) : Palette.Hex(0x323734);
+            cell.Edge.color = item == null ? Palette.Hex(0x64695E, 0.65f) : Palette.Hex(0x626B64, 0.45f);
             float remaining = 0, duration = 0;
             StatusEffect? consume = item?.m_shared.m_consumeStatusEffect;
             if (consume)
@@ -138,11 +143,10 @@ internal sealed class RagnarokActionBar : IDisposable
             }
             cell.LevelStar.enabled = quality.Length > 0;
             cell.Queued.text = item != null && player.IsEquipActionQueued(item) ? "…" : "";
-            bool breaking = item != null && item.m_shared.m_useDurability && item.GetDurabilityPercentage() < 0.1f;
             cell.Rect.anchoredPosition = new Vector2(Start + i * (Slot + Gap),
                 Mathf.Lerp(cell.Rect.anchoredPosition.y, -Top + (equipped ? 6 : 0), 1 - Mathf.Exp(-18 * Time.unscaledDeltaTime)));
             cell.Equipped.enabled = equipped || breaking;
-            cell.Equipped.color = breaking ? Palette.Hex(0x291D1B) : Palette.Hex(0x2B271B);
+            cell.Equipped.color = breaking ? Palette.Hex(0x291D1B, Palette.HudGlassOpacity) : Palette.Hex(0x2B271B, Palette.HudGlassOpacity);
             cell.Key.color = breaking ? Palette.Bone : Palette.Hex(0x9A978B);
             cell.LevelStar.color = Palette.GoldBright;
             cell.Ring.enabled = breaking || equipped || (gamepad && Selected(original!) == i);
@@ -178,16 +182,17 @@ internal sealed class RagnarokActionBar : IDisposable
             }).At(Start + i * (Slot + Gap), Top, Slot, Slot);
             button.transition = Selectable.Transition.ColorTint;
             ColorBlock colors = button.colors;
-            colors.normalColor = Palette.Hex(0x101515);
-            colors.highlightedColor = Palette.Hex(0x1C2221);
+            colors.normalColor = Palette.HudGlass;
+            colors.highlightedColor = Palette.Hex(0x1C2221, 0.68f);
             colors.selectedColor = colors.highlightedColor;
-            colors.pressedColor = Palette.Hex(0x292F2B);
+            colors.pressedColor = Palette.Hex(0x292F2B, 0.72f);
+            colors.colorMultiplier = 1;
             colors.fadeDuration = 0.1f;
             button.colors = colors;
             var parentCell = button.transform;
-            Image edge = Ugui.Image(parentCell, "Slot edge", theme.HudActionEdge, Palette.Hex(0x323734)).Stretch();
+            Image edge = Ugui.Image(parentCell, "Slot edge", theme.HudActionEdge, Palette.Hex(0x626B64, 0.45f)).Stretch();
             // State fill sits behind the item and labels, keeping their artwork readable.
-            Image equippedFill = Ugui.Image(parentCell, "Equipped or breaking", theme.HudActionSlot, Palette.Hex(0x2B271B)).Stretch();
+            Image equippedFill = Ugui.Image(parentCell, "Equipped or breaking", theme.HudActionSlot, Palette.Hex(0x2B271B, Palette.HudGlassOpacity)).Stretch();
             var cell = new Cell
             {
                 Rect = (RectTransform)button.transform,
@@ -196,14 +201,14 @@ internal sealed class RagnarokActionBar : IDisposable
                 Icon = Ugui.ItemIcon(Ugui.Image(parentCell, "Item", null, Color.white)).At(11, 10, Slot - 22, Slot - 22),
                 Ring = Ugui.Image(parentCell, "Active Border", theme.HudActionEdge, Palette.Hex(0xD4A955)).Stretch(),
                 Equipped = equippedFill,
-                Cooldown = Ugui.Image(parentCell, "Cooldown sweep", theme.HudActionSlot, Color.black.WithAlpha(0.65f)).Stretch(),
-                Timer = Ugui.Text(parentCell, "Cooldown remaining", "", theme.Strong, 14, Palette.Bone, TextAlignmentOptions.Center).Stretch(),
+                Cooldown = Ugui.Image(parentCell, "Cooldown sweep", theme.HudActionSlot, Color.black.WithAlpha(0.35f)).Stretch(),
+                Timer = Ugui.Text(parentCell, "Cooldown remaining", "", theme.Numbers, 14, Palette.Bone, TextAlignmentOptions.Center).Stretch(),
                 DurabilityTrack = Ugui.Image(parentCell, "Durability track", theme.White, Palette.Hex(0x343833)).At(ContentInset, Slot - 10, Slot - ContentInset * 2, 2),
                 Durability = Ugui.Image(parentCell, "Durability", theme.White, Palette.Success).At(ContentInset, Slot - 10, Slot - ContentInset * 2, 2),
                 Key = Ugui.Text(parentCell, "Key", "", theme.Strong, 11, Palette.Muted, TextAlignmentOptions.BaselineLeft).At(ContentInset, HeaderBaseline, 16, 0),
-                Count = Ugui.Text(parentCell, "Stack", "", theme.Strong, 13, Palette.Bone, TextAlignmentOptions.BottomRight).At(4, 32, Slot - 8, 19),
+                Count = Ugui.Text(parentCell, "Stack", "", theme.Numbers, 13, Palette.Bone, TextAlignmentOptions.BottomRight).At(4, 32, Slot - 8, 19),
                 LevelStar = Ugui.Image(parentCell, "Level star", theme.HudStar, Palette.GoldBright).At(Slot - ContentInset - 15, HeaderBaseline - 7, 7, 7),
-                Quality = Ugui.Text(parentCell, "Quality", "", theme.Strong, 10, Palette.GoldBright, TextAlignmentOptions.BaselineRight).At(Slot - ContentInset - 18, HeaderBaseline, 18, 0),
+                Quality = Ugui.Text(parentCell, "Quality", "", theme.Numbers, 10, Palette.GoldBright, TextAlignmentOptions.BaselineRight).At(Slot - ContentInset - 18, HeaderBaseline, 18, 0),
                 Queued = Ugui.Text(parentCell, "Queued", "", theme.Strong, 18, Palette.Bone, TextAlignmentOptions.Center).At(15, 14, 28, 20)
             };
             cell.Key.overflowMode = cell.Quality.overflowMode = TextOverflowModes.Overflow;
@@ -219,10 +224,10 @@ internal sealed class RagnarokActionBar : IDisposable
         // Inventory badge: a diamond holding a pack, then the key that opens it.
         float badgeX = right + PaddingX + 12, middle = Top + Slot / 2;
         Ugui.Image(root, "Pack Rim", theme.Diamond, Palette.Gold).At(badgeX, middle - 17, 34, 34);
-        Ugui.Image(root, "Pack Core", theme.Diamond, Palette.Obsidian.WithAlpha(0.95f)).At(badgeX + 2, middle - 15, 30, 30);
+        Ugui.Image(root, "Pack Core", theme.Diamond, Palette.HudGlass).At(badgeX + 2, middle - 15, 30, 30);
         Ugui.Image(root, "Pack", theme.HudBackpack, Palette.Bone).At(badgeX + 7, middle - 10, 20, 20);
 
-        Image cap = Ugui.Image(root, "Inventory Key", theme.Button, Color.white).At(badgeX + 42, middle - 11, 40, 22);
+        Image cap = Ugui.Image(root, "Inventory Key", theme.Button, Color.white.WithAlpha(Palette.HudGlassOpacity)).At(badgeX + 42, middle - 11, 40, 22);
         inventoryKey = Ugui.Text(cap.transform, "Label", "", theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center).Stretch(2, 0, 2, 0);
         inventoryKey.overflowMode = TextOverflowModes.Overflow;
         textOutlines.Add(new TextOutline(inventoryKey));
@@ -264,6 +269,7 @@ internal sealed class RagnarokActionBar : IDisposable
         }
         if (root) UnityEngine.Object.Destroy(root!.gameObject);
         root = null;
+        EquippedCard = null;
         mask = null;
         original = null;
         cells.Clear();

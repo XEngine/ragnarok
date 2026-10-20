@@ -18,14 +18,14 @@ internal sealed class CharacterPortrait : IDisposable
     private static readonly AccessTools.FieldRef<VisEquipment, int> HairHash = AccessTools.FieldRefAccess<VisEquipment, int>("m_hairItem");
     private static readonly AccessTools.FieldRef<VisEquipment, int> BeardHash = AccessTools.FieldRefAccess<VisEquipment, int>("m_beardItem");
     private readonly RawImage image;
-    private readonly Image rune;
+    private readonly Graphic rune;
     private readonly GameObject mask;
     private RenderTexture? texture;
     private float nextCheck;
     private int signature;
     private bool ready, failed;
 
-    internal CharacterPortrait(Theme theme, Transform parent, Image rune)
+    internal CharacterPortrait(Theme theme, Transform parent, Graphic rune)
     {
         this.rune = rune;
         Image disc = Ugui.Image(parent, "Portrait mask", theme.Disc, Color.white).At(4, 4, 84, 84);

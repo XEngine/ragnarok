@@ -15,8 +15,9 @@
   <ItemGroup>
     <!-- Forsaken power glyphs, loaded by name: Ragnarok.Powers.GP_Eikthyr.png and so on. -->
     <EmbeddedResource Include="Assets/Powers/*.png" LogicalName="Ragnarok.Powers.%(Filename)%(Extension)" />
-    <!-- Alegreya (titles) and Scada (body), SIL Open Font License: Ragnarok.Fonts.Scada-Regular.ttf and so on. -->
+    <!-- Rune & Iron fonts and their redistribution licenses; see Assets/Fonts/SOURCES.md. -->
     <EmbeddedResource Include="Assets/Fonts/*.ttf" LogicalName="Ragnarok.Fonts.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets/Fonts/*-OFL.txt" LogicalName="Ragnarok.Fonts.%(Filename)%(Extension)" />
     <Reference Include="assembly_utils">
       <HintPath>$(GamePath)/valheim_Data/Managed/assembly_utils.dll</HintPath>
       <Private>false</Private>

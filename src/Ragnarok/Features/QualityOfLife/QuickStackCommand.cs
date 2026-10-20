@@ -1,22 +1,25 @@
+using System;
 using HarmonyLib;
 
 namespace Ragnarok.Features.QualityOfLife;
 
-// The Quick Stack press shared by the Ragnarök inventory and the vanilla one: runs the stack with
-// the "keep" settings and returns the line to show under the button.
+// Both inventory styles supply their selected category; callers without a scope use Keep settings.
+// Both paths preserve assigned gear/provisions/quiver slots and the transfer layer's protections.
 internal static class QuickStackCommand
 {
     internal static readonly AccessTools.FieldRef<InventoryGui, ItemDrop.ItemData> DragItem =
         AccessTools.FieldRefAccess<InventoryGui, ItemDrop.ItemData>("m_dragItem");
 
-    internal static string? Run(InterfaceSettings settings, InventoryGui gui)
+    internal static string? Run(InterfaceSettings settings, InventoryGui gui, Func<ItemDrop.ItemData, bool>? include = null)
     {
         Player player = Player.m_localPlayer;
         if (!player || !gui || NearbyStorage.StorageRuntime.Registry is not { } registry) return null;
         if (!settings.Features.QuickStack.Value)
             return ServerConfig.Instance?.Controlled(settings.Features.QuickStack) == true ? "Quick stack is off on this server" : "Quick stack is off";
         NearbyStorage.QuickStackResult r =
-            NearbyStorage.QuickStack.Run(player, registry, item => Keep(settings, item), DragItem(gui), OpenContainer(gui));
+            NearbyStorage.QuickStack.Run(player, registry,
+                item => include == null ? Keep(settings, item) : Assigned(item) || !include(item),
+                DragItem(gui), OpenContainer(gui));
         if (r.Pending) registry.ShowPending(player);
         return r.Items > 0
             ? $"{r.Items} item{(r.Items == 1 ? "" : "s")} → {r.Chests} chest{(r.Chests == 1 ? "" : "s")}"
@@ -60,7 +63,7 @@ internal static class QuickStackCommand
     internal static bool Keep(InterfaceSettings settings, ItemDrop.ItemData item)
     {
         // Provisions and gear in the character slots were put there on purpose.
-        if (Equipment.CharacterSlots.InSlot(item) || Equipment.BetterArcheryCompat.IsArrowSlot(item.m_gridPos)) return true;
+        if (Assigned(item)) return true;
         switch (item.m_shared.m_itemType)
         {
             case ItemDrop.ItemData.ItemType.OneHandedWeapon:
@@ -81,4 +84,8 @@ internal static class QuickStackCommand
                 return false;
         }
     }
+
+    // Category-scoped stacking must retain deliberate gear/provision/quiver placement too.
+    private static bool Assigned(ItemDrop.ItemData item) =>
+        Equipment.CharacterSlots.InSlot(item) || Equipment.BetterArcheryCompat.IsArrowSlot(item.m_gridPos);
 }

@@ -43,6 +43,17 @@ The synchronization protocol continues to send legacy section names for existing
 
 ## Verification
 
+Native Linux equivalents are `./dev.sh test`, `./dev.sh build` and
+`./dev.sh build --configuration Release`; see [LINUX.md](LINUX.md) for isolation,
+setup and development deployment. LocalSaves is development-only and uses the
+installed BepInEx Mono.Cecil assembly; it is not a plugin dependency.
+
+Crafting keeps native selection/actions behind owned presentation. `CraftSearch`
+holds pure search/food rules, `CraftFilter` adapts native lists, and `RecipeDetails`
+groups untranslated native tooltip lines before localization. `CraftFrameShape`
+defines the repair contour; `CraftFrameGraphic` renders it. Regression checks also
+cover these pure rules and contour geometry.
+
 Run on Windows using the installed development game assemblies:
 
 ```powershell

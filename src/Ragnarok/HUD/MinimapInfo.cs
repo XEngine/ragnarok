@@ -28,7 +28,7 @@ internal sealed class MinimapInfo : IDisposable
     private RectTransform? top, bottom;
     private TextMeshProUGUI? day, clock, now, next;
     private Image? sun;
-    private readonly List<HudBackdrop> backdrops = new();
+    private readonly List<TextOutline> outlines = new();
     private string shownDay = "", shownClock = "", shownNow = "", shownNext = "";
     private long predictedPeriod = -1;
     private Heightmap.Biome predictedBiome;
@@ -46,8 +46,7 @@ internal sealed class MinimapInfo : IDisposable
         Minimap current = Minimap.instance;
         if (current != minimap)
         {
-            top = bottom = null;
-            shifted = null;
+            Dispose();
             minimap = current;
         }
         if (!minimap || !settings.MinimapInfo.Value || !EnvMan.instance || !ZNet.instance)
@@ -61,10 +60,10 @@ internal sealed class MinimapInfo : IDisposable
         // The weather strip would run into the crafting panel under the map; it waits while the inventory is open.
         bottom!.gameObject.SetActive(show && !InventoryGui.IsVisible());
         if (!show) return;
-        foreach (HudBackdrop backdrop in backdrops) backdrop.Apply(settings.MinimapBackground, settings.MinimapBackgroundOpacity);
         MakeRoom(minimap);
         Place(minimap);
         Refresh();
+        foreach (TextOutline outline in outlines) outline.Sync();
     }
 
     public void Dispose()
@@ -72,7 +71,8 @@ internal sealed class MinimapInfo : IDisposable
         if (top) UnityEngine.Object.Destroy(top!.gameObject);
         if (bottom) UnityEngine.Object.Destroy(bottom!.gameObject);
         top = bottom = null;
-        backdrops.Clear();
+        outlines.Clear();
+        shownDay = shownClock = shownNow = shownNext = "";
         if (shifted) shifted!.anchoredPosition = shiftedFrom;
         shifted = null;
     }
@@ -83,13 +83,16 @@ internal sealed class MinimapInfo : IDisposable
         top = Strip(parent, "Ragnarok Day Clock");
         sun = Ugui.Image(top, "Sun", theme.Diamond, Palette.Gold).At(10, 8, 8, 8);
         day = Ugui.Text(top, "Day", "", theme.Strong, 15, Palette.Gold).At(24, 0, 140, StripHeight);
-        clock = Ugui.Text(top, "Clock", "", theme.Strong, 14, Palette.Bone, TextAlignmentOptions.MidlineRight);
+        clock = Ugui.Text(top, "Clock", "", theme.Numbers, 14, Palette.Bone, TextAlignmentOptions.MidlineRight);
         Right(clock, 10);
 
         bottom = Strip(parent, "Ragnarok Weather");
         now = Ugui.Text(bottom, "Now", "", theme.Strong, 13, Palette.Bone).At(10, 0, 160, StripHeight);
         next = Ugui.Text(bottom, "Next", "", theme.Subtle, 12, Palette.Muted, TextAlignmentOptions.MidlineRight);
         Right(next, 10);
+        next.color = Palette.Bone.WithAlpha(0.85f);
+        foreach (TMP_Text label in new[] { day, clock, now, next })
+            outlines.Add(new TextOutline(label!, world: true));
     }
 
     private RectTransform Strip(Transform parent, string name)
@@ -97,7 +100,6 @@ internal sealed class MinimapInfo : IDisposable
         RectTransform strip = Ugui.Node(parent, name);
         strip.anchorMin = strip.anchorMax = strip.pivot = new Vector2(0.5f, 0.5f);
         strip.sizeDelta = new Vector2(200, StripHeight);
-        backdrops.Add(new HudBackdrop(theme, strip, new Vector4(16, 6, 16, 6)));
         Ugui.Image(strip, "Rule", theme.White, Palette.Gold.WithAlpha(0.45f)).Stretch(left: 12, top: StripHeight - 1, right: 12);
         return strip;
     }

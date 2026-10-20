@@ -57,11 +57,11 @@ internal sealed class FeatureSettings
         QuickStack = config.Bind("QualityOfLife.QuickStack", "Enabled", true,
             "The Quick Stack button: puts items into nearby chests that already hold the same kind. A server can turn it off for everyone.");
         KeepWeapons = config.Bind("QualityOfLife.QuickStack", "KeepWeapons", true,
-            "Quick Stack leaves weapons, shields and ammunition in your inventory.");
+            "Legacy preference for unscoped Quick Stack callers: retain weapons, shields and ammunition. Both inventory styles use their selected category instead.");
         KeepConsumables = config.Bind("QualityOfLife.QuickStack", "KeepConsumables", true,
-            "Quick Stack leaves food, meads and other consumables in your inventory.");
+            "Legacy preference for unscoped Quick Stack callers: retain food, meads and other consumables. Both inventory styles use their selected category instead.");
         KeepTools = config.Bind("QualityOfLife.QuickStack", "KeepTools", true,
-            "Quick Stack leaves tools (hammer, hoe, cultivator, fishing rod) and torches in your inventory.");
+            "Legacy preference for unscoped Quick Stack callers: retain tools and torches. Both inventory styles use their selected category instead.");
         for (int i = 0; i < ProvisionKeys.Length; i++)
             ProvisionKeys[i] = config.Bind("QualityOfLife.Provisions", $"Slot{i + 1}Key", new KeyboardShortcut(KeyCode.Alpha4 + i, KeyCode.LeftAlt),
                 $"Use the item in provision slot {i + 1} (eat, drink), like a hotbar key. Valheim's own hotbar key does not fire with it. " +

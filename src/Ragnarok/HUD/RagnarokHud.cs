@@ -19,6 +19,7 @@ internal struct HudFood
 internal struct HudSnapshot
 {
     internal float Health, MaxHealth, Stamina, MaxStamina, Eitr, MaxEitr, Adrenaline, MaxAdrenaline;
+    internal float HealthRegen;
     internal List<HudFood> Foods;
     internal List<HudStatus> Statuses;
     internal int Comfort;
@@ -59,6 +60,7 @@ internal struct HudSnapshot
         return new HudSnapshot
         {
             Health = player.GetHealth(), MaxHealth = player.GetMaxHealth(),
+            HealthRegen = HealthRegeneration.PerSecond(player),
             Stamina = player.GetStamina(), MaxStamina = player.GetMaxStamina(),
             Eitr = player.GetEitr(), MaxEitr = player.GetMaxEitr(),
             Adrenaline = player.GetAdrenaline(), MaxAdrenaline = player.GetMaxAdrenaline(),
@@ -82,6 +84,7 @@ internal struct HudSnapshot
         return new HudSnapshot
         {
             Health = 96 + Mathf.Sin(time * 0.7f) * 30, MaxHealth = 160,
+            HealthRegen = 0.6f,
             Stamina = 88 + Mathf.Sin(time * 1.3f) * 30, MaxStamina = 130,
             Eitr = 42, MaxEitr = 80,
             Foods = buffer, Statuses = statuses, Comfort = 7,
@@ -94,6 +97,7 @@ internal struct HudSnapshot
 // and an independent Forsaken seal at bottom left. All follow the game's HUD root.
 internal sealed class RagnarokHud : IDisposable
 {
+    internal static RectTransform? ShownVitals { get; private set; }
     private const float VitalsWidth = 513, FoodStep = 60;
 
     private readonly InterfaceSettings settings;
@@ -110,9 +114,9 @@ internal sealed class RagnarokHud : IDisposable
     private FoodSlot[] slots = Array.Empty<FoodSlot>();
     private PowerEmblem? emblem;
     private ProvisionBar? provisions;
-    private HudBackdrop? vitalsBackdrop;
     private RectTransform? knot;
     private TextMeshProUGUI? weaponName;
+    private TextMeshProUGUI? healthRegen;
     private Image? criticalVignette;
     private readonly List<TextOutline> vitalsTextOutlines = new();
 
@@ -146,13 +150,15 @@ internal sealed class RagnarokHud : IDisposable
 
         HudSnapshot? snapshot = Preview ? HudSnapshot.Demo(Time.unscaledTime, foods, statuses) : HudSnapshot.FromLocalPlayer(foods, statuses);
         root!.SetActive(snapshot.HasValue);
-        character!.SetVisible(snapshot.HasValue);
+        ShownVitals = !Preview && snapshot.HasValue ? (RectTransform)root.transform : null;
+        bool showCharacter = snapshot.HasValue && (Preview || !InventoryGui.IsVisible());
+        character!.SetVisible(showCharacter);
         powerRoot!.gameObject.SetActive(snapshot.HasValue && settings.HudPower.Value);
-        strip!.SetVisible(snapshot.HasValue && settings.HudStatus.Value);
+        strip!.SetVisible(showCharacter && settings.HudStatus.Value);
         keys!.SetVisible(snapshot.HasValue && settings.HudKeys.Value);
         criticalVignette!.gameObject.SetActive(snapshot.HasValue);
         if (snapshot is not { } data) return;
-        if (settings.HudStatus.Value)
+        if (showCharacter && settings.HudStatus.Value)
         {
             strip.SetScale(settings.HudScale.Value);
             strip.Place(settings.Status);
@@ -160,7 +166,7 @@ internal sealed class RagnarokHud : IDisposable
         }
         if (settings.HudKeys.Value)
         {
-            if (!keys.Dock(Preview ? null : KeysDock(), settings.HudStatus.Value ? strip.Rect : null))
+            if (!keys.Dock(Preview ? null : KeysDock(), showCharacter && settings.HudStatus.Value ? strip.Rect : null))
             {
                 keys.SetScale(settings.HudScale.Value);
                 keys.Place(settings.Keys);
@@ -168,10 +174,15 @@ internal sealed class RagnarokHud : IDisposable
             keys.Tick(Preview);
         }
         root.transform.localScale = Vector3.one * settings.HudScale.Value;
-        character.Tick(Preview, data.Statuses.Count);
+        if (showCharacter) character.Tick(Preview, data.Statuses.Count);
         powerRoot.localScale = Vector3.one * settings.HudScale.Value;
         settings.Power.Apply(powerRoot);
         bars[0].Set(data.Health, data.MaxHealth);
+        float regen = Mathf.Round(data.HealthRegen * 100) / 100;
+        string regenText = regen > 0 ? "+" + regen.ToString("0.##") + "/s" : "0/s";
+        if (healthRegen!.text != regenText) healthRegen.text = regenText;
+        healthRegen.color = regen > 0 ? Palette.Bone : Palette.Muted;
+        healthRegen.enabled = settings.HudNumbers.Value;
         bars[1].Set(data.Stamina, data.MaxStamina);
         bars[2].Root.gameObject.SetActive(data.MaxEitr > 0);
         if (data.MaxEitr > 0) bars[2].Set(data.Eitr, data.MaxEitr);
@@ -194,7 +205,6 @@ internal sealed class RagnarokHud : IDisposable
         RectTransform rootRect = (RectTransform)root.transform;
         rootRect.sizeDelta = new Vector2(VitalsWidth, adrenaline && data.MaxEitr > 0 ? 94 : 76);
         settings.Vitals.Apply(rootRect);
-        vitalsBackdrop?.Apply(settings.Vitals);
 
         emblem?.Set(data.Power);
 
@@ -212,6 +222,7 @@ internal sealed class RagnarokHud : IDisposable
 
     private void DestroyRoot()
     {
+        if (root && ShownVitals == root!.transform) ShownVitals = null;
         if (root) UnityEngine.Object.Destroy(root);
         vitalsTextOutlines.Clear();
         root = null;
@@ -253,7 +264,6 @@ internal sealed class RagnarokHud : IDisposable
         rect.sizeDelta = new Vector2(420, 200);
         settings.Vitals.Apply(rect);
         root = rect.gameObject;
-        vitalsBackdrop = new HudBackdrop(theme, rect, new Vector4(20, 8, 20, 8));
         strip = new StatusStrip(theme, icons, parent);
         keys = new KeyHintsPanel(theme, icons, parent);
 
@@ -263,11 +273,11 @@ internal sealed class RagnarokHud : IDisposable
         powerRoot.sizeDelta = new Vector2(PowerEmblem.Width, PowerEmblem.Size);
         emblem = settings.HudPower.Value ? new PowerEmblem(theme, icons, powerRoot, new Rect(0, 0, PowerEmblem.Width, PowerEmblem.Size)) : null;
 
-        Ugui.Text(foodRoot, "Food label", "FOOD", theme.Strong, 11, Palette.Bone, spacing: 3).At(0, 0, 200, 18);
+        OutlineVitalsText(Ugui.Text(foodRoot, "Food label", "FOOD", theme.Strong, 11, Palette.Bone, spacing: 3).At(CharacterHud.FoodLabelLeft, 0, 200, 18));
         slots = new FoodSlot[3];
         for (int i = 0; i < slots.Length; i++)
-            slots[i] = new FoodSlot(theme, foodRoot, new Rect(i * FoodStep, 24, 46, 64));
-        provisions = new ProvisionBar(theme, foodRoot, 0, 96);
+            slots[i] = new FoodSlot(theme, foodRoot, new Rect(CharacterHud.FoodLeft + i * FoodStep, 24, CharacterHud.FoodSize, 64));
+        provisions = new ProvisionBar(theme, foodRoot, CharacterHud.FoodLeft, 96);
         weaponName = Ugui.Text(rect, "Equipped weapon", "", theme.Heading, 16.5f, Palette.Bone, TextAlignmentOptions.Center)
             .At(0, -2, VitalsWidth, 28);
         weaponName.overflowMode = TextOverflowModes.Overflow;
@@ -279,6 +289,9 @@ internal sealed class RagnarokHud : IDisposable
             new Bar(theme, rect, "Eitr", new Rect(0, 66, VitalsWidth, 6), Palette.Hex(0x9A7BEA), 2, OutlineVitalsText),
             new Bar(theme, rect, "Adrenaline", new Rect(0, 84, VitalsWidth, 6), Palette.Ember, 2, OutlineVitalsText)
         };
+        healthRegen = Ugui.Text(bars[0].Root, "Health regeneration per second", "", theme.Numbers, 9, Palette.Bone)
+            .At(5, -3, 80, 15);
+        OutlineVitalsText(healthRegen);
         knot = Ugui.Node(rect, "Vitals diamond").At(VitalsWidth / 2, 42, 0, 0);
         Ugui.Image(knot, "Rim", theme.Diamond, Palette.Gold).At(-16, -16, 32, 32);
         Ugui.Image(knot, "Core", theme.Diamond, Palette.Ink).At(-14, -14, 28, 28);
@@ -328,7 +341,7 @@ internal sealed class RagnarokHud : IDisposable
             hatch.enabled = false;
             caption = Ugui.Text(Root, "Caption", name.ToUpperInvariant(), theme.Strong, 10, Palette.Bone,
                 kind == 0 ? TextAlignmentOptions.BaselineRight : kind == 1 ? TextAlignmentOptions.BaselineLeft : TextAlignmentOptions.MidlineLeft);
-            value = Ugui.Text(Root, "Value", "", theme.Strong, 18, Palette.Bone,
+            value = Ugui.Text(Root, "Value", "", theme.Numbers, 18, Palette.Bone,
                 kind == 0 ? TextAlignmentOptions.BaselineRight : kind == 1 ? TextAlignmentOptions.BaselineLeft : TextAlignmentOptions.MidlineLeft);
             if (kind == 0)
             {
@@ -418,9 +431,9 @@ internal sealed class RagnarokHud : IDisposable
     private sealed class FoodSlot
     {
         private readonly GameObject root;
-        private readonly CanvasGroup opacity;
+        private readonly TextOutline countdownOutline;
         private readonly Theme theme;
-        private readonly Image ring, progress, icon;
+        private readonly Image silhouette, well, ring, progress, icon;
         private readonly TextMeshProUGUI countdown;
 
         internal FoodSlot(Theme theme, Transform parent, Rect r)
@@ -428,9 +441,9 @@ internal sealed class RagnarokHud : IDisposable
             this.theme = theme;
             RectTransform rect = Ugui.Node(parent, "Food").At(r);
             root = rect.gameObject;
-            opacity = root.AddComponent<CanvasGroup>();
-            opacity.blocksRaycasts = false;
-            Ugui.Image(rect, "Well", theme.Disc, Palette.Hex(0x101B1E)).At(2, 2, 42, 42);
+            root.AddComponent<CanvasGroup>().blocksRaycasts = false;
+            silhouette = Ugui.Image(rect, "Circle silhouette", theme.HudRing, Palette.Hex(0x080C0D, Palette.HudGlassOpacity)).At(-1, -1, 48, 48);
+            well = Ugui.Image(rect, "Well", theme.Disc, Palette.HudGlass).At(0, 0, 46, 46);
             ring = Ugui.Image(rect, "Duration Track", theme.HudRing, Palette.Hex(0x514C3D)).At(0, 0, 46, 46);
             progress = Ugui.Image(rect, "Remaining", theme.HudRing, Palette.Gold).At(0, 0, 46, 46);
             progress.type = Image.Type.Filled;
@@ -438,8 +451,9 @@ internal sealed class RagnarokHud : IDisposable
             progress.fillOrigin = (int)Image.Origin360.Top;
             progress.fillClockwise = true;
             icon = Ugui.Image(rect, "Food Kind", theme.IconFood, Palette.Tan).At(12, 12, 22, 22);
-            countdown = Ugui.Text(rect, "Countdown", "", theme.Strong, 11, Palette.Bone, TextAlignmentOptions.Center).At(-3, 49, 52, 18);
+            countdown = Ugui.Text(rect, "Countdown", "", theme.Numbers, 11, Palette.Bone, TextAlignmentOptions.Center).At(-3, 49, 52, 18);
             countdown.overflowMode = TextOverflowModes.Overflow;
+            countdownOutline = new TextOutline(countdown);
         }
 
         internal void Set(bool visible, HudFood? food)
@@ -447,11 +461,18 @@ internal sealed class RagnarokHud : IDisposable
             root.SetActive(visible);
             if (!visible) return;
             bool has = food.HasValue;
-            ring.color = Palette.Hex(0x514C3D);
-            opacity.alpha = has ? 1f : 0.3f;
+            ring.sprite = has ? theme.HudRing : theme.HudDashedRing;
+            ring.color = has ? Palette.Hex(0x514C3D) : Palette.Muted.WithAlpha(0.5f);
+            silhouette.enabled = has;
+            well.color = has ? Palette.HudGlass : Palette.Hex(0x101B1E, 0.28f);
             progress.enabled = icon.enabled = has;
-            countdown.text = "\u2014";
-            if (food is not { } f) return;
+            countdown.enabled = (food?.Seconds ?? 0) > 0;
+            countdown.text = "";
+            if (food is not { } f)
+            {
+                countdownOutline.Sync();
+                return;
+            }
             progress.fillAmount = Mathf.Clamp01(f.Remaining);
             bool magic = f.Eitr > 0;
             bool stamina = !magic && f.Stamina > f.Health;
@@ -461,6 +482,7 @@ internal sealed class RagnarokHud : IDisposable
             countdown.text = seconds >= 60 ? Mathf.CeilToInt(seconds / 60f) + "m" : Mathf.Max(0, seconds) + "s";
             // Keep the number legible when food can be refreshed; pulse the ring instead.
             progress.color = Palette.Gold.WithAlpha(f.CanEat ? 0.65f + 0.35f * Mathf.Sin(Time.unscaledTime * 5) : 1);
+            countdownOutline.Sync();
         }
     }
 

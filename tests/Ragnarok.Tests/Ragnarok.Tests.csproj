@@ -10,5 +10,8 @@
     <Compile Include="../../src/Ragnarok/Features/Gameplay/DeathPenalty.cs" Link="DeathPenalty.cs" />
     <Compile Include="../../src/Ragnarok/Features/NearbyStorage/WithdrawalPlan.cs" Link="WithdrawalPlan.cs" />
     <Compile Include="../../src/Ragnarok/Configuration/ConfigSchema.cs" Link="ConfigSchema.cs" />
+    <Compile Include="../../src/Ragnarok/Features/QualityOfLife/CraftSearch.cs" Link="CraftSearch.cs" />
+    <Compile Include="../../src/Ragnarok/Ui/Shared/CraftFrameShape.cs" Link="CraftFrameShape.cs" />
+    <Compile Include="../../src/Ragnarok/Ui/Shared/RecipeDetails.cs" Link="RecipeDetails.cs" />
   </ItemGroup>
 </Project>

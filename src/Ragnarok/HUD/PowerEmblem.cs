@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using TMPro;
 using UnityEngine;
@@ -48,9 +49,10 @@ internal sealed class PowerEmblem
     private readonly MonochromeIcons icons;
     private readonly Theme theme;
     private readonly Image glow, icon, placeholder, progress, track;
-    private readonly TextMeshProUGUI title, state, key;
-    private readonly GameObject keyChip;
-    private float readyAt = -10f, nextKeyRefresh;
+    private readonly TextMeshProUGUI caption, title, state, key;
+    private readonly RectTransform keyChip;
+    private readonly List<TextOutline> outlines = new();
+    private float readyAt = -10f, nextKeyRefresh, keyWidth = 26;
     private bool wasCooling, initialized;
 
     internal PowerEmblem(Theme theme, MonochromeIcons icons, Transform parent, Rect r)
@@ -58,7 +60,7 @@ internal sealed class PowerEmblem
         this.icons = icons;
         this.theme = theme;
         root = Ugui.Node(parent, "Forsaken Power").At(r);
-        Ugui.Image(root, "Disc", theme.Disc, Palette.Hex(0x101919)).At(2, 2, Size - 4, Size - 4);
+        Ugui.Image(root, "Disc", theme.Disc, Palette.HudGlass).At(2, 2, Size - 4, Size - 4);
         track = Ugui.Image(root, "Ring Track", theme.HudRing, Palette.Hex(0x514C3D)).At(0, 0, Size, Size);
         progress = Ugui.Image(root, "Remaining Ring", theme.HudRing, Palette.Gold).At(0, 0, Size, Size);
         progress.type = Image.Type.Filled;
@@ -73,17 +75,20 @@ internal sealed class PowerEmblem
 
         const float textX = 112;
         RectTransform chip = Ugui.Node(root, "Key").At(textX, 9, 26, 26);
-        keyChip = chip.gameObject;
-        Ugui.Image(chip, "Foot", theme.HudTile, Palette.Bone).At(0, 2, 26, 26);
-        Ugui.Image(chip, "Face", theme.HudTile, Palette.Ink).Stretch();
-        Ugui.Image(chip, "Edge", theme.HudTileEdge, Palette.Bone).Stretch();
-        key = Ugui.Text(chip, "Label", "", theme.Strong, 13, Palette.Bone, TextAlignmentOptions.Center).Stretch();
+        keyChip = chip;
+        // Sliced corners preserve their soft one-pixel edge at the displayed size.
+        Ugui.Image(chip, "Face", theme.HudKeySurface, Palette.HudGlass).Stretch();
+        Ugui.Image(chip, "Edge", theme.HudKeyEdge, Palette.Bone.WithAlpha(0.45f)).Stretch();
+        key = Ugui.Text(chip, "Label", "", theme.Strong, 13, Palette.Bone.WithAlpha(0.9f), TextAlignmentOptions.Center).Stretch(3, 0, 3, 0);
         key.enableAutoSizing = true;
         key.fontSizeMin = 7;
         key.fontSizeMax = 13;
         key.overflowMode = TextOverflowModes.Ellipsis;
-        Ugui.Text(root, "Caption", "FORSAKEN POWER", theme.Strong, 11, Palette.Bone, spacing: 2)
+        caption = Ugui.Text(root, "Caption", "FORSAKEN POWER", theme.Strong, 11, Palette.Bone, spacing: 2)
             .At(146, 9, Width - 146, 26);
+        caption.enableAutoSizing = true;
+        caption.fontSizeMin = 8;
+        caption.fontSizeMax = 11;
         title = Ugui.Text(root, "Name", "", theme.Heading, 24, Palette.Bone).At(textX, 38, Width - textX, 33);
         title.richText = false;
         title.enableAutoSizing = true;
@@ -92,6 +97,8 @@ internal sealed class PowerEmblem
         title.overflowMode = TextOverflowModes.Overflow;
         state = Ugui.Text(root, "State", "", theme.Strong, 13, Palette.Bone).At(textX, 72, Width - textX, 24);
         state.overflowMode = TextOverflowModes.Overflow;
+        foreach (TextMeshProUGUI label in new[] { key, caption, title, state })
+            outlines.Add(new TextOutline(label));
     }
 
     internal void SetVisible(bool visible) => root.gameObject.SetActive(visible);
@@ -111,28 +118,40 @@ internal sealed class PowerEmblem
         icon.enabled = glyph;
         placeholder.enabled = !glyph;
         icon.color = Palette.Gold.WithAlpha(cooling && !active ? 0.5f : 1);
-        track.color = power.Has ? Palette.Hex(0x514C3D) : Palette.Moss;
+        track.sprite = power.Has ? theme.HudRing : theme.HudDashedRing;
+        track.color = power.Has ? Palette.Hex(0x514C3D) : Palette.Muted.WithAlpha(0.55f);
         progress.enabled = power.Has;
         progress.fillAmount = active ? Mathf.Clamp01(power.ActiveRemaining / Mathf.Max(1, power.ActiveDuration))
             : cooling ? 1 - Mathf.Clamp01(power.Cooldown / Mathf.Max(1, power.MaxCooldown)) : 1;
 
-        title.text = (power.Has ? power.Title ?? "" : "Forsaken power").ToUpperInvariant();
+        caption.text = power.Has ? "FORSAKEN POWER" : "UNCLAIMED";
+        title.text = (power.Has ? power.Title ?? "" : "A power awaits").ToUpperInvariant();
         title.color = power.Has ? Palette.Bone : Palette.Muted;
+        title.At(112, power.Has ? 38 : 34, Width - 112, power.Has ? 33 : 30);
         string effect = power.Name == "GP_Eikthyr" ? "Run & jump" : "Active";
-        state.text = !power.Has ? "None"
+        state.text = !power.Has ? "Defeat a Forsaken. Offer its trophy\nat the Sacrificial Stones."
             : active ? effect + " - " + Clock(power.ActiveRemaining)
             : cooling ? "Cooldown - " + Clock(power.Cooldown)
             : "<color=#C5A65C>Ready</color>";
-        keyChip.SetActive(power.Has);
+        state.fontSize = power.Has ? 13 : 11;
+        state.alignment = power.Has ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.TopLeft;
+        state.At(112, power.Has ? 72 : 68, Width - 112, power.Has ? 24 : 28);
+        keyChip.gameObject.SetActive(power.Has);
         if (power.Has && now >= nextKeyRefresh)
         {
             nextKeyRefresh = now + 1;
             key.text = KeyName();
+            // Measure longer rebound keys instead of squeezing them into a one-letter chip.
+            keyWidth = Mathf.Clamp(key.GetPreferredValues(key.text, Mathf.Infinity, 26).x + 10, 26, 70);
         }
-        key.color = cooling && !active ? Palette.Muted : Palette.Bone;
+        keyChip.At(112, 9, keyWidth, 26);
+        caption.At(power.Has ? 112 + keyWidth + 8 : 112, 9,
+            power.Has ? Width - 112 - keyWidth - 8 : Width - 112, 26);
+        key.color = Palette.Bone.WithAlpha(0.9f);
         float flare = 1 - Mathf.Clamp01((now - readyAt) / 0.8f);
-        glow.enabled = flare > 0;
+        glow.enabled = power.Has && flare > 0;
         glow.color = Palette.GoldBright.WithAlpha(flare * 0.8f);
+        foreach (TextOutline outline in outlines) outline.Sync();
     }
 
     private static string Clock(float seconds) =>
@@ -142,7 +161,7 @@ internal sealed class PowerEmblem
     {
         if (ZInput.instance == null) return "F";
         string bound = ZInput.instance.GetBoundKeyString("GP", true);
-        if (string.IsNullOrEmpty(bound)) return "";
+        if (string.IsNullOrEmpty(bound)) return "UNBOUND";
         string localized = Localization.instance != null ? Localization.instance.Localize(bound) : bound;
         return localized.Length <= 4 ? localized.ToUpper(CultureInfo.InvariantCulture) : localized;
     }

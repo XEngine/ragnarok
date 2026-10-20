@@ -7,8 +7,6 @@ using UnityEngine;
 
 namespace Ragnarok.Features.QualityOfLife;
 
-internal enum CraftCategory { Weapons, Armor, Ammo, Tools, Health, Stamina, Eitr, Materials, Other }
-
 // The crafting search and category filters, shared by the Ragnarök crafting panel and the vanilla one.
 // Valheim's own recipe list is filtered after it is built (SlotRecipeListPatch), so selection, keys and
 // gamepad all work on what is shown.
@@ -17,6 +15,14 @@ internal static class CraftFilter
     internal static string Query = "";
     internal static readonly HashSet<CraftCategory> Categories = new();
     internal static bool CraftableOnly;
+    internal static bool CraftableFirst;
+    internal static CraftArmorSlot ArmorSlot;
+    internal static int ContextVersion;
+    internal static readonly HashSet<CraftArmorSlot> PresentSlots = new();
+    private static string[] terms = Array.Empty<string>();
+    private static readonly List<string> ingredients = new();
+    private static string? station;
+    private static ZNetScene? scene;
 
     // The categories of every recipe this station offers (known ones, craftable or not), before the
     // filters: only these get a chip. Set each time Valheim builds its list.
@@ -24,34 +30,47 @@ internal static class CraftFilter
 
     // On while either crafting panel shows the filters.
     internal static Func<bool> Enabled = () => false;
+    internal static Func<bool> SortEnabled = () => false;
 
     private static readonly MethodInfo UpdateCraftingPanel = AccessTools.Method(typeof(InventoryGui), "UpdateCraftingPanel");
 
-    internal static bool Active => Enabled() && (Query.Length > 0 || Categories.Count > 0 || CraftableOnly);
+    internal static bool Active => Enabled() && (Query.Length > 0 || Categories.Count > 0 || CraftableOnly || ArmorSlot != CraftArmorSlot.All);
 
-    internal static bool Matches(Recipe recipe, bool canCraft)
+    internal static bool Matches(Recipe recipe, bool canCraft, int quality)
     {
         ItemDrop.ItemData.SharedData shared = recipe.m_item.m_itemData.m_shared;
         if (CraftableOnly && !canCraft) return false;
         if (Categories.Count > 0 && !Categories.Contains(Of(shared))) return false;
-        return Query.Length == 0 || Localization.instance.Localize(shared.m_name).IndexOf(Query, StringComparison.OrdinalIgnoreCase) >= 0;
+        if (ArmorSlot != CraftArmorSlot.All && Slot(shared.m_itemType) != ArmorSlot) return false;
+        if (terms.Length == 0) return true;
+        ingredients.Clear();
+        Player player = Player.m_localPlayer;
+        CraftingStation station = player ? player.GetCurrentCraftingStation() : null!;
+        foreach (Piece.Requirement resource in recipe.m_resources)
+            if (resource.m_resItem && resource.GetAmount(quality) > 0 &&
+                resource.m_upgraderResource == (station && station.m_upgrader) &&
+                (!recipe.m_requireOnlyOneIngredient || !player || player.IsKnownMaterial(resource.m_resItem.m_itemData.m_shared.m_name)))
+                ingredients.Add(Localization.instance.Localize(resource.m_resItem.m_itemData.m_shared.m_name));
+        return CraftSearch.Matches(terms, Localization.instance.Localize(shared.m_name), ingredients);
     }
 
-    // Food and meads go by what they restore: the largest of health, stamina and eitr, or for a mead its
-    // effect. What is still to be fermented or baked (mead bases, bread dough) goes by what it becomes.
-    // Food or meads that restore none of the three (resistance meads) are Other; the rest go by item type.
+    // Foods use their dominant resource, including what dough becomes after baking.
+    // Meads/bases get their own category, including resistance meads.
     internal static CraftCategory Of(ItemDrop.ItemData.SharedData shared)
     {
+        if (CraftSearch.Mead(shared.m_food, shared.m_foodStamina, shared.m_foodEitr, shared.m_consumeStatusEffect))
+            return CraftCategory.Meads;
         if (Restores(shared) is { } stat) return stat;
-        if (Becomes(shared) is { } made) return Restores(made) ?? CraftCategory.Other;
+        if (Becomes(shared) is { } made)
+            return CraftSearch.Mead(made.m_food, made.m_foodStamina, made.m_foodEitr, made.m_consumeStatusEffect)
+                ? CraftCategory.Meads : Restores(made) ?? CraftCategory.Other;
         return Of(shared.m_itemType);
     }
 
     private static CraftCategory? Restores(ItemDrop.ItemData.SharedData shared)
     {
         if (shared.m_food > 0 || shared.m_foodStamina > 0 || shared.m_foodEitr > 0)
-            return shared.m_foodEitr >= shared.m_food && shared.m_foodEitr >= shared.m_foodStamina ? CraftCategory.Eitr
-                : shared.m_foodStamina > shared.m_food ? CraftCategory.Stamina : CraftCategory.Health;
+            return CraftSearch.Food(shared.m_food, shared.m_foodStamina, shared.m_foodEitr);
         if (shared.m_consumeStatusEffect is SE_Stats se)
         {
             if (se.m_healthOverTime > 0 || se.m_healthUpFront > 0 || se.m_healthRegenMultiplier > 1) return CraftCategory.Health;
@@ -90,7 +109,8 @@ internal static class CraftFilter
     {
         ItemDrop.ItemData.ItemType.OneHandedWeapon or ItemDrop.ItemData.ItemType.TwoHandedWeapon or
             ItemDrop.ItemData.ItemType.TwoHandedWeaponLeft or ItemDrop.ItemData.ItemType.Bow or
-            ItemDrop.ItemData.ItemType.Shield or ItemDrop.ItemData.ItemType.Attach_Atgeir => CraftCategory.Weapons,
+            ItemDrop.ItemData.ItemType.Attach_Atgeir => CraftCategory.Weapons,
+        ItemDrop.ItemData.ItemType.Shield => CraftCategory.Shields,
         ItemDrop.ItemData.ItemType.Helmet or ItemDrop.ItemData.ItemType.Chest or ItemDrop.ItemData.ItemType.Legs or
             ItemDrop.ItemData.ItemType.Shoulder or ItemDrop.ItemData.ItemType.Hands or ItemDrop.ItemData.ItemType.Utility or
             ItemDrop.ItemData.ItemType.Trinket => CraftCategory.Armor,
@@ -100,9 +120,61 @@ internal static class CraftFilter
         _ => CraftCategory.Other
     };
 
+    internal static CraftArmorSlot Slot(ItemDrop.ItemData.ItemType type) => type switch
+    {
+        ItemDrop.ItemData.ItemType.Helmet => CraftArmorSlot.Head,
+        ItemDrop.ItemData.ItemType.Chest => CraftArmorSlot.Chest,
+        ItemDrop.ItemData.ItemType.Legs => CraftArmorSlot.Legs,
+        ItemDrop.ItemData.ItemType.Shoulder => CraftArmorSlot.Cape,
+        ItemDrop.ItemData.ItemType.Utility or ItemDrop.ItemData.ItemType.Trinket => CraftArmorSlot.Utility,
+        _ => CraftArmorSlot.Other
+    };
+
+    internal static void Select(CraftCategory? category)
+    {
+        Categories.Clear();
+        if (category is { } selected) Categories.Add(selected);
+        ArmorSlot = CraftArmorSlot.All;
+        Changed();
+    }
+
+    internal static void SelectSlot(CraftArmorSlot slot) { ArmorSlot = slot; Changed(); }
+
+    // Never carry a food query/category into an unrelated station (or another world).
+    internal static void PrepareStation(Player player)
+    {
+        string current = player.GetCurrentCraftingStation() ? player.GetCurrentCraftingStation().m_name : "__hand__";
+        if (station == current && scene == ZNetScene.instance) return;
+        station = current;
+        scene = ZNetScene.instance;
+        ContextVersion++;
+        Query = "";
+        terms = Array.Empty<string>();
+        Categories.Clear();
+        ArmorSlot = CraftArmorSlot.All;
+        CraftableOnly = false;
+    }
+
+    internal static void Reset()
+    {
+        ContextVersion++;
+        station = null;
+        scene = productScene = null;
+        products = null;
+        Query = "";
+        terms = Array.Empty<string>();
+        ingredients.Clear();
+        Categories.Clear();
+        Present.Clear();
+        PresentSlots.Clear();
+        ArmorSlot = CraftArmorSlot.All;
+        CraftableOnly = CraftableFirst = false;
+    }
+
     internal static void Toggle(CraftCategory category)
     {
         if (!Categories.Remove(category)) Categories.Add(category);
+        if (!Categories.Contains(CraftCategory.Armor)) ArmorSlot = CraftArmorSlot.All;
         Changed();
     }
 
@@ -111,6 +183,7 @@ internal static class CraftFilter
         query = query.Trim();
         if (query == Query) return;
         Query = query;
+        terms = CraftSearch.Terms(query);
         Changed();
     }
 
@@ -136,22 +209,55 @@ internal static class SlotRecipeListPatch
     private static readonly Type Pair = AccessTools.Inner(typeof(InventoryGui), "RecipeDataPair");
     private static readonly PropertyInfo PairRecipe = AccessTools.Property(Pair, "Recipe");
     private static readonly PropertyInfo PairCan = AccessTools.Property(Pair, "CanCraft");
+    private static readonly PropertyInfo PairItem = AccessTools.Property(Pair, "ItemData");
     private static readonly PropertyInfo PairElement = AccessTools.Property(Pair, "InterfaceElement");
 
     private static void Postfix(InventoryGui __instance)
     {
         IList list = (IList)Available.GetValue(__instance);
+        if (Player.m_localPlayer) CraftFilter.PrepareStation(Player.m_localPlayer);
         CraftFilter.Present.Clear();
-        foreach (object pair in list) CraftFilter.Present.Add(CraftFilter.Of(((Recipe)PairRecipe.GetValue(pair)).m_item.m_itemData.m_shared));
+        CraftFilter.PresentSlots.Clear();
+        foreach (object pair in list)
+        {
+            var shared = ((Recipe)PairRecipe.GetValue(pair)).m_item.m_itemData.m_shared;
+            CraftCategory category = CraftFilter.Of(shared);
+            CraftFilter.Present.Add(category);
+            if (category == CraftCategory.Armor) CraftFilter.PresentSlots.Add(CraftFilter.Slot(shared.m_itemType));
+        }
         // A category this station has nothing in (a food filter left on at the forge) stops filtering.
         CraftFilter.Categories.RemoveWhere(c => !CraftFilter.Present.Contains(c));
-        if (!CraftFilter.Active) return;
+        if (!CraftFilter.Categories.Contains(CraftCategory.Armor) ||
+            (CraftFilter.ArmorSlot != CraftArmorSlot.All && !CraftFilter.PresentSlots.Contains(CraftFilter.ArmorSlot)))
+            CraftFilter.ArmorSlot = CraftArmorSlot.All;
+        if (!CraftFilter.Enabled()) return;
         for (int i = list.Count - 1; i >= 0; i--)
         {
             object pair = list[i];
-            if (CraftFilter.Matches((Recipe)PairRecipe.GetValue(pair), (bool)PairCan.GetValue(pair))) continue;
+            var item = PairItem.GetValue(pair) as ItemDrop.ItemData;
+            if (!CraftFilter.Active || CraftFilter.Matches((Recipe)PairRecipe.GetValue(pair), (bool)PairCan.GetValue(pair), item == null ? 1 : item.m_quality + 1)) continue;
             if (PairElement.GetValue(pair) is GameObject element) UnityEngine.Object.Destroy(element);
             list.RemoveAt(i);
+        }
+        // Reorder the actual native pairs, not just our rows, keeping selection/gamepad indices aligned.
+        if (CraftFilter.SortEnabled())
+        {
+            List<(object Pair, int Index, string Name, bool Can)> ordered = new();
+            for (int i = 0; i < list.Count; i++)
+            {
+                object pair = list[i];
+                string name = Localization.instance.Localize(((Recipe)PairRecipe.GetValue(pair)).m_item.m_itemData.m_shared.m_name);
+                ordered.Add((pair, i, name, (bool)PairCan.GetValue(pair)));
+            }
+            ordered.Sort((a, b) =>
+            {
+                int ready = CraftFilter.CraftableFirst ? b.Can.CompareTo(a.Can) : 0;
+                if (ready != 0) return ready;
+                int name = StringComparer.CurrentCultureIgnoreCase.Compare(a.Name, b.Name);
+                return name != 0 ? name : a.Index.CompareTo(b.Index);
+            });
+            list.Clear();
+            foreach (var entry in ordered) list.Add(entry.Pair);
         }
         for (int i = 0; i < list.Count; i++)
             if (PairElement.GetValue(list[i]) is GameObject element)

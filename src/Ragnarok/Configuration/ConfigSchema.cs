@@ -69,5 +69,9 @@ internal static class ConfigSchema
         }
     }
 
-    internal static bool Visible(string section, string key) => !(section == "HUD" && key == "LayoutVersion");
+    internal static bool Visible(string section, string key) => !(section == "HUD" && key == "LayoutVersion") &&
+        !((key == "Background" || key == "BackgroundOpacity") &&
+          (section == "HUD.Vitals" || section == "HUD.Status" || section == "HUD.Keys" ||
+           section == "HUD.Minimap" || section == "HUD.Compass" || section == "HUD.Character" ||
+           section == "HUD.Power" || section == "HUD.Notifications" || section == "HUD.SkillToast"));
 }

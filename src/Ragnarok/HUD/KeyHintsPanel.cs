@@ -36,7 +36,6 @@ internal sealed class KeyHintsPanel : IDisposable
     private readonly MonochromeIcons icons;
     private readonly RectTransform root;
     private readonly VerticalLayoutGroup layout;
-    private readonly HudBackdrop backdrop;
     private readonly List<Row> rows = new();
     private readonly List<Element> elements = new();
     private readonly StringBuilder signature = new();
@@ -59,7 +58,6 @@ internal sealed class KeyHintsPanel : IDisposable
         layout.childForceExpandWidth = layout.childForceExpandHeight = false;
         ContentSizeFitter fitter = root.gameObject.AddComponent<ContentSizeFitter>();
         fitter.horizontalFit = fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-        backdrop = new HudBackdrop(theme, root, new Vector4(18, 10, 18, 10));
     }
 
     internal void SetVisible(bool visible)
@@ -72,7 +70,6 @@ internal sealed class KeyHintsPanel : IDisposable
     internal void Place(HudPlacement placement)
     {
         placement.Apply(root);
-        backdrop.Apply(placement);
         TextAnchor alignment = (TextAnchor)(int)placement.Position.Value;
         if (placedAlignment == alignment) return;
         placedAlignment = alignment;
@@ -252,7 +249,7 @@ internal sealed class KeyHintsPanel : IDisposable
 
     private void Rebuild()
     {
-        Ugui.Clear(root, HudBackdrop.Name);
+        Ugui.Clear(root);
         bool docked = dockWidth > 0;
         layout.childAlignment = docked ? TextAnchor.UpperCenter : placedAlignment;
         List<RectTransform> built = new();

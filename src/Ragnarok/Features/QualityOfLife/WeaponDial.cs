@@ -37,7 +37,7 @@ internal sealed class WeaponDial : IDisposable
         ItemDrop.ItemData.ItemType.Tool, ItemDrop.ItemData.ItemType.Torch
     };
 
-    // The dial's colours and type. Ragnarök: obsidian segments, a crimson choice edged in gold, a gold halo
+    // The dial's colours and type. Ragnarök: smoked glass, a gold choice and halo
     // with diamond gems between the segments, Norse headings. Valheim: dark glass, its orange highlight and
     // its own font, like the game's emote dial.
     private sealed class Look
@@ -60,9 +60,9 @@ internal sealed class WeaponDial : IDisposable
         if (ragnarok)
             return new Look
             {
-                Fill = Palette.Obsidian.WithAlpha(0.8f), FillOn = Palette.Hex(0x3A3123, 0.94f), FillHand = new Color(0.17f, 0.18f, 0.17f, 0.88f),
-                Edge = Palette.GoldDim.WithAlpha(0.75f), EdgeOn = Palette.GoldBright, EdgeHand = Palette.Bone.WithAlpha(0.6f),
-                Hub = Palette.Obsidian.WithAlpha(0.95f), Accent = Palette.Gold, AccentDim = Palette.GoldDim, Title = Palette.Gold, Muted = Palette.Muted,
+                Fill = Palette.HudGlass, FillOn = Palette.Hex(0x3A3123, Palette.HudGlassOpacity), FillHand = Palette.Hex(0x222925, Palette.HudGlassOpacity),
+                Edge = Palette.Hex(0x626B64, 0.45f), EdgeOn = InventoryCategories.Gold, EdgeHand = Palette.Bone.WithAlpha(0.65f),
+                Hub = Palette.HudGlass, Accent = InventoryCategories.Gold, AccentDim = Palette.GoldDim, Title = Palette.Hex(0xF2D597), Muted = Palette.Bone.WithAlpha(0.85f),
                 Heading = theme.Heading, Body = theme.Strong, Ornate = true, Aura = new Color(0.8f, 0.68f, 0.48f)
             };
         TMP_FontAsset? valheim = InventoryGui.instance && InventoryGui.instance.m_containerName ? InventoryGui.instance.m_containerName.font : theme.Body;
@@ -80,6 +80,8 @@ internal sealed class WeaponDial : IDisposable
     {
         internal ItemDrop.ItemData Item = null!;
         internal Image Fill = null!, Edge = null!, Icon = null!, Aura = null!;
+        internal Image? Durability;
+        internal TextMeshProUGUI Metadata = null!;
         internal RectTransform IconRect = null!, Group = null!;
         internal CanvasGroup Fade = null!;
         internal readonly List<RectTransform> Marks = new();
@@ -101,7 +103,9 @@ internal sealed class WeaponDial : IDisposable
     private RectTransform? dial;
     private CanvasGroup? dialFade;
     private float openedAt;
-    private TextMeshProUGUI? title, detail;
+    private TextMeshProUGUI? title, detail, category, durability;
+    private readonly List<TextOutline> outlines = new();
+    private float nextDetails;
     private Vector2 aim;
     private int chosen = -1;
 
@@ -191,6 +195,7 @@ internal sealed class WeaponDial : IDisposable
     {
         Open = false;
         slots.Clear();
+        outlines.Clear();
         if (canvas) UnityEngine.Object.Destroy(canvas);
         canvas = null;
     }
@@ -215,8 +220,11 @@ internal sealed class WeaponDial : IDisposable
         openedAt = Time.unscaledTime;
         Art();
         look = Choose();
-        float shadow = Outer * 2 + 220;
-        Centre(Ugui.Image(root, "Shadow", glowSprite, new Color(0, 0, 0, 0.7f)).rectTransform, Vector2.zero, new Vector2(shadow, shadow));
+        if (!look.Ornate)
+        {
+            float shadow = Outer * 2 + 220;
+            Centre(Ugui.Image(root, "Shadow", glowSprite, new Color(0, 0, 0, 0.7f)).rectTransform, Vector2.zero, new Vector2(shadow, shadow));
+        }
 
         // One ring segment per item, turned to its place; its icon at the segment's middle.
         (Sprite fill, Sprite edge) = Segment(items.Count);
@@ -248,15 +256,22 @@ internal sealed class WeaponDial : IDisposable
             Image icon = Ugui.Image(group, item.m_shared.m_name, item.GetIcon(), Color.white);
             Centre(icon.rectTransform, direction * IconRadius, new Vector2(Icon, Icon));
             icon.preserveAspect = true;
-            if (item.m_gridPos.y == 0)
-            {
-                TextMeshProUGUI key = Ugui.Text(group, "Key", (item.m_gridPos.x + 1).ToString(), look.Body, 13, look.AccentDim,
-                    TextAlignmentOptions.Center);
-                Centre(key.rectTransform, direction * (Outer - 16), new Vector2(24, 18));
-            }
+            TextMeshProUGUI metadata = Ugui.Text(group, "Key and stack", "", look.Body, 12, look.Muted, TextAlignmentOptions.Center);
+            Centre(metadata.rectTransform, direction * IconRadius + new Vector2(0, -51), new Vector2(72, 18));
+            Outline(metadata);
             Slot slot = new() { Item = item, Fill = f, Edge = e, Icon = icon, IconRect = icon.rectTransform, Aura = aura, Group = group, Fade = fade, Direction = direction };
+            slot.Metadata = metadata;
+            if (item.m_shared.m_useDurability)
+            {
+                Vector2 at = direction * IconRadius + new Vector2(0, -64);
+                Centre(Ugui.Image(group, "Durability track", theme.White, Palette.Hex(0x626B64, 0.45f)).rectTransform, at, new Vector2(34, 2));
+                slot.Durability = Ugui.Image(group, "Durability", theme.White, Palette.Success);
+                Centre(slot.Durability.rectTransform, at, new Vector2(34, 2));
+                slot.Durability.rectTransform.pivot = new Vector2(0, 0.5f);
+                slot.Durability.rectTransform.anchoredPosition -= new Vector2(17, 0);
+            }
 
-            // Ragnarök: crimson diamonds that open around the piece's outer edge when it is aimed at.
+            // Gold diamonds open around the piece's outer edge when it is aimed at.
             if (look.Ornate)
             {
                 float half = 180f / items.Count - 5f;
@@ -283,15 +298,34 @@ internal sealed class WeaponDial : IDisposable
         needle.anchoredPosition = Vector2.zero;
         knob = Ugui.Image(root, "Knob", theme.Diamond, look.EdgeOn).rectTransform;
         Centre(knob, Vector2.zero, new Vector2(16, 16));
-        Centre(Ugui.Image(root, "Origin", theme.Diamond, look.AccentDim).rectTransform, Vector2.zero, new Vector2(8, 8));
+        if (!look.Ornate)
+            Centre(Ugui.Image(root, "Origin", theme.Diamond, look.AccentDim).rectTransform, Vector2.zero, new Vector2(8, 8));
 
-        title = Ugui.Text(root, "Title", "", look.Heading, 19, look.Title, TextAlignmentOptions.Center);
+        category = Ugui.Text(root, "Type and quality", "", look.Body, 10, look.Muted, TextAlignmentOptions.Center, spacing: 1);
+        Centre(category.rectTransform, new Vector2(0, 55), new Vector2(Hub * 1.6f, 18));
+        category.enableAutoSizing = true;
+        category.fontSizeMin = 8;
+        category.fontSizeMax = 10;
+        title = Ugui.Text(root, "Title", "", look.Heading, 21, look.Title, TextAlignmentOptions.Center);
         title.textWrappingMode = TextWrappingModes.Normal;
-        Centre(title.rectTransform, new Vector2(0, 16), new Vector2(Hub * 1.6f, 56));
+        title.enableAutoSizing = true;
+        title.fontSizeMin = 13;
+        title.fontSizeMax = 21;
+        Centre(title.rectTransform, new Vector2(0, 23), new Vector2(Hub * 1.65f, 42));
         detail = Ugui.Text(root, "Detail", "", look.Body, 12, look.Muted, TextAlignmentOptions.Center);
-        Centre(detail.rectTransform, new Vector2(0, -30), new Vector2(Hub * 1.6f, 20));
-        // Ragnarök: a short brass rule between the name and its notes.
-        if (look.Ornate) Centre(Ugui.Image(root, "Rule", theme.White, Palette.GoldBright).rectTransform, new Vector2(0, -12), new Vector2(34, 2));
+        detail.textWrappingMode = TextWrappingModes.Normal;
+        detail.enableAutoSizing = true;
+        detail.fontSizeMin = 9;
+        detail.fontSizeMax = 12;
+        Centre(detail.rectTransform, new Vector2(0, -16), new Vector2(Hub * 1.65f, 32));
+        durability = Ugui.Text(root, "Durability", "", look.Body, 12, Palette.Success, TextAlignmentOptions.Center);
+        Centre(durability.rectTransform, new Vector2(0, -50), new Vector2(Hub * 1.6f, 20));
+        foreach (TMP_Text label in new[] { category, title, detail, durability }) Outline(label);
+    }
+
+    private void Outline(TMP_Text label)
+    {
+        if (look.Ornate) outlines.Add(new TextOutline(label, world: true));
     }
 
     // Ragnarök's ornaments: the gold halo, and a diamond gem on it between each pair of segments.
@@ -336,6 +370,7 @@ internal sealed class WeaponDial : IDisposable
             chosen = now;
             Paint();
         }
+        else if (Time.unscaledTime >= nextDetails) Paint();
 
         // The aim: the knob rides round the hub's rim towards the pointer, clear of the name in the middle
         // (the needle stays hidden). Near the centre, where letting go cancels, it waits there.
@@ -377,17 +412,19 @@ internal sealed class WeaponDial : IDisposable
             slot.Group.anchoredPosition = slot.Direction * ((1 - arrive) * 80f + slot.Push);
             slot.Group.localScale = Vector3.one * Mathf.Lerp(1.12f, 1f, arrive);
             slot.IconRect.localScale = Vector3.one * (1 + 0.22f * slot.Glow);
-            slot.Aura.color = look.Aura.WithAlpha(0.5f * slot.Glow);
+            slot.Aura.color = look.Aura.WithAlpha((look.Ornate ? 0.08f : 0.5f) * slot.Glow);
             slot.Aura.rectTransform.localScale = Vector3.one * (1 + 0.07f * slot.Glow);
             // The ornaments pop slightly past full size before settling.
             float x = slot.Glow - 1, pop = slot.Glow < 0.01f ? 0 : 1 + 2.70158f * x * x * x + 1.70158f * x * x;
             foreach (RectTransform mark in slot.Marks) mark.localScale = Vector3.one * pop;
         }
+        foreach (TextOutline outline in outlines) outline.Sync();
     }
 
-    // The chosen segment lit (crimson or orange), its icon a little larger; what is in hand slightly lighter.
+    // The chosen segment lit (gold or orange), its icon a little larger; what is in hand slightly lighter.
     private void Paint()
     {
+        nextDetails = Time.unscaledTime + 0.2f;
         for (int i = 0; i < slots.Count; i++)
         {
             Slot slot = slots[i];
@@ -396,21 +433,70 @@ internal sealed class WeaponDial : IDisposable
             slot.Edge.color = on ? look.EdgeOn : hand ? look.EdgeHand : look.Edge;
 
             slot.Icon.color = on || hand ? Color.white : new Color(1, 1, 1, 0.8f);
+            string key = slot.Item.m_gridPos.y == 0 ? (slot.Item.m_gridPos.x + 1).ToString() : "";
+            string stack = slot.Item.m_shared.m_maxStackSize > 1 ? "×" + slot.Item.m_stack : "";
+            slot.Metadata.text = (key + "  " + stack).Trim();
+            if (slot.Durability)
+            {
+                float remaining = slot.Item.GetDurabilityPercentage();
+                slot.Durability!.rectTransform.sizeDelta = new Vector2(34 * remaining, 2);
+                slot.Durability.color = DurabilityColor(remaining);
+            }
         }
         hubRing!.color = chosen >= 0 ? look.Accent : look.Edge;
         if (chosen < 0)
         {
             title!.text = "";
+            category!.text = durability!.text = "";
             detail!.text = "Aim to choose";
             return;
         }
         ItemDrop.ItemData item = slots[chosen].Item;
         title!.text = Localization.instance.Localize(item.m_shared.m_name);
-        List<string> notes = new();
-        if (item.m_equipped) notes.Add("In hand");
-        if (item.m_shared.m_useDurability) notes.Add($"{Mathf.RoundToInt(item.GetDurabilityPercentage() * 100)}%");
-        if (item.m_shared.m_maxQuality > 1) notes.Add($"Level {item.m_quality}");
-        detail!.text = string.Join("  ·  ", notes);
+        string kind = item.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Shield ? "Shield" :
+            item.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Torch ? "Torch" :
+            item.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Tool ? "Tool" :
+            Label("$skill_" + item.m_shared.m_skillType.ToString().ToLowerInvariant(), "Weapon");
+        category!.text = (kind + " · " + Label("$item_quality", "Quality") + " " + item.m_quality +
+            (item.m_equipped ? " · In hand" : "")).ToUpperInvariant();
+        detail!.text = DamageSummary(item);
+        float percentage = item.GetDurabilityPercentage();
+        durability!.text = item.m_shared.m_useDurability
+            ? Label("$item_durability", "Durability") + " " + Mathf.RoundToInt(percentage * 100) + "%" : "";
+        durability.color = DurabilityColor(percentage);
+    }
+
+    private static Color DurabilityColor(float remaining) => remaining < 0.1f ? Palette.Health :
+        remaining < 0.25f ? Palette.Stamina : Palette.Hex(0x9BC48A);
+
+    private static string Label(string token, string fallback)
+    {
+        string localized = Localization.instance.Localize(token);
+        return localized.StartsWith("[", StringComparison.Ordinal) || localized.StartsWith("$", StringComparison.Ordinal) ? fallback : localized;
+    }
+
+    private static string DamageSummary(ItemDrop.ItemData item)
+    {
+        var damage = item.GetDamage();
+        List<string> parts = new();
+        void Add(string key, string label, float amount)
+        {
+            if (amount > 0) parts.Add(Label("$inventory_" + key, label) + " " + amount.ToString("0.#"));
+        }
+        if (item.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Shield && item.GetBaseBlockPower() > 0)
+            parts.Add(Label("$item_blockarmor", "Block") + " " + item.GetBaseBlockPower().ToString("0.#"));
+        Add("damage", "Damage", damage.m_damage);
+        Add("blunt", "Blunt", damage.m_blunt);
+        Add("slash", "Slash", damage.m_slash);
+        Add("pierce", "Pierce", damage.m_pierce);
+        Add("chop", "Chop", damage.m_chop);
+        Add("pickaxe", "Pickaxe", damage.m_pickaxe);
+        Add("fire", "Fire", damage.m_fire);
+        Add("frost", "Frost", damage.m_frost);
+        Add("lightning", "Lightning", damage.m_lightning);
+        Add("poison", "Poison", damage.m_poison);
+        Add("spirit", "Spirit", damage.m_spirit);
+        return string.Join(" · ", parts);
     }
 
     // Generated art --------------------------------------------------------------------------

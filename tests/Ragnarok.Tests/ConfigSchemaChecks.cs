@@ -57,6 +57,13 @@ internal static class ConfigSchemaChecks
         }
         check(!ConfigSchema.Visible("HUD", "LayoutVersion"), "Internal migration marker exposed as a user control");
         check(ConfigSchema.Visible("HUD", "Style"), "HUD style was hidden");
+        foreach (string section in new[] { "Vitals", "Status", "Keys", "Minimap", "Compass", "Character", "Power", "Notifications", "SkillToast" })
+        {
+            check(!ConfigSchema.Visible("HUD." + section, "Background"), "Removed backdrop control exposed in " + section);
+            check(!ConfigSchema.Visible("HUD." + section, "BackgroundOpacity"), "Removed backdrop opacity exposed in " + section);
+            check(ConfigSchema.Visible("HUD." + section, "MarginX"), "HUD placement hidden in " + section);
+        }
+        check(ConfigSchema.Visible("HUD.Inventory", "BackgroundOpacity"), "Inventory panel opacity was hidden with HUD backdrops");
         Console.WriteLine("PASS: configuration migration, conflict precedence, idempotence and legacy wire names.");
     }
 }

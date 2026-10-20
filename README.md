@@ -3,23 +3,37 @@
 A custom Valheim mod pack for KernelPanic and friends. This repository contains our
 own plugin and the development tools.
 
+See [CHANGELOG.md](CHANGELOG.md) for the consolidated change record,
+[the Rune & Iron guide](docs/RUNE-IRON-HUD.md) for design details, and
+[verification notes](docs/VERIFICATION.md) for completed checks and remaining in-game tests.
+
+**Arch Linux:** native Linux setup and equivalent development commands are documented
+in [docs/LINUX.md](docs/LINUX.md). Run `./scripts/setup.sh` to create an isolated
+`~/RagnarokDev` environment from your installed Valheim copy, then `./dev.sh play`.
+The Windows instructions below remain available for the original development PC.
+
 ## Settings window and HUD (0.3.0)
 
 Press **F10** to open the Ragnarök settings window: a dashboard overview plus one page
 per config section. Changes apply instantly and save to the config file. Escape or F10
-closes it. The key and the window size are under **Interface**.
+closes it. The key and the window size are under **HUD → Window**.
 
 The style ("Forge & Animus") mixes God of War's obsidian, gold filigree and ember with
 Assassin's Creed's hairlines, chamfered corners and crimson selection. Theme colours,
-generated sprites and Valheim's TextMeshPro fonts live in `src/Ragnarok/Ui/Shared/Theme.cs`.
+generated sprites and font selection live in `src/Ragnarok/Ui/Shared/Theme.cs`.
+The Rune & Iron HUD uses embedded Cinzel, Barlow Semi Condensed and Noto Sans Runic;
+font sources and licenses are recorded in `src/Ragnarok/Assets/Fonts/SOURCES.md`.
 Everything is built in code with Unity UI (uGUI); there are no asset bundles.
 While the window is open, game actions and camera input are blocked and clicks cannot
 reach game UI behind it.
 
 **HUD → Style** chooses `Vanilla` (default) or `Ragnarok`. The Ragnarök HUD replaces
-the vanilla health, stamina, eitr and food display with a bottom-left cluster; switch
-back at any time. It is parented to Valheim's HUD, so it follows the game's UI scale
-and hides with Ctrl+F3. Other vanilla HUD elements are unchanged.
+the native vitals with health/stamina bars above the bottom-center hotbar, an eitr
+strip when applicable, and character/food information at top left; switch back at any time.
+It is parented to Valheim's HUD, so it follows the game's UI scale
+and hides with Ctrl+F3. Separate settings control the other HUD replacements.
+Inside the health bar, a read-only HP-per-second estimate reflects food regeneration
+and positive healing effects; it shows zero at full health. It does not change healing ticks.
 
 **Weapon dial** (`[HUD.WeaponDial]`, `Features/QualityOfLife/WeaponDial.cs`): hold the dial key (V by default; the side
 mouse buttons can be bound in F10). Every weapon, shield, bow, tool and torch you carry is laid out in
@@ -27,48 +41,62 @@ a ring at the screen's centre, hotbar first, up to 12. Move the mouse (or the ri
 and release the key to take it in hand; release with the pointer in the middle to cancel. While the
 dial is open it counts as one of Valheim's radial menus, so the camera holds still and attacks, blocks
 and jumps are off, but you can still walk. Picking the item already in hand does nothing.
+Rune & Iron uses translucent glass with outlined labels. The center identifies the selected
+item's type, quality, name, base damage (or shield block armor) and durability percentage;
+each durable item has a condition bar beneath its icon, beside hotbar keys and stack counts.
 
-Buffs and debuffs move to a bottom-right strip ("12:23 RESTED ◇   7 COMFORT ◇ ◇"):
-value, spaced label and a monochrome version of the game's icon. Resting, campfire and
+Buffs and debuffs use translucent rounded tiles with native icons and countdowns.
+Labels are optional; B toggles them. Resting, campfire and
 shelter join one comfort group showing your comfort level. `[HUD.Status] Enabled = false`
 turns the strip off and brings back Valheim's top-right list.
 
-The diamond emblem beside the bars is your Forsaken power: its rim refills clockwise
-while recharging (timer in the centre), drains in ember while the power is active, and
-flares once with a key prompt when it is ready. It replaces Valheim's power box;
-`[HUD.Vitals] ShowForsakenPower = false` removes it and the bars move to the edge.
+The circular Forsaken power display has a recharge/active-duration ring, outlined
+name and state text, and a muted shortcut chip that follows the native binding.
+New characters see an introductory empty state without an activation prompt.
+`[HUD.Vitals] ShowForsakenPower = false` hides it.
 
 The key guide (`[HUD.Keys]`) replaces Valheim's bottom hint bar with a compact vertical
 list at the right centre by default. It mirrors whichever vanilla hint set is active
 (building, combat, inventory, fishing), so rebinds, gamepad layouts and translations
 carry over. `Enabled = false` restores the vanilla bar.
 
-Each HUD part (vitals, status, key guide) has `Background` and `BackgroundOpacity`:
-`Shade` is a soft feathered field (Assassin's Creed), `Plate` a chamfered obsidian plate
-with a gold rim (God of War), `None` draws nothing. Default: Shade at 50%.
+HUD parts draw directly over the world without the optional Shade/Plate backdrops.
+Legacy `Background`/`BackgroundOpacity` HUD keys are ignored and hidden from settings.
+The minimap uses translucent framing and outlined labels; individual HUD slot fills
+retain their smoked-glass styling.
+Rune & Iron inventory, chest and character side panels default to 85% smoked
+glass, with lighter inner slot/dashboard fills. `[HUD.Inventory] BackgroundOpacity`
+still adjusts their panel opacity; former defaults migrate automatically. The
+top-left character, food and status HUD hides while the inventory is open.
 
 HUD settings are split into `[HUD]` (style, scale), `[HUD.Vitals]` and `[HUD.Status]`;
 the F10 window shows the two parts as sub-pages under HUD. Values from 0.3.0's single
 `[HUD]` section are migrated automatically on first load.
 
-Both parts can be placed anywhere: `Position` picks one of nine screen points
+HUD parts can be placed anywhere: `Position` picks one of nine screen points
 (TopLeft … BottomRight; a 3×3 grid in the F10 window), and `MarginX` / `MarginY` set the
 distance from those edges in 1080p pixels (-500 to 500; on a centred axis, positive moves
-right/up). Defaults: vitals bottom-left, status bottom-right, 40 px.
+right/up). Defaults put vitals at bottom-center (0, 118), character at top-left (40, 34),
+status under the character name (150, 72), and Forsaken power at bottom-left (40, 34).
 
-The inventory (`[Inventory] Style`, default `FollowHud`) replaces Valheim's player grid with
-the Ragnarök panel: chamfered slots, quality diamonds, gold rings on equipped gear, a crimson
-gamepad cursor, armour and weight in the header, and a Ragnarök-styled version of the vanilla item tooltip beside the hovered slot. Valheim's
+The inventory (`[HUD.Inventory] Style`, default `FollowHud`) replaces Valheim's player grid with
+the Rune & Iron panel: character name, armor and carry weight/meter in the header,
+All/Gear/Materials/Food/Trophies tabs below, rounded slots with gold selected/equipped
+edges, dashed empty slots and a compact gold-outlined item tooltip. Valheim item icons are retained.
+There is no extra hotbar strip or category legend below the grid. Valheim's
 own grid keeps running underneath, so click, Shift-split, Ctrl-move and right-click work as before.
-Chests and crafting still use Valheim's panels.
+Chests share the styling and tabs, with their name and weight in the header
+and sorting, Take all and Place stacks below. Both retain Valheim's inventory logic.
 
-**Quick Stack** (right of the grid) puts carried items into chests within the nearby-chest
+**Quick Stack** (below the grid) puts carried items into chests within the nearby-chest
 range that already hold the same item, nearest first, like Valheim's "Stack all" for every
-chest at once. Equipped and quest items never move. The **Keep** chips (also
-`[QualityOfLife.QuickStack]`) leave weapons/shields/ammo, food and consumables, and tools/torches
-in your inventory; all three are on by default. The same ward, ownership and multiplayer rules
-as nearby crafting apply. With the vanilla inventory, the same button and chips appear in
-Valheim's own style right of the armour and weight plaques.
+chest at once (only the open chest when one is open). Either inventory style's selected
+category also selects what Quick Stack transfers; the button names that category.
+All includes every eligible category. Equipped, quest, dragged and assigned
+gear/provision/quiver items stay protected. Category tabs replace the three Keep chips
+in both styles. Saved `[QualityOfLife.QuickStack]` Keep preferences remain available
+for unscoped callers. Ward, ownership, server-enable and
+multiplayer rules remain the same as nearby crafting.
 
 **Character panel** (right of the inventory, in either inventory style, `[Inventory] CharacterSlots`): worn gear sits in its
 own slot (head, chest, legs, cape, utility, trinket) and six **provision** slots hold food, meads and
@@ -76,9 +104,21 @@ other consumables. Items there do not use grid slots. Putting gear on (right cli
 drop on its slot) moves it into the slot; taking it off, or dragging it into the grid, moves it back.
 The slots are positions in fixed rows far below the player's grid, so they save, weigh and work like
 normal inventory; vanilla's grid and "inventory full" checks simply do not see them. With the vanilla
-inventory the same panel is drawn from Valheim's own slot prefab and wood panel, under the vanilla
-Quick Stack block. Turning the panel off moves everything back into the grid as room allows.
-Quick Stack never takes items from these slots.
+inventory the side panel uses Valheim's own slot prefab, font and wood artwork, aligned with
+the inventory's top and bottom. Turning it off moves everything back into the grid as room allows.
+Quick Stack never takes items from these slots. In both styles, the side frame
+stacks worn gear over provisions and optional arrows, with the stats/set dashboard below the slots.
+Four compact cards show current armor,
+health, stamina and eitr (with resource maxima). A fixed set-bonus strip shows equipped piece
+counts and compact native effects, with incomplete bonuses marked Locked. Each set gets one
+summary line; hover for full descriptions, including longer or modded effects. The strip does
+not scroll. This display does not change equipment effects or increase the panel size.
+Vanilla also has the shared name/armor/rounded weight header, category tabs, Quick Stack scope,
+Name/Kind/Weight sorting and white-key/muted-action guide. Its chest has a matching storage header,
+tabs and native Take All/Place Stacks actions. Native item icons, grid interactions and tooltips
+remain in use. The combined native panels shrink together only when screen/crafting space requires it;
+the character dashboard stays visible with an open chest. Switching styles or unloading restores
+native sizes, offsets and hidden widgets.
 
 **Minimap info** (`[HUD.Minimap]`, either HUD style): day and clock in a strip above the minimap,
 current weather and the next one (with the time until it starts) below. The next weather repeats
@@ -88,32 +128,66 @@ the screen for the clock strip, it is moved down just enough.
 
 **Minimap frame** (`[HUD.Minimap] Style`, FollowHud by default): Valheim's small map keeps working;
 its frame art is hidden (map picture, pins, markers, wind arrow and masks are kept) and a Ragnarök
-frame drawn around the map: dark chamfered plate, gold hairline rim, corner gems, crimson north mark,
-and the biome name in gold capitals. Everything is restored on Vanilla or unload.
+round gold-rimmed frame drawn around translucent terrain, with smoked-glass medallions and map key.
+Biome, cardinal, key, day/clock and weather labels have outlines and shadows.
+Everything is restored on Vanilla or unload.
 
-**Notifications** (`[HUD.Notifications]`, FollowHud by default): Valheim's unlock messages (new
-recipe, piece, station, material, trophy, item) become cards with the item in a gold diamond, and
-its top-left messages (pickups, toggles) become slim rows; repeated pickups merge with a running
-count. Placement and backdrop like the other HUD parts; centre messages stay Valheim's; everything
-still goes to the message log. The settings page has a **Test notifications** button.
+**Notifications** (`[HUD.Notifications]`, FollowHud by default): unlocks, pickups and status messages
+use rounded dark cards with semantic gold/blue/red accents. Up to four stack, newest at the bottom,
+for four seconds; repeated pickups merge with a gold count. Placement remains
+configurable; optional HUD backdrop plating has been removed. Centre system lines use outlined bone/amber/red text; death, discovery, new-day and
+newly selected power banners use the larger Rune & Iron treatment. Discovery audio stays native,
+and intercepted messages still enter the native log. The settings page has a **Test notifications** button.
 
-**Compass** (`[HUD.Compass]`, either HUD style): a heading strip at the top centre that slides with
-the camera; N in crimson, cardinals in gold, ticks every 15°, the bearing in degrees under the notch.
-Markers under the strip, each with its distance: your bed (gold house, any distance), the nearest six
-portals within `PortalRange` (blue ring, from `ZDOMan.GetPortalList`), and ships within 400 m that you
-are not aboard (longship), and other players with their names (yellow figure), only those who share
+In a world, use the F5 console for UI-only popup previews:
+`ragnarok_popup all` plays every sample in sequence; close F5 to start playback.
+Use `ragnarok_popup clear` to cancel, or choose `pickup`, `unlock`, `rested`, `wet`,
+`warning`, `skill`, `milestone`, `system`, `blocked`, `failure`, `death`, `discovery`,
+`power` or `day`. Tab completion lists the options. No `devcommands` needed;
+Ragnarök notifications must be enabled. Samples do not change skills, powers,
+inventory, health or world progression, or enter the native message log.
+Skill gains use compact pills; untouched default placement docks above the health/vitals panel.
+Every tenth level gets a banner below the compass, with the game's skill description. Custom toast
+positions are retained. All of this follows the notification style; Vanilla uses native messages.
+
+Ragnarök **tooltips** appear after 250 ms, sit 16 HUD units to the right of the pointer, and flip/clamp
+at screen edges. Item cards show quality stars and native durability/effects. Hold **Shift** to compare
+supported numeric stats against comparable equipped gear; green/red deltas use the native displayed
+base values, while stamina/eitr costs treat lower values as improvements. Status tiles also show
+native descriptions and remaining time in matching hover cards when the UI cursor is available.
+
+**Compass** (`[HUD.Compass]`, either HUD style): a Rune & Iron heading rail at the top centre that slides with
+the camera; Cinzel directions, gold north, ticks every 5° and fading rail ends. Colored diamonds below
+show a name and distance; a separate footer keeps the gold bearing/direction, current biome and day visible.
+Markers include your bed (parchment, any distance), the nearest six
+portals within `PortalRange` (blue, from `ZDOMan.GetPortalList`), ships within 400 m that you
+are not aboard (parchment), and other players with their names (gold), only those who share
 their position on the map (`ZNet.GetPlayerList`, `m_publicPosition`).
 
 **Crafting panel** (`[HUD.Crafting] Style`, FollowHud by default): drawn over Valheim's crafting
 panel, which keeps running unseen (list, selection, requirements, timing, multi-craft, upgrade, repair).
-Station header with Craft / Upgrade tabs, a search box (game keys are ignored while it has focus),
-category chips (weapons, armour, ammo, tools, food & meads, materials, other; none lit = all) and a
-"craftable only" chip; recipe list on the left, the recipe, its requirements and the craft button
-(progress bar while crafting) on the right.
+Smoked glass follows inventory opacity, with Craft / Upgrade pills, native repair and item icons.
+Repair sits in a flush extension of the panel's left contour, sharing its background and border.
+The whole extension is hidden unless the current station supports repair and a native repair
+action is available, including when all equipment is already repaired. Opening a chest
+keeps crafting visible and usable.
+Search matches recipe names and current ingredients (all words must match); `/` focuses it.
+Labeled filters show only categories the current station offers: weapons, shields, armor, tools,
+ammo/materials or health-, stamina-, eitr-focused foods and meads. Armor adds Head / Chest / Legs /
+Cape / Utility filters. All and Craftable only are separate, with Name / Craftable-first sorting.
+The selected recipe shows italic flavor text and a scrollable text breakdown grouped into
+physical damage, elemental damage, blocking/protection, attack/resource use, nourishment,
+equipment and effects. Values and skill damage ranges come from the native tooltip at the
+selected quality/world level; unfamiliar effect text is retained. There are no stat cards.
+Smaller material tiles retain names, icons, green/red have/need quantities and readiness.
+Hover the recipe icon for the complete native item tooltip. Style, quantity,
+upgrades and the craft progress bar keep using Valheim's controls. No Pin action is added.
+Search/category/slot/craftable state resets when moving between station types or worlds.
 
 With Valheim's crafting panel the same search and filters sit above its recipe list in Valheim's style
 (`[QualityOfLife.Crafting] VanillaFilters`). Both panels share one filter state (`Features/QualityOfLife/CraftFilter.cs`), which
-filters Valheim's own recipe list after it is built. With the vanilla HUD, filled provision slots show
+filters Valheim's own recipe list after it is built; vanilla keeps native sorting and glyph controls
+(armor-slot filtering is cleared when switching to vanilla). With the vanilla HUD, filled provision slots show
 as Valheim hotbar slots just past the hotbar, with their keys (`Features/QualityOfLife/VanillaProvisionBar.cs`).
 
 **Info panel** (follows the inventory style): the wooden board above the inventory, with the character
@@ -143,17 +217,17 @@ tier order, unlocked ones lit. The chosen one's name, description and conditions
 from the same player stats Valheim's details use. Valheim's secrecy is kept: a locked secret stays hidden
 and an unmet condition shows as ???. Valheim's "cheated" note shows bottom left when it applies.
 
-**Sort** (under Quick Stack, both inventories; `[QualityOfLife.InventorySort]`): A-Z, Type or Weight. Partial
+**Sort** (in the inventory footer, both styles; `[QualityOfLife.InventorySort]`): Name, Kind or Weight. Partial
 stacks of the same item are merged first, then the grid is laid out in reading order. The hotbar row
 stays as it is by default (`KeepHotbar`); character, provision and quiver slots never move.
 
-**Provision bar** (`[QualityOfLife.Provisions]`): filled provision slots show beside the food diamonds
+**Provision bar** (`[QualityOfLife.Provisions]`): filled provision slots show beside the food circles
 in the Ragnarök HUD with their hotkeys (default Left Alt+1…6, rebindable in the settings window).
 A key eats or drinks from its slot like a hotbar key; Valheim's hotbar does not also fire on it.
 
 **Better Archery** (optional, soft dependency): when its quiver is enabled, the character panel shows
-the worn leather quiver in the middle gear cell and an **Arrows** column with the quiver's three
-slots (Better Archery's own rows; its ammo-only rule and Alt+1-3 keys apply). The grid is its base
+the worn leather quiver and its three **Arrows** slots (a row in the Ragnarök dashboard,
+a column in the vanilla panel) (Better Archery's own rows; its ammo-only rule and Alt+1-3 keys apply). The grid is its base
 rows only. Character slots live at fixed rows 64/65, and are shielded from Valheim's
 `DropInvalidItems` (which runs on every spawn) and from Better Archery's hidden-row repairs, which
 would otherwise drop them.
@@ -217,7 +291,7 @@ Stations = true
 
 See [the gameplay test checklist](docs/NEARBY-CHESTS.md).
 
-## Ready on this machine
+## Windows development layout
 
 - Source: `D:\RagnarokDev\Source`
 - Development game: `D:\RagnarokDev\Valheim`

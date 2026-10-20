@@ -50,18 +50,21 @@ internal sealed class ProvisionBar
         private readonly RectTransform rect;
         private readonly Image icon;
         private readonly TextMeshProUGUI amount, key;
+        private readonly TextOutline amountOutline, keyOutline;
         private string shownAmount = "", shownKey = "";
 
         internal Cell(Theme theme, Transform parent)
         {
             rect = Ugui.Node(parent, "Provision").At(0, 0, Size, Size);
-            Ugui.Image(rect, "Tile", theme.White, Palette.Obsidian.WithAlpha(0.75f)).At(0, 0, Size, Size);
+            Ugui.Image(rect, "Tile", theme.White, Palette.HudGlass).At(0, 0, Size, Size);
             icon = Ugui.Image(rect, "Icon", null, Color.white).At(4, 4, Size - 8, Size - 8);
             Ugui.ItemIcon(icon);
-            amount = Ugui.Text(rect, "Amount", "", theme.Strong, 11, Palette.Bone, TextAlignmentOptions.BottomRight).At(0, Size - 15, Size - 3, 14);
+            amount = Ugui.Text(rect, "Amount", "", theme.Numbers, 11, Palette.Bone, TextAlignmentOptions.BottomRight).At(0, Size - 15, Size - 3, 14);
             amount.overflowMode = TextOverflowModes.Overflow;
             key = Ugui.Text(rect, "Key", "", theme.Strong, 9, Palette.Muted, TextAlignmentOptions.TopLeft).At(3, 1, Size, 12);
             key.overflowMode = TextOverflowModes.Overflow;
+            amountOutline = new TextOutline(amount);
+            keyOutline = new TextOutline(key);
         }
 
         internal void Set(ItemDrop.ItemData item, string label, float x)
@@ -73,6 +76,8 @@ internal sealed class ProvisionBar
             string count = item.m_shared.m_maxStackSize > 1 ? item.m_stack.ToString() : "";
             if (count != shownAmount) amount.text = shownAmount = count;
             if (label != shownKey) key.text = shownKey = label;
+            amountOutline.Sync();
+            keyOutline.Sync();
         }
 
         internal void Hide()

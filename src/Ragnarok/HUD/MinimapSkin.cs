@@ -25,7 +25,8 @@ internal sealed class MinimapSkin : IDisposable
     private Minimap? minimap;
     private RectTransform? front, ring, wind, compass, needle, keyCap;
     private RectTransform? clip;
-    private TextMeshProUGUI? key, biome, biomeShadow;
+    private TextMeshProUGUI? key, biome;
+    private readonly List<TextOutline> outlines = new();
     private TMP_Text? vanillaBiome;
     private float nextKeyRefresh;
 
@@ -67,6 +68,8 @@ internal sealed class MinimapSkin : IDisposable
         undo.Clear();
         if (front) UnityEngine.Object.Destroy(front!.gameObject);
         front = null;
+        outlines.Clear();
+        nextKeyRefresh = 0;
         AboveMap = BelowMap = 0;
     }
 
@@ -76,6 +79,10 @@ internal sealed class MinimapSkin : IDisposable
         HideFrameArt(map);
         clip = RoundMask(map);
         HideVanillaBiome(map.m_biomeNameSmall);
+        Color mapColor = map.m_mapImageSmall.color;
+        map.m_mapImageSmall.color = mapColor.WithAlpha(Palette.HudGlassOpacity);
+        RawImage picture = map.m_mapImageSmall;
+        undo.Add((picture, () => picture.color = mapColor));
 
         front = Ugui.Node(root, "Ragnarok Minimap Rim");
         front.SetAsLastSibling();
@@ -94,6 +101,7 @@ internal sealed class MinimapSkin : IDisposable
             r.anchorMin = r.anchorMax = new Vector2(0.5f + cardinal.Item2 * 0.43f, 0.5f + cardinal.Item3 * 0.43f);
             r.pivot = new Vector2(0.5f, 0.5f);
             r.sizeDelta = new Vector2(18, 18);
+            outlines.Add(new TextOutline(label, world: true));
         }
         wind = Medallion("Wind");
         compass = Medallion("Compass");
@@ -104,16 +112,18 @@ internal sealed class MinimapSkin : IDisposable
         hub.rectTransform.anchorMin = hub.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
         hub.rectTransform.sizeDelta = new Vector2(5, 5);
 
-        // The biome's name inside the bottom of the circle, bone over a soft shadow (it sits on the map).
-        biomeShadow = Ugui.Text(front, "Biome Shadow", "", theme.Strong, 14, Color.black.WithAlpha(0.8f), TextAlignmentOptions.Center);
-        biome = Ugui.Text(front, "Biome", "", theme.Strong, 14, Palette.Bone, TextAlignmentOptions.Center);
+        // Outlined labels stay legible over both map terrain and the world behind it.
+        biome = Ugui.Text(front, "Biome", "", theme.Heading, 14, Palette.Bone, TextAlignmentOptions.Center);
+        outlines.Add(new TextOutline(biome, world: true));
 
-        Image cap = Ugui.Image(front, "Map Key", theme.Button, Color.white);
+        Image cap = Ugui.Image(front, "Map Key", theme.HudKeySurface, Palette.HudGlass);
         keyCap = cap.rectTransform;
         keyCap.anchorMin = keyCap.anchorMax = keyCap.pivot = new Vector2(0.5f, 0.5f);
         keyCap.sizeDelta = new Vector2(KeyWidth, KeyHeight);
         key = Ugui.Text(keyCap, "Label", "M", theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center).Stretch(1, 0, 1, 0);
         key.overflowMode = TextOverflowModes.Overflow;
+        Ugui.Image(keyCap, "Edge", theme.HudKeyEdge, Palette.Bone.WithAlpha(0.45f)).Stretch();
+        outlines.Add(new TextOutline(key, world: true));
 
         foreach (Graphic g in front.GetComponentsInChildren<Graphic>()) g.raycastTarget = false;
 
@@ -255,7 +265,7 @@ internal sealed class MinimapSkin : IDisposable
         group.alpha = 0;
         undo.Add((text, () =>
         {
-            if (added) UnityEngine.Object.Destroy(group);
+            if (added) UnityEngine.Object.DestroyImmediate(group);
             else group.alpha = alpha;
         }));
     }
@@ -292,9 +302,8 @@ internal sealed class MinimapSkin : IDisposable
 
         // Our biome label shows what Valheim writes into its own (hidden) one.
         string name = vanillaBiome ? vanillaBiome!.text : "";
-        if (biome!.text != name) biome.text = biomeShadow!.text = name;
+        if (biome!.text != name) biome.text = name;
         biome.At(-radius, radius - 30, radius * 2, 22);
-        biomeShadow!.At(-radius + 1, radius - 28.5f, radius * 2, 22);
         if (Time.unscaledTime >= nextKeyRefresh)
         {
             nextKeyRefresh = Time.unscaledTime + 1f;
@@ -302,5 +311,6 @@ internal sealed class MinimapSkin : IDisposable
             if (!string.IsNullOrEmpty(bound) && Localization.instance != null) bound = Localization.instance.Localize(bound);
             key!.text = string.IsNullOrEmpty(bound) ? "M" : bound.ToUpperInvariant();
         }
+        foreach (TextOutline outline in outlines) outline.Sync();
     }
 }

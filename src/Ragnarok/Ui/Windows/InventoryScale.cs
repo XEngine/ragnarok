@@ -3,8 +3,8 @@ using UnityEngine;
 
 namespace Ragnarok.UI.Windows;
 
-// [Inventory] Scale, for the Ragnarök inventory only (Valheim's keeps its own size): the inventory, with
-// its character column, enlarged or reduced from its top-left
+// [Inventory] Scale controls the guide layout. The native layout only shrinks
+// when necessary to fit its character board/open chest, anchored at the same top-left
 // corner. It grows into the free space towards the info board and crafting panel, which keep their size
 // and place; growth stops short of those panels and of the screen's edges. An open chest keeps its size and
 // only moves down as far as the inventory grew.
@@ -25,6 +25,7 @@ internal sealed class InventoryScale : IDisposable
 
     private readonly Func<bool> ragnarok;
     private bool placed;
+    private bool custom;
 
     internal InventoryScale(InterfaceSettings settings, Func<bool> ragnarok)
     {
@@ -44,20 +45,27 @@ internal sealed class InventoryScale : IDisposable
             if (container) containerHome = container!.anchoredPosition;
         }
         if (!player || !container) return;
-        // Valheim's own inventory keeps Valheim's own size and place.
-        if (!ragnarok())
-        {
-            if (placed) Dispose();
-            return;
-        }
+        bool guide = ragnarok();
+        if (placed && custom != guide) Dispose();
+        custom = guide;
         if (!InventoryGui.IsVisible()) return;
         placed = true;
 
-        float wanted = settings.InventoryScale.Value * Base;
-        float scale = Mathf.Max(Mathf.Min(wanted, Room()), Mathf.Min(wanted, 1f));
+        float wanted = guide ? settings.InventoryScale.Value * Base : 1f;
+        // The reference layout includes its header and footer. Allow it to shrink
+        // when needed instead of forcing the taller layout past the screen edge.
+        float scale = Mathf.Clamp(Mathf.Min(wanted, Room()), 0.5f, wanted);
 
         // Each panel keeps its top-left corner where Valheim put it.
         Place(player!, playerHome, scale, Vector2.zero);
+        // Native chest is anchored below Player and inherits its scale. It needs
+        // no extra growth offset; keep its own native anchor/scale intact.
+        if (!guide)
+        {
+            container!.localScale = Vector3.one;
+            container.anchoredPosition = containerHome;
+            return;
+        }
         // The chest sits below the inventory at its own size: it moves down by as much as the inventory grew.
         Vector3 grown = player!.parent.TransformVector(new Vector3(0, -(scale - 1) * player.rect.height, 0));
         Vector2 down = container!.parent.InverseTransformVector(grown);
@@ -133,15 +141,24 @@ internal sealed class InventoryScale : IDisposable
         float playerBottom = lowest, bottom = playerBottom;
         if (container!.gameObject.activeInHierarchy)
         {
-            float yMin = container.rect.yMin;
-            if (container.Find("Ragnarok Chest") is RectTransform chest && chest.gameObject.activeInHierarchy)
+            if (!custom)
             {
-                chest.GetWorldCorners(corners);
-                yMin = float.MaxValue;
-                foreach (Vector3 corner in corners) yMin = Mathf.Min(yMin, container.InverseTransformPoint(corner).y);
+                container.GetWorldCorners(corners);
+                foreach (Vector3 corner in corners)
+                    bottom = Mathf.Min(bottom, home.y + p.InverseTransformPoint(corner).y);
             }
-            Vector3 chestBottom = space.InverseTransformPoint(container.parent.TransformPoint(chestHome + new Vector3(0, yMin, 0)));
-            bottom = Mathf.Min(bottom, chestBottom.y);
+            else
+            {
+                float yMin = container.rect.yMin;
+                if (container.Find("Ragnarok Chest") is RectTransform chest && chest.gameObject.activeInHierarchy)
+                {
+                    chest.GetWorldCorners(corners);
+                    yMin = float.MaxValue;
+                    foreach (Vector3 corner in corners) yMin = Mathf.Min(yMin, container.InverseTransformPoint(corner).y);
+                }
+                Vector3 chestBottom = space.InverseTransformPoint(container.parent.TransformPoint(chestHome + new Vector3(0, yMin, 0)));
+                bottom = Mathf.Min(bottom, chestBottom.y);
+            }
         }
 
         // Limits: the screen, and the panels to the right.
@@ -154,9 +171,23 @@ internal sealed class InventoryScale : IDisposable
             Rect b = Bounds(o, space);
             if (b.xMin > topLeft.x + 10) limitRight = Mathf.Min(limitRight, b.xMin - Margin * 2);
         }
+        // The integrated repair extension occupies space left of the native crafting rectangle.
+        RectTransform? repair = CraftPanel.RepairExtension;
+        if (repair && repair!.gameObject.activeInHierarchy)
+        {
+            CanvasGroup? group = repair.GetComponentInParent<CanvasGroup>();
+            if (!group || group!.alpha > 0.05f)
+            {
+                Rect b = Bounds(repair, space);
+                if (b.xMin > topLeft.x + 10) limitRight = Mathf.Min(limitRight, b.xMin - Margin * 2);
+            }
+        }
 
         float width = right - topLeft.x, height = topLeft.y - playerBottom;
         if (width < 1 || height < 1 || screen.width < 1) return 1f;
+        if (!custom)
+            return Mathf.Min((limitRight - topLeft.x) / (width + 10),
+                (topLeft.y - limitBottom) / (topLeft.y - bottom + 10));
         return Mathf.Min((limitRight - topLeft.x) / width, 1 + (bottom - limitBottom) / height);
     }
 

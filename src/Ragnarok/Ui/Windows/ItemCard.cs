@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
@@ -6,24 +7,17 @@ using UnityEngine.UI;
 
 namespace Ragnarok.UI.Windows;
 
-// Valheim's item tooltip in the Ragnarök style guide, opened beside the hovered slot: the name in Alegreya
-// with the level diamond on the frame's corner, the description and kind, then each stat group as large
-// rows (an icon, the figure in bold, its range quiet) over paired detail cells, status effects as their own
-// blocks, notes in italics, and a footer with the durability rule and the weight. The vanilla text is sorted
-// by its localization tokens, so every stat, mod-added line and translation still appears somewhere.
+// Reference tooltip: rounded gold outline, title/kind, italic description, plain
+// label/value rows and weight/quality footer. Vanilla supplies every stat and effect.
 internal sealed class ItemCard
 {
     internal const string Name = "Ragnarok Item Tooltip";
-    private const float Width = 320, Pad = 14, Offset = 10, Big = 26, Cell = 22, CellGap = 6, Gap = 10;
+    private const float Width = 320, Pad = 16, Offset = 16, HoverDelay = 0.25f;
 
     private static readonly Regex Tags = new("<.*?>", RegexOptions.Compiled);
     private static readonly Regex Token = new(@"^\$([a-z_]+)", RegexOptions.Compiled);
-    private static readonly Regex Number = new(@"^\s*([-+]?[\d.,]+%?[a-z/]*)\s*(.*)$", RegexOptions.Compiled);
 
     private enum Group { Damage, Defence, Food, Other }
-
-    // The figures that head a group, with their glyph and colour; the rest of a group become detail cells.
-    private readonly Dictionary<string, (Sprite Glyph, Color Color)> heads;
 
     private static readonly HashSet<string> DamageTokens = new()
     {
@@ -40,54 +34,48 @@ internal sealed class ItemCard
 
     private readonly Theme theme;
     private readonly RectTransform root, content;
-    private readonly TextMeshProUGUI title, levelLabel;
-    private readonly RectTransform level;
-    private readonly TextMeshProUGUI levelText;
+    private readonly TextMeshProUGUI title, kind;
+    private readonly Vector3[] corners = new Vector3[4];
     private ItemDrop.ItemData? shown;
     private int shownStack, shownQuality;
     private float shownDurability;
     private bool shownEquipped;
+    private string? shownDetails;
+    private string shownDetailsHeading = "", shownDetailsCaption = "";
+    private ItemDrop.ItemData? hovered;
+    private float hoveredSince, detailsSince;
+    private bool detailsPending;
+    private readonly Image[] stars = new Image[8];
+    private ItemDrop.ItemData? shownComparison;
+    private bool comparing;
+    private int comparisonQuality;
+    private Parsed? comparisonStats;
+    private static readonly Regex Figure = new(@"^([+-]?\d+(?:[.,]\d+)?)\s*(%|/s)?(?:\s*\([^)]*\))?$");
+    private static readonly HashSet<string> DamageFigures = new()
+    {
+        "inventory_damage", "inventory_blunt", "inventory_slash", "inventory_pierce", "inventory_chop", "inventory_pickaxe",
+        "inventory_fire", "inventory_frost", "inventory_lightning", "inventory_poison", "inventory_spirit"
+    };
 
     internal ItemCard(Theme theme, RectTransform parent)
     {
         this.theme = theme;
-        heads = new Dictionary<string, (Sprite, Color)>
-        {
-            ["inventory_damage"] = (theme.GlyphSlash, Palette.GoldBright),
-            ["inventory_blunt"] = (theme.GlyphBlunt, Palette.GoldBright),
-            ["inventory_slash"] = (theme.GlyphSlash, Palette.GoldBright),
-            ["inventory_pierce"] = (theme.GlyphPierce, Palette.GoldBright),
-            ["inventory_chop"] = (theme.GlyphChop, Palette.GoldBright),
-            ["inventory_pickaxe"] = (theme.GlyphPickaxe, Palette.GoldBright),
-            ["inventory_fire"] = (theme.GlyphFire, Palette.Ember),
-            ["inventory_frost"] = (theme.GlyphFrost, Palette.Eitr),
-            ["inventory_lightning"] = (theme.GlyphLightning, Palette.Key),
-            ["inventory_poison"] = (theme.GlyphPoison, Palette.Hex(0x8DBA55)),
-            ["inventory_spirit"] = (theme.GlyphSpirit, Palette.Hex(0xD6D2F0)),
-            ["item_armor"] = (theme.GlyphShield, Palette.GoldBright),
-            ["item_blockarmor"] = (theme.GlyphShield, Palette.GoldBright),
-            ["item_food_health"] = (theme.GlyphHealth, Palette.Alert),
-            ["item_food_stamina"] = (theme.GlyphStamina, Palette.Stamina),
-            ["item_food_eitr"] = (theme.GlyphEitr, Palette.Eitr)
-        };
-
         root = Ugui.Node(parent, Name);
         root.anchorMin = root.anchorMax = root.pivot = new Vector2(0, 1);
-        Ugui.Image(root, "Frame", theme.Tooltip, Color.white).Stretch();
-
-        title = Ugui.Text(root, "Name", "", theme.Heading, 21, Palette.Bone).At(Pad, 11, Width - Pad * 2, 30);
-        levelLabel = Ugui.Text(root, "Level Label", "lvl.", theme.Subtle, 11, Palette.Faint, TextAlignmentOptions.MidlineRight)
-            .At(Width - 78, 4, 34, 16);
-        // The level sits in a diamond astride the frame's top edge, near its right corner.
-        level = Ugui.Node(root, "Level");
-        level.At(Width - 40, -13, 26, 26);
-        Ugui.Image(level, "Rim", theme.Diamond, Palette.Gold).Stretch();
-        Ugui.Image(level, "Core", theme.Diamond, Palette.Obsidian).Stretch(2, 2, 2, 2);
-        levelText = Ugui.Text(level, "Number", "", theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center).Stretch();
-        levelText.overflowMode = TextOverflowModes.Overflow;
-
-        content = Ugui.Node(root, "Content");
-        content.At(0, 44, Width, 0);
+        Ugui.Image(root, "Frame", theme.PackSurface, Palette.Hex(0x0C0F11, 0.98f)).Stretch();
+        Ugui.Image(root, "Outline", theme.PackEdge, InventoryCategories.Gold).Stretch();
+        title = Ugui.Text(root, "Name", "", theme.Heading, 21, InventoryCategories.Gold).At(Pad, 12, Width - Pad * 2, 31);
+        title.enableAutoSizing = true;
+        title.fontSizeMin = 15;
+        title.fontSizeMax = 21;
+        kind = Ugui.Text(root, "Kind", "", theme.Strong, 10.5f, InventoryCategories.Material, spacing: 1.8f)
+            .At(Pad, 44, Width - Pad * 2, 19);
+        for (int i = 0; i < stars.Length; i++)
+        {
+            stars[i] = Ugui.Image(root, "Quality star " + i, theme.HudStar, InventoryCategories.Gold).At(0, 22, 8, 8);
+            stars[i].enabled = false;
+        }
+        content = Ugui.Node(root, "Content").At(0, 72, Width, 0);
         root.gameObject.SetActive(false);
     }
 
@@ -105,32 +93,121 @@ internal sealed class ItemCard
 
     internal void Destroy()
     {
-        if (root) Object.Destroy(root.gameObject);
+        if (root)
+        {
+            root.gameObject.SetActive(false);
+            Object.Destroy(root.gameObject);
+        }
+    }
+
+    // Non-item details share the exact frame, fonts, spacing and screen fitting
+    // of item cards. The caller owns this card under its own UI hierarchy.
+    internal void ShowDetails(string? body, Rect area, string heading = "Set Bonus", string caption = "EQUIPMENT · SET EFFECTS")
+    {
+        if (!root) return;
+        bool visible = !string.IsNullOrEmpty(body);
+        if (!visible) detailsPending = false;
+        else if (!detailsPending) { detailsPending = true; detailsSince = Time.unscaledTime; }
+        visible &= Time.unscaledTime - detailsSince >= HoverDelay;
+        if (root.gameObject.activeSelf != visible)
+        {
+            root.gameObject.SetActive(visible);
+            if (visible) Raise();
+        }
+        if (!visible) return;
+        if (shownDetails != body || shownDetailsHeading != heading || shownDetailsCaption != caption)
+        {
+            shownDetails = body;
+            shownDetailsHeading = heading;
+            shownDetailsCaption = caption;
+            title.text = heading;
+            title.rectTransform.sizeDelta = new Vector2(Width - Pad * 2, 31);
+            foreach (Image star in stars) star.enabled = false;
+            kind.text = caption;
+            Ugui.Clear(content);
+            float height = Paragraph(Restyle(body!), theme.Body, 13, Palette.Bone, Pad, Width - Pad * 2, 0);
+            root.sizeDelta = new Vector2(Width, 72 + height + Pad);
+        }
+        Position(area);
     }
 
     // `slot` is the hovered slot's rect in the panel's top-left coordinates.
     internal void Show(ItemDrop.ItemData? item, Player player, Rect slot)
     {
-        bool on = item != null;
+        if (hovered != item) { hovered = item; hoveredSince = Time.unscaledTime; }
+        bool on = item != null && Time.unscaledTime - hoveredSince >= HoverDelay;
         if (root.gameObject.activeSelf != on)
         {
             root.gameObject.SetActive(on);
             if (on) Raise();
         }
-        if (item == null)
+        if (item == null || !on)
         {
             shown = null;
             return;
         }
-        root.anchoredPosition = new Vector2(slot.xMax + Offset, -slot.y);
-        if (item == shown && item.m_stack == shownStack && item.m_quality == shownQuality &&
-            item.m_equipped == shownEquipped && Mathf.Approximately(item.m_durability, shownDurability)) return;
-        shown = item;
-        shownStack = item.m_stack;
-        shownQuality = item.m_quality;
-        shownEquipped = item.m_equipped;
-        shownDurability = item.m_durability;
-        Fill(item, player);
+        ItemDrop.ItemData? equipped = Comparison(player, item);
+        bool compare = equipped != null && (ZInput.GetKey(KeyCode.LeftShift) || ZInput.GetKey(KeyCode.RightShift));
+        if (item != shown || item.m_stack != shownStack || item.m_quality != shownQuality || equipped != shownComparison || compare != comparing ||
+            (equipped?.m_quality ?? 0) != comparisonQuality ||
+            item.m_equipped != shownEquipped || !Mathf.Approximately(item.m_durability, shownDurability))
+        {
+            shown = item;
+            shownStack = item.m_stack;
+            shownQuality = item.m_quality;
+            shownEquipped = item.m_equipped;
+            shownDurability = item.m_durability;
+            shownComparison = equipped;
+            comparisonQuality = equipped?.m_quality ?? 0;
+            comparing = compare;
+            Fill(item, player);
+        }
+        Position(slot);
+    }
+
+    private void Position(Rect anchor)
+    {
+        if ((!ZInput.IsGamepadActive() || ZInput.IsMouseActive()) && root.parent is RectTransform parent)
+        {
+            Canvas? canvas = parent.GetComponentInParent<Canvas>();
+            Camera? camera = canvas && canvas!.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, ZInput.pointerPosition, camera, out Vector2 point))
+                anchor = new Rect(point.x - parent.rect.xMin, parent.rect.yMax - point.y, 0, 0);
+        }
+        root.anchoredPosition = new Vector2(anchor.xMax + Offset, -anchor.y);
+        FitOnScreen(anchor);
+    }
+
+    private Rect Bounds(RectTransform rect, Transform space)
+    {
+        rect.GetWorldCorners(corners);
+        Vector2 min = new(float.MaxValue, float.MaxValue), max = new(float.MinValue, float.MinValue);
+        foreach (Vector3 corner in corners)
+        {
+            Vector2 p = space.InverseTransformPoint(corner);
+            min = Vector2.Min(min, p);
+            max = Vector2.Max(max, p);
+        }
+        return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+    }
+
+    private void FitOnScreen(Rect slot)
+    {
+        Canvas? canvas = root.parent.GetComponentInParent<Canvas>();
+        if (!canvas || canvas!.rootCanvas.transform is not RectTransform screen) return;
+        Rect limit = Bounds(screen, root.parent);
+        root.localScale = Vector3.one;
+        float scale = Mathf.Min(1, (limit.height - 16) / root.rect.height, (limit.width - 16) / Width);
+        root.localScale = Vector3.one * Mathf.Max(0.1f, scale);
+        Rect bounds = Bounds(root, root.parent);
+        if (bounds.xMax > limit.xMax - 8)
+        {
+            root.anchoredPosition = new Vector2(slot.xMin - Width * root.localScale.x - Offset, -slot.y);
+            bounds = Bounds(root, root.parent);
+        }
+        float x = Mathf.Max(0, limit.xMin + 8 - bounds.xMin) - Mathf.Max(0, bounds.xMax - limit.xMax + 8);
+        float y = Mathf.Max(0, limit.yMin + 8 - bounds.yMin) - Mathf.Max(0, bounds.yMax - limit.yMax + 8);
+        root.anchoredPosition += new Vector2(x, y);
     }
 
     // Parsing --------------------------------------------------------------------------------
@@ -281,203 +358,116 @@ internal sealed class ItemCard
 
     private void Fill(ItemDrop.ItemData item, Player player)
     {
-        ItemDrop.ItemData.SharedData shared = item.m_shared;
-        title.text = Localization.instance.Localize(shared.m_name);
-        bool levelled = shared.m_maxQuality > 1;
-        level.gameObject.SetActive(levelled);
-        levelLabel.gameObject.SetActive(levelled);
-        if (levelled) levelText.text = item.m_quality.ToString();
-        title.rectTransform.sizeDelta = new Vector2(Width - Pad * 2 - (levelled ? 54 : 0), 30);
-
+        comparisonStats = comparing && shownComparison != null ? Parse(shownComparison.GetTooltip()) : null;
+        title.text = Localization.instance.Localize(item.m_shared.m_name);
+        int starCount = item.m_shared.m_maxQuality > 1 ? Mathf.Min(stars.Length, item.m_shared.m_maxQuality) : 0;
+        for (int i = 0; i < stars.Length; i++)
+        {
+            stars[i].enabled = i < starCount;
+            if (i < starCount)
+            {
+                stars[i].At(Width - Pad - (starCount - i) * 10, 22, 8, 8);
+                stars[i].color = i < item.m_quality ? InventoryCategories.Gold : Palette.Hex(0x4D5551);
+            }
+        }
+        title.rectTransform.sizeDelta = new Vector2(Width - Pad * 2 - (starCount > 0 ? starCount * 10 + 8 : 0), 31);
+        string category = Kind(item).ToUpperInvariant();
+        if (item.m_shared.m_skillType is Skills.SkillType.Axes or Skills.SkillType.Pickaxes)
+            category = "WEAPON · TOOL";
+        string state = item.m_equipped ? " · EQUIPPED" : player.IsEquipActionQueued(item) ? " · EQUIPPING" : "";
+        kind.text = category + state;
         Parsed p = Parse(item.GetTooltip());
         Ugui.Clear(content);
         float w = Width - Pad * 2, y = 0;
-
         if (p.About.Count > 0)
-            y = Paragraph(Restyle(string.Join(" ", p.About.ToArray())), theme.Body, 12.5f, Palette.Bone.WithAlpha(0.85f), Pad, w, y) + 6;
-        string state = item.m_equipped ? "  ·  <color=#CDAE7C>Equipped</color>" : player.IsEquipActionQueued(item) ? "  ·  Equipping" : "";
-        string kind = Kind(item);
-        if (kind.Length > 0 || state.Length > 0)
-        {
-            Ugui.Text(content, "Kind", kind + state, theme.Subtle, 12, Palette.Faint).At(Pad, y, w, 18);
-            y += 20;
-        }
-
-        bool stats = false;
+            y = Paragraph(Restyle(string.Join(" ", p.About.ToArray())), theme.Subtle, 13, Palette.Bone, Pad, w, y) + 12;
         foreach (Group group in new[] { Group.Damage, Group.Defence, Group.Food, Group.Other })
-        {
-            if (!p.Rows.TryGetValue(group, out var rows) || rows.Count == 0) continue;
-            y = Rule(y + 4) + 8;
-            y = Rows(rows, w, y);
-            stats = true;
-        }
+            if (p.Rows.TryGetValue(group, out var rows))
+                foreach (Line line in rows) y = Row(line, w, y);
         foreach (Effect effect in p.Effects)
         {
-            y = EffectBlock(effect, shared, w, y + (stats ? 2 : 6));
-            stats = true;
+            y += 6;
+            if (effect.Name.Length > 0)
+                y = Paragraph(effect.Name, theme.Strong, 12, InventoryCategories.Gold, Pad, w, y) + 3;
+            foreach (string about in effect.About)
+                y = Paragraph(Restyle(about), theme.Subtle, 12, Palette.Muted, Pad, w, y) + 3;
+            foreach (Line line in effect.Rows) y = Row(line, w, y);
         }
-
-        if (p.Notes.Count > 0 || p.NoTeleport)
+        if (p.Durability is { } durability) y = Row(durability, w, y);
+        foreach (string note in p.Notes)
+            y = Paragraph(note, theme.Subtle, 11.5f, InventoryCategories.Material, Pad, w, y + 3);
+        if (p.NoTeleport)
+            y = Paragraph(Localization.instance.Localize("$item_noteleport"), theme.Subtle, 12, Palette.Health, Pad, w, y + 4);
+        y += 10;
+        Ugui.Image(content, "Rule", theme.White, Palette.Hex(0x303531)).At(Pad, y, w, 0.75f);
+        y += 10;
+        List<string> footer = new();
+        if (p.Weight is { } weight) footer.Add(weight.Label + " " + Tags.Replace(weight.Value, ""));
+        if (item.m_shared.m_maxQuality > 1)
+            footer.Add(Localization.instance.Localize("$item_quality") + " " + item.m_quality);
+        if (p.Value is { } value) footer.Add(value.Label + " " + Tags.Replace(value.Value, ""));
+        y = Paragraph(string.Join(" · ", footer.ToArray()), theme.Body, 11.5f, InventoryCategories.Material, Pad, w, y);
+        if (shownComparison != null)
+            y = Paragraph("vs " + Localization.instance.Localize(shownComparison.m_shared.m_name), theme.Body, 10.5f,
+                InventoryCategories.Material, Pad, w, y + 4);
+        if (item.IsEquipable() || item.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Consumable)
         {
-            y = Rule(y + 4) + 8;
-            foreach (string note in p.Notes)
-                y = Paragraph(note, theme.Subtle, 12, Palette.Faint, Pad, w, y) + 2;
-            if (p.NoTeleport)
-            {
-                Ugui.Image(content, "Alert", theme.GlyphAlert, Palette.Alert).At(Pad, y + 3, 13, 13);
-                Ugui.Text(content, "No Teleport", Localization.instance.Localize("$item_noteleport"), theme.Subtle, 12, Palette.Alert)
-                    .At(Pad + 19, y, w - 19, 18);
-                y += 20;
-            }
+            string action = item.m_equipped ? "Unequip" : item.IsEquipable() ? "Equip" : "Use";
+            string hints = "<color=#FFFFFF><b>RMB</b></color> " + action;
+            if (shownComparison != null) hints += "    <color=#FFFFFF><b>SHIFT</b></color> Compare";
+            y = Paragraph(hints, theme.Body, 10.5f, InventoryCategories.Material, Pad, w, y + 6);
         }
-        y = Footer(p, item, w, y + 6);
-        root.sizeDelta = new Vector2(Width, 44 + y);
+        root.sizeDelta = new Vector2(Width, 72 + y + Pad);
     }
 
-    // Large rows head the group (damage kinds, armour, block, food values); the rest pair up into cells.
-    private float Rows(List<Line> rows, float w, float y)
+    private float Row(Line line, float width, float y)
     {
-        List<Line> cells = new();
-        foreach (Line line in rows)
-        {
-            if (heads.TryGetValue(line.Token, out var head))
-            {
-                y = Cells(cells, w, y);
-                y = Head(line, head.Glyph, head.Color, w, y);
-            }
-            else cells.Add(line);
-        }
-        return Cells(cells, w, y);
+        float leftWidth = width * 0.46f, rightWidth = width * 0.51f;
+        TextMeshProUGUI label = Ugui.Text(content, "Label", line.Label, theme.Body, 13, Palette.Bone,
+            TextAlignmentOptions.TopLeft, wrap: true);
+        TextMeshProUGUI value = Ugui.Text(content, "Value", Restyle(line.Value) + Delta(line), theme.Numbers, 14, Palette.Bone,
+            TextAlignmentOptions.TopRight, wrap: true);
+        float height = Mathf.Max(24, label.GetPreferredValues(label.text, leftWidth, 0).y,
+            value.GetPreferredValues(value.text, rightWidth, 0).y + 4);
+        label.At(Pad, y, leftWidth, height);
+        value.At(Pad + width - rightWidth, y, rightWidth, height);
+        label.overflowMode = value.overflowMode = TextOverflowModes.Overflow;
+        return y + height;
     }
 
-    // Icon, label and figure in bold, its range or total small and quiet beside it.
-    private float Head(Line line, Sprite glyph, Color color, float w, float y)
+    private static ItemDrop.ItemData? Comparison(Player player, ItemDrop.ItemData item)
     {
-        Ugui.Image(content, "Icon", glyph, color).At(Pad, y + 5, 16, 16);
-        Ugui.Text(content, line.Label, line.Label, theme.Strong, 15, Palette.Bone).At(Pad + 24, y, w * 0.5f, Big);
-        (string main, string rest) = Figure(line.Value);
-        // Food values are coloured like their bar; vanilla's "(current: 95)" is left out.
-        bool food = line.Token.StartsWith("item_food");
-        string figure = food
-            ? $"<color=#{ColorUtility.ToHtmlStringRGB(color)}>{main}</color>"
-            : main + (rest.Length > 0 ? $" <size=86%><color=#{Hex(Palette.Muted)}>{rest}</color></size>" : "");
-        TextMeshProUGUI value = Ugui.Text(content, "Value", figure, theme.Strong, 15, Palette.Bone, TextAlignmentOptions.MidlineRight)
-            .At(Pad + w * 0.4f, y, w * 0.6f, Big);
-        value.overflowMode = TextOverflowModes.Overflow;
-        return y + Big + 4;
-    }
-
-    // Detail cells on moss bands, two to a row; a long label or the last odd one spans the row.
-    private float Cells(List<Line> cells, float w, float y)
-    {
-        int i = 0;
-        while (i < cells.Count)
-        {
-            bool pair = i + 1 < cells.Count && Short(cells[i]) && Short(cells[i + 1]);
-            if (pair)
-            {
-                float half = (w - CellGap) / 2;
-                CellAt(cells[i], Pad, half, y);
-                CellAt(cells[i + 1], Pad + half + CellGap, half, y);
-                i += 2;
-            }
-            else
-            {
-                CellAt(cells[i], Pad, w, y);
-                i++;
-            }
-            y += Cell + 4;
-        }
-        cells.Clear();
-        return y;
-    }
-
-    private static bool Short(Line line) => line.Label.Length <= 12 && Tags.Replace(line.Value, "").Length <= 8;
-
-    private void CellAt(Line line, float x, float width, float y)
-    {
-        Image band = Ugui.Image(content, "Cell", theme.White, Palette.Moss.WithAlpha(0.45f)).At(x, y, width, Cell);
-        Ugui.Text(band.transform, "Label", line.Label, theme.Body, 12, Palette.Muted).At(7, 0, width * 0.62f - 7, Cell);
-        TextMeshProUGUI value = Ugui.Text(band.transform, "Value", Restyle(line.Value), theme.Body, 12, Palette.Bone,
-            TextAlignmentOptions.MidlineRight).At(width * 0.35f, 0, width * 0.65f - 7, Cell);
-        value.overflowMode = TextOverflowModes.Overflow;
-    }
-
-    // A status effect (a mead's, a cape's, a set's): a lighter band across the card with its icon and name,
-    // its description, and its figures as cells.
-    private float EffectBlock(Effect effect, ItemDrop.ItemData.SharedData shared, float w, float y)
-    {
-        float top = y;
-        Image band = Ugui.Image(content, "Effect", theme.White, Palette.Moss.WithAlpha(0.22f));
-        band.transform.SetAsLastSibling();
-        y += 8;
-        if (effect.Name.Length > 0)
-        {
-            Sprite? icon = EffectIcon(shared, effect.Name);
-            Ugui.Image(content, "Icon", icon ? theme.Mono.Get(icon) ?? icon : theme.GlyphEffect, Palette.GoldBright)
-                .At(Pad, y + 4, 17, 17).preserveAspect = true;
-            Ugui.Text(content, "Name", effect.Name, theme.Strong, 15, Palette.Bone).At(Pad + 25, y, w - 25, Big);
-            y += Big;
-        }
-        foreach (string about in effect.About)
-            y = Paragraph(Restyle(about), theme.Body, 12, Palette.Muted, Pad, w, y) + 2;
-        if (effect.Rows.Count > 0) y = Cells(new List<Line>(effect.Rows), w, y + 6);
-        y += 6;
-        band.At(0, top, Width, y - top);
-        band.transform.SetAsFirstSibling();
-        return y + 2;
-    }
-
-    private static Sprite? EffectIcon(ItemDrop.ItemData.SharedData shared, string name)
-    {
-        foreach (StatusEffect? effect in new[] { shared.m_consumeStatusEffect, shared.m_equipStatusEffect, shared.m_setStatusEffect })
-            if (effect && effect!.m_icon && name.Contains(Localization.instance.Localize(effect.m_name))) return effect.m_icon;
+        if (!item.IsEquipable()) return null;
+        bool weapon = CraftFilter.Of(item.m_shared.m_itemType) == CraftCategory.Weapons;
+        foreach (ItemDrop.ItemData candidate in player.GetInventory().GetAllItems())
+            if (candidate != item && candidate.m_equipped && candidate.m_shared.m_itemType == item.m_shared.m_itemType &&
+                (!weapon || candidate.m_shared.m_skillType == item.m_shared.m_skillType)) return candidate;
         return null;
     }
 
-    // The footer: the durability rule across the card (bright to the item's share, a diamond on the mark)
-    // with the figure beneath; otherwise a hairline. Value on the left, weight on the right.
-    private float Footer(Parsed p, ItemDrop.ItemData item, float w, float y)
+    private string Delta(Line line)
     {
-        if (p.Durability is { } durability)
+        if (comparisonStats == null || line.Token.Length == 0) return "";
+        bool lower = line.Token is "item_staminause" or "item_eitruse" or "item_staminahold";
+        bool comparable = lower || DamageFigures.Contains(line.Token) || DefenceTokens.Contains(line.Token);
+        if (!comparable) return "";
+        Line? before = null;
+        foreach (var rows in comparisonStats.Rows.Values)
         {
-            float pct = Mathf.Clamp01(item.GetDurabilityPercentage());
-            float mark = Width * pct;
-            Ugui.Image(content, "Track", theme.White, Palette.Moss).At(0, y, Width, 1);
-            Ugui.Image(content, "Worn", theme.White, pct < 0.25f ? Palette.Alert : Palette.Gold).At(0, y - 0.5f, mark, 2);
-            Ugui.Image(content, "Mark", theme.Diamond, pct < 0.25f ? Palette.Alert : Palette.Gold).At(mark - 5, y - 4.5f, 10, 10);
-            Ugui.Image(content, "Mark Core", theme.Diamond, Palette.Obsidian).At(mark - 3, y - 2.5f, 6, 6);
-            y += 9;
-            (string main, string rest) = Figure(durability.Value);
-            Ugui.Text(content, "Durability",
-                $"<color=#{Hex(Palette.Muted)}>{durability.Label}</color> {main}" + (rest.Length > 0 ? $" <color=#{Hex(Palette.Muted)}>{rest}</color>" : ""),
-                theme.Body, 12, Palette.Bone).At(Pad, y, w * 0.68f, 22);
+            before = rows.Find(other => other.Token == line.Token && other.Label == line.Label);
+            if (before != null) break;
         }
-        else
-        {
-            Ugui.Image(content, "Rule", theme.White, Palette.Moss).At(0, y, Width, 1);
-            y += 9;
-            if (p.Value is { } value)
-            {
-                Ugui.Image(content, "Coin", theme.GlyphCoin, Palette.Muted).At(Pad, y + 5, 12, 12);
-                Ugui.Text(content, "Value", Tags.Replace(value.Value, ""), theme.Body, 12, Palette.Muted).At(Pad + 17, y, w * 0.5f, 22);
-            }
-        }
-        if (p.Weight is { } weight)
-        {
-            string text = Tags.Replace(weight.Value, "");
-            TextMeshProUGUI label = Ugui.Text(content, "Weight", text, theme.Body, 12, Palette.Muted, TextAlignmentOptions.MidlineRight)
-                .At(Pad + w * 0.4f, y, w * 0.6f, 22);
-            float textWidth = label.GetPreferredValues(text).x;
-            Ugui.Image(content, "Weight Icon", theme.GlyphWeight, Palette.Muted).At(Pad + w - textWidth - 17, y + 5, 12, 12);
-        }
-        return y + 28;
-    }
-
-    private float Rule(float y)
-    {
-        Ugui.Image(content, "Rule", theme.White, Palette.Moss).At(Pad, y, Width - Pad * 2, 1);
-        return y + 1;
+        if (before == null) return "";
+        Match current = Figure.Match(Tags.Replace(line.Value, "").Trim());
+        Match previous = Figure.Match(Tags.Replace(before.Value, "").Trim());
+        if (!current.Success || !previous.Success || current.Groups[2].Value != previous.Groups[2].Value ||
+            !float.TryParse(current.Groups[1].Value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out float a) ||
+            !float.TryParse(previous.Groups[1].Value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out float b)) return "";
+        float delta = a - b;
+        if (Mathf.Abs(delta) < 0.005f) return "";
+        bool better = lower ? delta < 0 : delta > 0;
+        return " <size=80%><color=" + (better ? "#9BC48A" : "#F7A99F") + ">" +
+            delta.ToString("+0.##;-0.##", CultureInfo.InvariantCulture) + current.Groups[2].Value + "</color></size>";
     }
 
     private float Paragraph(string text, TMP_FontAsset? font, float size, Color color, float x, float w, float y)
@@ -488,18 +478,6 @@ internal sealed class ItemCard
         label.At(x, y, w, h);
         return y + h;
     }
-
-    // "15 (9-14)" into "15" and "(9-14)"; "80  (Current: 95)" keeps only "80".
-    private static (string Main, string Tail) Figure(string value)
-    {
-        string plain = Tags.Replace(value, "").Trim();
-        Match m = Number.Match(plain);
-        if (!m.Success) return (plain, "");
-        string rest = m.Groups[2].Value.Trim();
-        return (m.Groups[1].Value, rest);
-    }
-
-    private static string Hex(Color color) => ColorUtility.ToHtmlStringRGBA(color);
 
     // Vanilla colours mapped to the palette: main values bone, ranges and totals muted.
     private static string Restyle(string text) => text
