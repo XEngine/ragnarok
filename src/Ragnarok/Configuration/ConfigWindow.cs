@@ -13,11 +13,12 @@ namespace Ragnarok.Configuration;
 // ConfigFile, so any new Config.Bind section appears without extra UI code.
 internal sealed class ConfigWindow : IDisposable
 {
-    private const float Width = 1120, Height = 716, HeaderHeight = 120, SidebarWidth = 248, FooterHeight = 56;
-    private const float RowHeight = 80, RowGap = 10, ControlWidth = 300;
-    private const float ContentX = SidebarWidth + 36, ContentWidth = Width - SidebarWidth - 72;
-    private const float ScrollY = HeaderHeight + 22 + 92, ScrollHeight = Height - FooterHeight - 12 - ScrollY;
-    private const float RowWidth = ContentWidth;
+    private const float Width = 1040, Height = 680, HeaderHeight = 96, SidebarWidth = 248, FooterHeight = 56;
+    private const float RowHeight = 70, RowGap = 8, ControlWidth = 300;
+    private float ContentX => (sidebarCollapsed ? 20 : SidebarWidth) + 36;
+    private float ContentWidth => Width - ContentX - 36;
+    private const float ScrollY = HeaderHeight + 98, ScrollHeight = Height - FooterHeight - 12 - ScrollY;
+    private float RowWidth => ContentWidth;
 
     private static readonly Dictionary<string, (string Title, string Blurb)> Sections = new()
     {
@@ -96,6 +97,9 @@ internal sealed class ConfigWindow : IDisposable
     private ConfigControls controls = null!;
     private List<string> pages = new();
     private int page;
+    private bool sidebarCollapsed;
+    private readonly HashSet<string> collapsedSections = new() { "Gameplay", "QualityOfLife", "HUD" };
+    private TMP_Text sidebarToggleLabel = null!;
     private float openedAt, nextRefresh;
     private string hoverHelp = "";
     private ConfigEntryBase? capturing;
@@ -184,7 +188,16 @@ internal sealed class ConfigWindow : IDisposable
     {
         config.SettingChanged -= OnSettingChanged;
         config.ConfigReloaded -= OnConfigReloaded;
-        if (canvas) UnityEngine.Object.Destroy(canvas);
+        capturing = null;
+        UiState.WindowOpen = false;
+        controls?.Clear();
+        if (canvas)
+        {
+            canvas!.SetActive(false);
+            foreach (Button button in canvas.GetComponentsInChildren<Button>(true)) button.onClick.RemoveAllListeners();
+            foreach (Slider slider in canvas.GetComponentsInChildren<Slider>(true)) slider.onValueChanged.RemoveAllListeners();
+            UnityEngine.Object.Destroy(canvas);
+        }
     }
 
     private void OnSettingChanged(object sender, SettingChangedEventArgs e)
@@ -192,11 +205,18 @@ internal sealed class ConfigWindow : IDisposable
         if (UiState.WindowOpen && canvas) controls.Refresh();
     }
 
+    internal bool CanEdit(ConfigEntryBase entry) => ServerConfig.Instance?.Controlled(entry) != true;
+
     private void OnConfigReloaded(object sender, EventArgs e) => OnSettingChanged(sender, null!);
 
     private void ApplyScale()
     {
-        float scale = settings.Scale.Value;
+        // CanvasScaler matches height to a 1080-unit reference; fit in those
+        // same units so a low-resolution display is not scaled down twice.
+        float referenceWidth = 1080f * Screen.width / Mathf.Max(1, Screen.height);
+        float scale = Mathf.Min(settings.Scale.Value, (1080f - 32) / Height,
+            (referenceWidth - 32) / Width);
+        scale = Mathf.Max(0.1f, scale);
         Vector2 reference = new(1920f / scale, 1080f / scale);
         if (scaler.referenceResolution != reference) scaler.referenceResolution = reference;
     }
@@ -258,28 +278,49 @@ internal sealed class ConfigWindow : IDisposable
         ScrollRect navScroll = Scroller("Navigation", new Rect(1, HeaderHeight, SidebarWidth - 4, Height - HeaderHeight - FooterHeight - 84), 0);
         nav = (RectTransform)navScroll.content;
         Ugui.Image(window, "Note Rule", theme.White, Palette.GoldDim).At(28, Height - FooterHeight - 74, 24, 1);
-        Ugui.Text(window, "Note", "Changes apply instantly and are saved to the config file.", theme.Subtle, 13, Palette.Muted, wrap: true)
+        Ugui.Text(window, "Note", "Changes apply instantly and are saved to the config file.", theme.Subtle, 11, Palette.Muted, wrap: true)
             .At(28, Height - FooterHeight - 64, SidebarWidth - 48, 48);
 
-        // The page title (Alegreya, 32) over its blurb, then the guide's divider.
-        pageTitle = Ugui.Text(window, "Page Title", "", theme.Heading, 32, Palette.Gold).At(ContentX, HeaderHeight + 14, ContentWidth, 50);
-        pageBlurb = Ugui.Text(window, "Page Blurb", "", theme.Body, 14, Palette.Muted).At(ContentX, HeaderHeight + 62, ContentWidth, 22);
+        // Compact page heading and description above the controls.
+        pageTitle = Ugui.Text(window, "Page Title", "", theme.Heading, 24, Palette.Gold).At(ContentX, HeaderHeight + 14, ContentWidth, 50);
+        pageBlurb = Ugui.Text(window, "Page Blurb", "", theme.Body, 12, Palette.Muted).At(ContentX, HeaderHeight + 62, ContentWidth, 22);
         Ugui.Image(window, "Page Rule", theme.White, Palette.Gold.WithAlpha(0.45f)).At(ContentX, HeaderHeight + 97, ContentWidth, 1);
         ScrollArea();
         Footer();
+        LayoutPage();
+    }
+
+    private void LayoutPage()
+    {
+        foreach (string name in new[] { "Sidebar", "Sidebar Rule", "Navigation", "Note", "Note Rule" })
+            window.Find(name).gameObject.SetActive(!sidebarCollapsed);
+        sidebarToggleLabel.text = sidebarCollapsed ? "Show sidebar" : "Hide sidebar";
+        pageTitle.At(ContentX, HeaderHeight + 10, ContentWidth, 38);
+        pageBlurb.At(ContentX, HeaderHeight + 48, ContentWidth, 30);
+        window.Find("Page Rule").GetComponent<RectTransform>().At(ContentX, HeaderHeight + 87, ContentWidth, 1);
+        scroll.At(ContentX, ScrollY, ContentWidth + 16, ScrollHeight);
     }
 
     private void Header()
     {
-        Ugui.Text(window, "Eyebrow", "valheim · mod configuration", theme.Section, 16, Palette.Muted).At(36, 12, 600, 24);
-        Ugui.Text(window, "Title", "Ragnarök", theme.Heading, 44, Palette.Gold).At(34, 26, 600, 64);
-        Ugui.Text(window, "Byline", "by KernelPanic", theme.Subtle, 13, Palette.Muted).At(36, 84, 400, 18);
+        Ugui.Text(window, "Eyebrow", "valheim · mod configuration", theme.Section, 13, Palette.Muted).At(36, 12, 600, 24);
+        Ugui.Text(window, "Title", "Ragnarök", theme.Heading, 30, Palette.Gold).At(34, 24, 560, 42);
+        Ugui.Text(window, "Byline", "by KernelPanic", theme.Subtle, 11, Palette.Muted).At(36, 66, 400, 18);
 
         Button close = Ugui.Button(window, "Close", theme.Button, theme.ButtonHover, () => SetOpen(false)).At(Width - 36 - 130, 34, 130, 36);
-        closeLabel = Ugui.Text(close.transform, "Label", "Close  ·  Esc", theme.Strong, 14, Palette.Bone, TextAlignmentOptions.Center).Stretch();
+        closeLabel = Ugui.Text(close.transform, "Label", "Close  ·  Esc", theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center).Stretch();
         close.OnHover(h => closeLabel.color = h ? Palette.GoldBright : Palette.Bone);
         Image chip = Ugui.Image(window, "Version", theme.Card, Color.white).At(Width - 36 - 130 - 96, 34, 84, 36);
-        Ugui.Text(chip.transform, "Label", "v" + version, theme.Strong, 15, Palette.GoldBright, TextAlignmentOptions.Center).Stretch();
+        Ugui.Text(chip.transform, "Label", "v" + version, theme.Strong, 13, Palette.GoldBright, TextAlignmentOptions.Center).Stretch();
+
+        Button toggle = Ugui.Button(window, "Toggle sidebar", theme.Button, theme.ButtonHover, () =>
+        {
+            sidebarCollapsed = !sidebarCollapsed;
+            LayoutPage();
+            ShowPage(page);
+        }).At(Width - 36 - 130 - 96 - 116, 34, 104, 36);
+        sidebarToggleLabel = Ugui.Text(toggle.transform, "Label", "Hide sidebar", theme.Strong, 12, Palette.Bone,
+            TextAlignmentOptions.Midline).Stretch();
 
         Ornament(window, new Rect(24, HeaderHeight - 8, Width - 48, 2), Palette.Gold.WithAlpha(0.85f));
     }
@@ -334,10 +375,10 @@ internal sealed class ConfigWindow : IDisposable
     private void Footer()
     {
         helpMarker = Ugui.Image(window, "Help Marker", theme.Diamond, Palette.Faint).At(36, Height - FooterHeight / 2 - 5, 10, 10);
-        help = Ugui.Text(window, "Help", "", theme.Body, 13, Palette.Muted).At(58, Height - FooterHeight, Width - 480, FooterHeight);
+        help = Ugui.Text(window, "Help", "", theme.Body, 11, Palette.Muted).At(58, Height - FooterHeight, Width - 480, FooterHeight);
         Button reset = Ugui.Button(window, "Restore Defaults", theme.Button, theme.ButtonHover, () => RestoreDefaults(pages[page]))
             .At(Width - 36 - 190, Height - FooterHeight + 10, 190, 36);
-        TextMeshProUGUI label = Ugui.Text(reset.transform, "Label", "Restore defaults", theme.Strong, 14, Palette.Bone, TextAlignmentOptions.Center).Stretch();
+        TextMeshProUGUI label = Ugui.Text(reset.transform, "Label", "Restore defaults", theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center).Stretch();
         reset.OnHover(h => label.color = h ? Palette.GoldBright : Palette.Bone);
         resetButton = reset.gameObject;
     }
@@ -356,9 +397,10 @@ internal sealed class ConfigWindow : IDisposable
     private void ShowPage(int index)
     {
         page = index;
+        if (IsChild(pages[page])) collapsedSections.Remove(ParentOf(pages[page]));
         capturing = null;
         hoverHelp = "";
-        controls.Refreshers.Clear();
+        controls.Clear();
         Ugui.Clear(content);
         Navigation();
 
@@ -375,7 +417,7 @@ internal sealed class ConfigWindow : IDisposable
     private void Navigation()
     {
         Ugui.Clear(nav);
-        Ugui.Text(nav, "Label", "sections", theme.Section, 16, Palette.Muted).At(28, 16, 200, 24);
+        Ugui.Text(nav, "Label", "sections", theme.Section, 13, Palette.Muted).At(28, 16, 200, 24);
         float y = 48;
         int number = 0;
         string current = pages[page];
@@ -385,34 +427,50 @@ internal sealed class ConfigWindow : IDisposable
             bool active = i == page;
             if (IsChild(pages[i]))
             {
+                if (collapsedSections.Contains(ParentOf(pages[i]))) continue;
                 y = SubItem(i, y, active, i + 1 >= pages.Count || !IsChild(pages[i + 1]));
                 continue;
             }
             number++;
             // A parent whose sub-page is open keeps a lit index, so the trail stays readable.
             bool branch = IsChild(current) && ParentOf(current) == pages[i];
-            Rect item = new(12, y, SidebarWidth - 24, 48);
+            Rect item = new(12, y, SidebarWidth - 24, 38);
             Image background = Ugui.Image(nav, "Item Background", theme.White, active ? Palette.CardHover : Color.clear).At(item);
             if (active)
             {
                 Ugui.Image(nav, "Active Bar", theme.White, Palette.GoldBright).At(item.x, item.y, 3, item.height);
                 Ugui.Image(nav, "Active Rule", theme.White, Palette.GoldDim).At(item.x + 3, item.yMax - 1, item.width - 3, 1);
-                Ugui.Image(nav, "Active Marker", theme.Diamond, Palette.Gold).At(item.xMax - 20, item.center.y - 4, 8, 8);
+                Ugui.Image(nav, "Active Marker", theme.Diamond, Palette.Gold).At(item.x + 6, item.center.y - 4, 8, 8);
             }
-            Ugui.Text(nav, "Index", number.ToString("00"), theme.Strong, 12, active || branch ? Palette.Gold : Palette.Faint)
+            Ugui.Text(nav, "Index", number.ToString("00"), theme.Strong, 10, active || branch ? Palette.Gold : Palette.Faint)
                 .At(item.x + 18, item.y, 30, item.height);
             Color idle = branch ? Palette.Bone : Palette.Muted;
-            TextMeshProUGUI label = Ugui.Text(nav, "Title", Title(pages[i]), theme.Strong, 15,
-                active ? Palette.Bone : idle).At(item.x + 52, item.y, item.width - 76, item.height);
+            TextMeshProUGUI label = Ugui.Text(nav, "Title", Title(pages[i]), theme.Strong, 13,
+                active ? Palette.Bone : idle).At(item.x + 52, item.y, item.width - 94, item.height);
 
-            Button hit = Ugui.HitArea(nav, "Item", () => { if (target != page) ShowPage(target); }).At(item);
+            Button hit = Ugui.HitArea(nav, "Item", () =>
+            {
+                collapsedSections.Remove(pages[target]);
+                if (target != page) ShowPage(target); else Navigation();
+            }).At(item.x, item.y, item.width - 34, item.height);
+            string section = pages[i];
+            if (pages.Any(candidate => IsChild(candidate) && ParentOf(candidate) == section))
+            {
+                Button fold = Ugui.HitArea(nav, "Toggle " + section, () =>
+                {
+                    if (!collapsedSections.Add(section)) collapsedSections.Remove(section);
+                    Navigation();
+                }).At(item.xMax - 32, item.y + 4, 28, 30);
+                Ugui.Text(fold.transform, "State", collapsedSections.Contains(section) ? "+" : "-", theme.Strong, 14,
+                    Palette.Bone, TextAlignmentOptions.Midline).Stretch();
+            }
             if (!active)
                 hit.OnHover(h =>
                 {
                     background.color = h ? Palette.Card : Color.clear;
                     label.color = h ? Palette.Bone : idle;
                 });
-            y += 52;
+            y += 42;
         }
         nav.sizeDelta = new Vector2(0, y + 8);
     }
@@ -422,9 +480,9 @@ internal sealed class ConfigWindow : IDisposable
     private float SubItem(int index, float y, bool active, bool last)
     {
         const float stem = 39, tick = 12;
-        Rect item = new(stem + tick + 1, y - 4, SidebarWidth - stem - tick - 13, 36);
+        Rect item = new(stem + tick + 1, y - 4, SidebarWidth - stem - tick - 13, 30);
         Image background = Ugui.Image(nav, "Sub Background", theme.White, active ? Palette.CardHover : Color.clear).At(item);
-        Ugui.Image(nav, "Branch Stem", theme.White, Palette.Rule).At(stem, y - 4, 1, last ? 19 : 40);
+        Ugui.Image(nav, "Branch Stem", theme.White, Palette.Rule).At(stem, y - 4, 1, last ? 16 : 34);
         Image branch = Ugui.Image(nav, "Branch Tick", theme.White, active ? Palette.Gold : Palette.Rule).At(stem + 1, y + 14, tick, 1);
         if (active)
         {
@@ -432,7 +490,7 @@ internal sealed class ConfigWindow : IDisposable
             Ugui.Image(nav, "Active Marker", theme.Diamond, Palette.Gold).At(item.xMax - 20, item.center.y - 3, 6, 6);
         }
         Image marker = Ugui.Image(nav, "Sub Marker", theme.Diamond, active ? Palette.Gold : Palette.Faint).At(item.x + 12, item.center.y - 3, 6, 6);
-        TextMeshProUGUI label = Ugui.Text(nav, "Sub Title", Title(pages[index]), theme.Strong, 13,
+        TextMeshProUGUI label = Ugui.Text(nav, "Sub Title", Title(pages[index]), theme.Strong, 11,
             active ? Palette.Bone : Palette.Muted).At(item.x + 28, item.y, item.width - 52, item.height);
 
         int target = index;
@@ -445,7 +503,7 @@ internal sealed class ConfigWindow : IDisposable
                 marker.color = h ? Palette.GoldDim : Palette.Faint;
                 branch.color = h ? Palette.GoldDim : Palette.Rule;
             });
-        return y + 40;
+        return y + 34;
     }
 
     // A button row at the end of a section's page, e.g. "Test notifications".
@@ -467,12 +525,12 @@ internal sealed class ConfigWindow : IDisposable
                 hoverHelp = h ? description : hoverHelp == description ? "" : hoverHelp;
             });
             float textWidth = RowWidth - ControlWidth - 64;
-            Ugui.Text(row.transform, "Label", label, theme.Strong, 15, Palette.Bone).At(22, 12, textWidth, 24);
-            Ugui.Text(row.transform, "Description", description, theme.Body, 13, Palette.Muted, TextAlignmentOptions.TopLeft, wrap: true)
-                .At(22, 38, textWidth, 36);
+            Ugui.Text(row.transform, "Label", label, theme.Strong, 13, Palette.Bone).At(18, 7, textWidth, 22);
+            Ugui.Text(row.transform, "Description", description, theme.Body, 11, Palette.Muted, TextAlignmentOptions.TopLeft, wrap: true)
+                .At(18, 31, textWidth, 32);
             Button button = Ugui.Button(row.transform, "Run", theme.Button, theme.ButtonHover, run)
                 .At(RowWidth - ControlWidth - 22, (RowHeight - 34) / 2, ControlWidth, 34);
-            Ugui.Text(button.transform, "Label", label, theme.Strong, 14, Palette.Bone, TextAlignmentOptions.Center)
+            Ugui.Text(button.transform, "Label", label, theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center)
                 .Stretch();
             y += RowHeight + RowGap;
         }
@@ -491,9 +549,9 @@ internal sealed class ConfigWindow : IDisposable
                 string child = pages[i];
                 var button = Ugui.Button(content, child, theme.Card, theme.CardHover, () => ShowPage(target))
                     .At(0, top, RowWidth, 68);
-                Ugui.Text(button.transform, "Title", Title(child), theme.Strong, 16, Palette.Bone).At(18, 8, RowWidth - 36, 24);
+                Ugui.Text(button.transform, "Title", Title(child), theme.Strong, 13, Palette.Bone).At(18, 8, RowWidth - 36, 24);
                 Ugui.Text(button.transform, "Description", Sections.TryGetValue(child, out var metadata) ? metadata.Blurb : "",
-                    theme.Body, 12, Palette.Muted).At(18, 34, RowWidth - 36, 24);
+                    theme.Body, 10, Palette.Muted).At(18, 34, RowWidth - 36, 24);
                 top += 78;
             }
             return top;
@@ -513,9 +571,9 @@ internal sealed class ConfigWindow : IDisposable
             });
 
             float textWidth = RowWidth - ControlWidth - 64;
-            Ugui.Text(row.transform, "Label", ConfigControls.Pretty(entry.Definition.Key), theme.Strong, 15, Palette.Bone).At(22, 12, textWidth, 24);
-            Ugui.Text(row.transform, "Description", description, theme.Body, 13, Palette.Muted, TextAlignmentOptions.TopLeft, wrap: true)
-                .At(22, 38, textWidth, 36);
+            Ugui.Text(row.transform, "Label", ConfigControls.Pretty(entry.Definition.Key), theme.Strong, 13, Palette.Bone).At(18, 7, textWidth, 22);
+            Ugui.Text(row.transform, "Description", description, theme.Body, 11, Palette.Muted, TextAlignmentOptions.TopLeft, wrap: true)
+                .At(18, 31, textWidth, 32);
             Control(entry, row.transform, new Rect(RowWidth - ControlWidth - 22, (RowHeight - 34) / 2, ControlWidth, 34));
             y += RowHeight + RowGap;
         }
@@ -528,7 +586,7 @@ internal sealed class ConfigWindow : IDisposable
         RectTransform holder = Ugui.Node(parent, "Control").Stretch();
         controls.Add(entry, holder, r);
         CanvasGroup group = holder.gameObject.AddComponent<CanvasGroup>();
-        TextMeshProUGUI note = Ugui.Text(parent, "Server Note", "set by server", theme.Subtle, 12, Palette.Gold, TextAlignmentOptions.MidlineRight).At(r.x, r.y - 18, r.width, 16);
+        TextMeshProUGUI note = Ugui.Text(parent, "Server Note", "set by server", theme.Subtle, 10, Palette.Gold, TextAlignmentOptions.MidlineRight).At(r.x, r.y - 18, r.width, 16);
 
         void Refresh()
         {
@@ -577,7 +635,7 @@ internal sealed class ConfigWindow : IDisposable
             RectTransform row = Ugui.Image(left.transform, "Row", null, Color.clear, raycast: true).At(20, rowY, leftWidth - 40, 48).rectTransform;
             string description = entry.Description?.Description ?? "";
             row.OnHover(h => hoverHelp = h ? description : hoverHelp == description ? "" : hoverHelp);
-            Ugui.Text(row, "Label", $"{Title(entry.Definition.Section)}  ·  {ConfigControls.Pretty(entry.Definition.Key)}", theme.Strong, 15, Palette.Bone)
+            Ugui.Text(row, "Label", $"{Title(entry.Definition.Section)}  ·  {ConfigControls.Pretty(entry.Definition.Key)}", theme.Strong, 13, Palette.Bone)
                 .At(0, 0, leftWidth - 300, 48);
             Control(entry, row, new Rect(leftWidth - 40 - 250, 7, 250, 34));
             rowY += 56;
@@ -599,9 +657,9 @@ internal sealed class ConfigWindow : IDisposable
     {
         Image card = Ugui.Image(content, "Stat " + label, theme.Card, Color.white).At(x, 0, width, 118);
         Ugui.Image(card.transform, "Accent", theme.White, accent).At(18, 18, 24, 2);
-        Ugui.Text(card.transform, "Label", label.ToLowerInvariant(), theme.Section, 16, Palette.Muted).At(18, 22, width - 36, 24);
-        TextMeshProUGUI value = Ugui.Text(card.transform, "Value", "", theme.Display, 32, Palette.Bone).At(18, 42, width - 36, 48);
-        TextMeshProUGUI caption = Ugui.Text(card.transform, "Caption", "", theme.Body, 13, Palette.Muted).At(18, 86, width - 36, 20);
+        Ugui.Text(card.transform, "Label", label.ToLowerInvariant(), theme.Section, 13, Palette.Muted).At(18, 22, width - 36, 24);
+        TextMeshProUGUI value = Ugui.Text(card.transform, "Value", "", theme.Display, 24, Palette.Bone).At(18, 42, width - 36, 48);
+        TextMeshProUGUI caption = Ugui.Text(card.transform, "Caption", "", theme.Body, 11, Palette.Muted).At(18, 86, width - 36, 20);
         controls.Refreshers.Add(() =>
         {
             (string v, string c) = read();
@@ -613,14 +671,14 @@ internal sealed class ConfigWindow : IDisposable
     private void CardTitle(Transform card, string title)
     {
         Ugui.Image(card, "Marker", theme.Diamond, Palette.Gold).At(20, 22, 8, 8);
-        Ugui.Text(card, "Title", title, theme.Section, 17, Palette.Muted).At(36, 12, 400, 26);
+        Ugui.Text(card, "Title", title, theme.Section, 14, Palette.Muted).At(36, 12, 400, 26);
     }
 
     private void KeyLine(Transform card, float y, float width, string action, Func<string> key)
     {
-        Ugui.Text(card, "Action", action, theme.Strong, 15, Palette.Bone).At(20, y, width - 150, 34);
+        Ugui.Text(card, "Action", action, theme.Strong, 13, Palette.Bone).At(20, y, width - 150, 34);
         Image cap = Ugui.Image(card, "Key", theme.CardHover, Color.white).At(width - 20 - 100, y + 3, 100, 28);
-        TextMeshProUGUI label = Ugui.Text(cap.transform, "Label", "", theme.Strong, 13, Palette.Bone, TextAlignmentOptions.Center).Stretch();
+        TextMeshProUGUI label = Ugui.Text(cap.transform, "Label", "", theme.Strong, 11, Palette.Bone, TextAlignmentOptions.Center).Stretch();
         controls.Refreshers.Add(() => label.text = key());
     }
 
@@ -645,7 +703,7 @@ internal sealed class ConfigWindow : IDisposable
             if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) modifiers.Add(KeyCode.LeftAlt);
             ConfigEntryBase entry = capturing!;
             Capturing = null;
-            entry.BoxedValue = new KeyboardShortcut(key, modifiers.ToArray());
+            if (CanEdit(entry)) entry.BoxedValue = new KeyboardShortcut(key, modifiers.ToArray());
             return;
         }
     }
@@ -656,7 +714,7 @@ internal sealed class ConfigWindow : IDisposable
     private void RestoreDefaults(string section)
     {
         foreach (ConfigEntryBase entry in Entries(section))
-            entry.BoxedValue = entry.DefaultValue;
+            if (CanEdit(entry)) entry.BoxedValue = entry.DefaultValue;
         if (EventSystem.current) EventSystem.current.SetSelectedGameObject(null);
         controls.Refresh();
     }

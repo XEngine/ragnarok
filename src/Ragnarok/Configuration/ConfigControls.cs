@@ -25,6 +25,20 @@ internal sealed class ConfigControls
     private readonly ConfigWindow window;
 
     internal readonly List<Action> Refreshers = new();
+    private readonly List<TMP_InputField> fields = new();
+
+    internal void Clear()
+    {
+        Refreshers.Clear();
+        foreach (TMP_InputField field in fields)
+        {
+            UiState.TypingFields.Remove(field);
+            if (!field) continue;
+            field.onEndEdit.RemoveAllListeners();
+            field.onValueChanged.RemoveAllListeners();
+        }
+        fields.Clear();
+    }
 
     internal ConfigControls(Theme theme, ConfigWindow window)
     {
@@ -48,10 +62,15 @@ internal sealed class ConfigControls
             case KeyboardShortcut: KeyBinding(entry, parent, r); break;
             case string: TextField(entry, parent, r); break;
             default:
-                TextMeshProUGUI value = Ugui.Text(parent, "Value", "", theme.Strong, 15, Palette.GoldBright, TextAlignmentOptions.MidlineRight).At(r);
+                TextMeshProUGUI value = Ugui.Text(parent, "Value", "", theme.Strong, 13, Palette.GoldBright, TextAlignmentOptions.MidlineRight).At(r);
                 Refreshers.Add(() => value.text = entry.BoxedValue?.ToString() ?? "");
                 break;
         }
+    }
+
+    private void Set(ConfigEntryBase entry, object value)
+    {
+        if (window.CanEdit(entry)) entry.BoxedValue = value;
     }
 
     internal static string Pretty(string key) =>
@@ -59,7 +78,7 @@ internal sealed class ConfigControls
 
     private void Switch(ConfigEntryBase entry, Transform parent, Rect r)
     {
-        TextMeshProUGUI state = Ugui.Text(parent, "State", "", theme.Strong, 15, Palette.GoldBright, TextAlignmentOptions.MidlineRight)
+        TextMeshProUGUI state = Ugui.Text(parent, "State", "", theme.Strong, 13, Palette.GoldBright, TextAlignmentOptions.MidlineRight)
             .At(r.x, r.y, r.width - 68, r.height);
         Rect trackRect = new(r.xMax - 56, r.y + (r.height - 24) / 2, 56, 24);
         Image track = Ugui.Image(parent, "Switch", theme.White, Color.white, raycast: true).At(trackRect);
@@ -83,7 +102,7 @@ internal sealed class ConfigControls
             knob.color = on ? Palette.GoldBright : Palette.Faint;
         }
 
-        button.onClick.AddListener(() => entry.BoxedValue = !(bool)entry.BoxedValue);
+        button.onClick.AddListener(() => Set(entry, !(bool)entry.BoxedValue));
         track.OnHover(h => { hover = h; Refresh(); });
         Refreshers.Add(Refresh);
     }
@@ -94,7 +113,7 @@ internal sealed class ConfigControls
         const float cellW = 30, cellH = 18, gap = 3;
         float gridW = cellW * 3 + gap * 2, gridH = cellH * 3 + gap * 2;
         Rect grid = new(r.xMax - gridW, r.center.y - gridH / 2, gridW, gridH);
-        TextMeshProUGUI name = Ugui.Text(parent, "Position", "", theme.Strong, 14, Palette.GoldBright, TextAlignmentOptions.MidlineRight)
+        TextMeshProUGUI name = Ugui.Text(parent, "Position", "", theme.Strong, 12, Palette.GoldBright, TextAlignmentOptions.MidlineRight)
             .At(r.x, r.y, r.width - gridW - 16, r.height);
         foreach (Image line in Ugui.Outline(parent, new Rect(grid.x - 4, grid.y - 4, grid.width + 8, grid.height + 8)))
             line.color = Palette.Rule;
@@ -103,7 +122,7 @@ internal sealed class ConfigControls
         for (int i = 0; i < 9; i++)
         {
             ScreenAnchor anchor = (ScreenAnchor)i;
-            Button cell = Ugui.Button(parent, "Cell " + anchor, theme.Button, theme.ButtonHover, () => entry.BoxedValue = anchor)
+            Button cell = Ugui.Button(parent, "Cell " + anchor, theme.Button, theme.ButtonHover, () => Set(entry, anchor))
                 .At(grid.x + (i % 3) * (cellW + gap), grid.y + (i / 3) * (cellH + gap), cellW, cellH);
             Image marker = Ugui.Image(cell.transform, "Marker", theme.Diamond, Palette.GoldBright).At(cellW / 2 - 4, cellH / 2 - 4, 8, 8);
             cells.Add((cell, marker));
@@ -133,9 +152,9 @@ internal sealed class ConfigControls
             string name = names[i];
             float gap = i > 0 ? 3 : 0;
             Button button = Ugui.Button(parent, "Segment " + name, theme.Button, theme.ButtonHover,
-                () => entry.BoxedValue = Enum.Parse(type, name)).At(r.x + i * width + gap, r.y, width - gap, r.height);
+                () => Set(entry, Enum.Parse(type, name))).At(r.x + i * width + gap, r.y, width - gap, r.height);
             string text = EnumNames.TryGetValue(name, out string pretty) ? pretty : Pretty(name);
-            TextMeshProUGUI label = Ugui.Text(button.transform, "Label", text, theme.Strong, 13, Palette.Muted,
+            TextMeshProUGUI label = Ugui.Text(button.transform, "Label", text, theme.Strong, 11, Palette.Muted,
                 TextAlignmentOptions.Center).Stretch();
             segments.Add((name, button, label));
         }
@@ -157,9 +176,15 @@ internal sealed class ConfigControls
         float min = Convert.ToSingle(range.GetType().GetProperty("MinValue")!.GetValue(range, null));
         float max = Convert.ToSingle(range.GetType().GetProperty("MaxValue")!.GetValue(range, null));
         bool isInt = entry.SettingType == typeof(int);
-        bool whole = isInt || max - min > 10;
+        bool whole = isInt;
         bool percent = entry.Definition.Key.EndsWith("Opacity", StringComparison.Ordinal);
-        string unit = Units.TryGetValue(entry.Definition.Section + "." + entry.Definition.Key, out string u) ? u : whole ? "" : "×";
+        string key = entry.Definition.Key;
+        string unit = Units.TryGetValue(entry.Definition.Section + "." + key, out string u) ? u
+            : key.EndsWith("Percent", StringComparison.Ordinal) ? "%"
+            : key.EndsWith("Minutes", StringComparison.Ordinal) ? " min"
+            : key == "Range" ? " m"
+            : key.StartsWith("Margin", StringComparison.Ordinal) ? " px"
+            : key.EndsWith("Multiplier", StringComparison.Ordinal) || key.EndsWith("Scale", StringComparison.Ordinal) ? "\u00D7" : "";
 
         float trackWidth = r.width - 84;
         RectTransform root = Ugui.Node(parent, "Slider").At(r.x, r.y + (r.height - 18) / 2, trackWidth, 18);
@@ -193,15 +218,45 @@ internal sealed class ConfigControls
         slider.maxValue = max;
         slider.wholeNumbers = whole;
 
-        Image box = Ugui.Image(parent, "Value Box", theme.Card, Color.white).At(r.xMax - 72, r.y, 72, r.height);
-        TextMeshProUGUI value = Ugui.Text(box.transform, "Value", "", theme.Strong, 15, Palette.GoldBright, TextAlignmentOptions.Center).Stretch();
+        Image box = Ugui.Image(parent, "Value Box", theme.PackSurface, Palette.Hex(0x080B0C), raycast: true)
+            .At(r.xMax - 72, r.y, 72, r.height);
+        Ugui.Image(box.transform, "Edge", theme.PackEdge, Palette.Hex(0x625334)).Stretch();
+        box.gameObject.SetActive(false);
+        RectTransform area = Ugui.Node(box.transform, "Text Area").Stretch(5, 1, 5, 11);
+        area.gameObject.AddComponent<RectMask2D>();
+        TMP_Text value = Ugui.Text(area, "Value", "", theme.Strong, 13, Palette.GoldBright, TextAlignmentOptions.Midline).Stretch();
+        TMP_InputField field = box.gameObject.AddComponent<TMP_InputField>();
+        field.textViewport = area; field.textComponent = value; field.targetGraphic = box;
+        field.characterLimit = 24;
+        field.lineType = TMP_InputField.LineType.SingleLine;
+        field.customCaretColor = true; field.caretColor = Palette.GoldBright;
+        field.selectionColor = Palette.Gold.WithAlpha(0.35f);
+        Ugui.Text(box.transform, "Unit", percent ? "%" : unit.Trim(), theme.Body, 9, Palette.Muted,
+            TextAlignmentOptions.Midline).At(2, r.height - 12, 68, 10);
+        box.gameObject.SetActive(true);
+        fields.Add(field); UiState.TypingFields.Add(field);
 
+        string DisplayValue()
+        {
+            float current = Convert.ToSingle(entry.BoxedValue);
+            return (percent ? current * 100f : current).ToString(whole ? "0" : "0.##", CultureInfo.InvariantCulture);
+        }
+        field.onEndEdit.AddListener(text =>
+        {
+            if (!field.wasCanceled && window.CanEdit(entry) &&
+                ConfigSliderValue.TryRead(text, isInt, percent, min, max, out object parsed))
+                Set(entry, parsed);
+            field.SetTextWithoutNotify(DisplayValue());
+        });
+        float step = ConfigSliderValue.Step(key, isInt);
         bool updating = false;
         slider.onValueChanged.AddListener(v =>
         {
-            if (updating) return;
-            float snapped = whole ? Mathf.Round(v) : Mathf.Round(v * 20f) / 20f;
-            entry.BoxedValue = isInt ? Mathf.RoundToInt(snapped) : snapped;
+            if (updating || !window.CanEdit(entry)) return;
+            object snapped = ConfigSliderValue.Snap(v, isInt, min, max, step);
+            Set(entry, snapped);
+            // Snap the handle even when the setting did not change this frame.
+            slider.SetValueWithoutNotify(Convert.ToSingle(entry.BoxedValue));
         });
         Refreshers.Add(() =>
         {
@@ -209,8 +264,7 @@ internal sealed class ConfigControls
             updating = true;
             slider.SetValueWithoutNotify(current);
             updating = false;
-            value.text = percent ? (current * 100f).ToString("0", CultureInfo.InvariantCulture) + "%"
-                : current.ToString(whole ? "0" : "0.00", CultureInfo.InvariantCulture) + unit;
+            if (!field.isFocused) field.SetTextWithoutNotify(DisplayValue());
         });
     }
 
@@ -218,7 +272,7 @@ internal sealed class ConfigControls
     {
         Button button = Ugui.Button(parent, "Key", theme.Button, theme.ButtonHover,
             () => window.Capturing = window.Capturing == entry ? null : entry).At(r);
-        TextMeshProUGUI label = Ugui.Text(button.transform, "Label", "", theme.Strong, 14, Palette.Bone, TextAlignmentOptions.Center).Stretch();
+        TextMeshProUGUI label = Ugui.Text(button.transform, "Label", "", theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center).Stretch();
         Refreshers.Add(() =>
         {
             bool waiting = window.Capturing == entry;
@@ -235,7 +289,7 @@ internal sealed class ConfigControls
         background.gameObject.SetActive(false);
         RectTransform area = Ugui.Node(background.transform, "Text Area").Stretch(10, 6, 10, 6);
         area.gameObject.AddComponent<RectMask2D>();
-        TextMeshProUGUI text = Ugui.Text(area, "Text", "", theme.Body, 15, Palette.Bone).Stretch();
+        TextMeshProUGUI text = Ugui.Text(area, "Text", "", theme.Body, 13, Palette.Bone).Stretch();
         TMP_InputField field = background.gameObject.AddComponent<TMP_InputField>();
         field.textViewport = area;
         field.textComponent = text;
@@ -249,7 +303,8 @@ internal sealed class ConfigControls
         field.spriteState = new SpriteState { highlightedSprite = theme.FieldFocus, pressedSprite = theme.FieldFocus, selectedSprite = theme.FieldFocus };
         background.gameObject.SetActive(true);
 
-        field.onValueChanged.AddListener(v => entry.BoxedValue = v);
+        fields.Add(field); UiState.TypingFields.Add(field);
+        field.onValueChanged.AddListener(v => Set(entry, v));
         Refreshers.Add(() =>
         {
             if (!field.isFocused) field.SetTextWithoutNotify((string)entry.BoxedValue);

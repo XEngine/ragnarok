@@ -17,6 +17,24 @@ published release. Later refinements supersede earlier trials in the dated
 
 ### Shared styling and HUD
 
+- Keep status-effect labels always visible, tighten tile and label spacing, and
+  align the strip beneath the character name. Retire the label toggle shortcut/settings.
+
+- Increase the default nearby-storage/Quick Stack radius to 100 metres and its
+  configurable maximum to 500 metres. Loaded storage and existing access rules
+  still apply; sorting remains scoped to the open chest.
+
+- Add exact numeric input beside configuration sliders, with unit captions,
+  invalid-input rejection and range clamping. Snap dragging to setting-specific
+  increments, including five-point percentages and ten-item capacities.
+
+- Fix integer config sliders throwing InvalidCastException and allow fractional
+  values on wide float ranges. Compact config text/rows/window, add collapsible
+  navigation groups and a sidebar toggle, and guard edits/default resets against
+  server locks. Mark the server lock policy itself read-only on locked clients.
+
+- Remove the regeneration-rate text inside the health bar and its unused estimate.
+
 - Refresh Skills, Compendium, Trophies and Achievements with the same rounded
   charcoal frame, tabs, selection cards, parchment text and gold highlights as
   the character shortcuts. Add capsule scrollbars and matching Close keycap;

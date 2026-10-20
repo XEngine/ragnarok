@@ -7,6 +7,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../src/Ragnarok/Configuration/ConfigSliderValue.cs" Link="ConfigSliderValue.cs" />
     <Compile Include="../../src/Ragnarok/Ui/Shared/BuildMenuRules.cs" Link="BuildMenuRules.cs" />
     <Compile Include="../../src/Ragnarok/Features/Equipment/GraveRecoveryPlan.cs" Link="GraveRecoveryPlan.cs" />
     <Compile Include="../../src/Ragnarok/Features/Equipment/GraveRecoveryTag.cs" Link="GraveRecoveryTag.cs" />

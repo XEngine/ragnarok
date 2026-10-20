@@ -1,6 +1,9 @@
 # Nearby chest resources
 
-Default: enabled, 20 metres from the player, all three feature switches enabled.
+Default: enabled, 100 metres from the player, all three feature switches enabled.
+The shared radius also applies to Quick Stack and accepts 1-500 metres. Only loaded,
+accessible player-built chests are available; extending the radius does not load
+remote bases. Chest sorting remains limited to the currently open chest.
 This is an original implementation using the installed Valheim APIs and Harmony;
 no third-party mod code is included.
 
@@ -9,7 +12,7 @@ no third-party mod code is included.
 Use a separate local test character/world. Place chests with the hammer so they are
 player-built, then close them. Learn the materials normally before trying recipes.
 
-1. Put wood/stone/resin/coal/copper ore in closed chests within 20m. Carry only the
+1. Put wood/stone/resin/coal/copper ore in closed chests within the configured radius. Carry only the
    required tool. Build a piece, craft an item, refuel a fire, and add fuel/ore to a
    smelter. Check that precisely the normal cost disappears from the chest.
 2. Split a recipe cost between your inventory and two chests. Verify your carried
@@ -49,6 +52,7 @@ The owner checks the sending peer against the player, distance, privacy, wards a
 occupancy. No client unilaterally claims a chest. Consumption runs synchronously on
 the game thread and uses normal Inventory removal methods, preserving save callbacks.
 
-Live config is local. Range is enforced by the granting owner and the consumer;
-this is not a server-locked configuration system. Recipe/station gameplay and
+The host/server synchronizes this radius and the feature switches while
+Gameplay.Server.LockSettings is enabled. Range is enforced by the granting owner
+and the consumer; privacy, wards, occupancy and ownership checks remain in place. Recipe/station gameplay and
 network transfer tests require an actual world and are separate from menu smoke tests.

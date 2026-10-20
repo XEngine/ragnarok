@@ -31,7 +31,7 @@ internal sealed class ServerConfig : IDisposable
     private readonly Dictionary<ConfigEntryBase, string> held = new(), own = new();
     private readonly FileSystemWatcher? watcher;
     private ZNet? net;
-    private bool applying, dirty;
+    private bool applying, dirty, serverLocked;
     private int reloadPending;
     private readonly HashSet<ZRpc> registered = new();
 
@@ -62,7 +62,7 @@ internal sealed class ServerConfig : IDisposable
     }
 
     // Whether the server decides this setting now.
-    internal bool Controlled(ConfigEntryBase entry) => held.ContainsKey(entry);
+    internal bool Controlled(ConfigEntryBase entry) => held.ContainsKey(entry) || (entry == Lock && serverLocked);
 
     internal void Tick()
     {
@@ -74,7 +74,7 @@ internal sealed class ServerConfig : IDisposable
             net = current;
             if (net) Hook(net!);
         }
-        if ((!net || (!net!.IsServer() && net.GetServerPeer() == null)) && held.Count > 0) Release();
+        if ((!net || (!net!.IsServer() && net.GetServerPeer() == null)) && (held.Count > 0 || serverLocked)) Release();
 
         if (Interlocked.Exchange(ref reloadPending, 0) != 0)
         {
@@ -179,6 +179,7 @@ internal sealed class ServerConfig : IDisposable
             log.LogInfo("The server leaves Ragnarök's settings to each player.");
             return;
         }
+        serverLocked = true;
         foreach (ConfigEntryBase entry in synced)
         {
             if (values.TryGetValue(entry.Definition, out string value)) Hold(entry, value);
@@ -197,6 +198,7 @@ internal sealed class ServerConfig : IDisposable
 
     private void Release()
     {
+        serverLocked = false;
         foreach (ConfigEntryBase entry in held.Keys.ToList()) Release(entry);
     }
 

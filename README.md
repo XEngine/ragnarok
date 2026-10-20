@@ -14,6 +14,19 @@ The Windows instructions below remain available for the original development PC.
 
 ## Settings window and HUD (0.3.0)
 
+The F10 configuration window uses compact text and rows. Use **Hide sidebar / Show
+sidebar** to give the settings more room, and **+ / -** beside a section to fold
+its subpages. Each slider has an editable value box: type an exact number and press Enter or
+click away. Dragging snaps percentages by 5, capacities/pixel margins by 10,
+distance by 5 metres, duration by 1 minute, scale/opacity by 0.05 and other
+multipliers by 0.1. Integer counts such as rows and harvest yield step by 1.
+Typed values bypass drag increments and clamp to the setting's allowed range;
+opacity is entered as a percentage. With server `Gameplay.Server.LockSettings` enabled,
+shared gameplay settings are synchronized and locked for connected players;
+Restore Defaults skips those locked entries. HUD style, sizing and key bindings
+remain personal preferences.
+
+
 Press **F10** to open the Ragnarök settings window: a dashboard overview plus one page
 per config section. Changes apply instantly and save to the config file. Escape or F10
 closes it. The key and the window size are under **HUD → Window**.
@@ -32,8 +45,6 @@ the native vitals with health/stamina bars above the bottom-center hotbar, an ei
 strip when applicable, and character/food information at top left; switch back at any time.
 It is parented to Valheim's HUD, so it follows the game's UI scale
 and hides with Ctrl+F3. Separate settings control the other HUD replacements.
-Inside the health bar, a read-only HP-per-second estimate reflects food regeneration
-and positive healing effects; it shows zero at full health. It does not change healing ticks.
 
 **Weapon dial** (`[HUD.WeaponDial]`, `Features/QualityOfLife/WeaponDial.cs`): hold the dial key (V by default; the side
 mouse buttons can be bound in F10). Every weapon, shield, bow, tool and torch you carry is laid out in
@@ -46,7 +57,7 @@ item's type, quality, name, base damage (or shield block armor) and durability p
 each durable item has a condition bar beneath its icon, beside hotbar keys and stack counts.
 
 Buffs and debuffs use translucent rounded tiles with native icons and countdowns.
-Labels are optional; B toggles them. Resting, campfire and
+Effect labels are always visible, with tighter tile spacing and aligned below the character name. Resting, campfire and
 shelter join one comfort group showing your comfort level. `[HUD.Status] Enabled = false`
 turns the strip off and brings back Valheim's top-right list.
 
@@ -103,7 +114,7 @@ HUD parts can be placed anywhere: `Position` picks one of nine screen points
 (TopLeft … BottomRight; a 3×3 grid in the F10 window), and `MarginX` / `MarginY` set the
 distance from those edges in 1080p pixels (-500 to 500; on a centred axis, positive moves
 right/up). Defaults put vitals at bottom-center (0, 118), character at top-left (40, 34),
-status under the character name (150, 72), and Forsaken power at bottom-left (40, 34).
+status below the character name (150, 72), and Forsaken power at bottom-left (40, 34).
 
 The inventory (`[HUD.Inventory] Style`, default `FollowHud`) replaces Valheim's player grid with
 the Rune & Iron panel: character name, armor and carry weight/meter in the header,
@@ -309,7 +320,7 @@ Server side: `ServerConfig.cs`. It uses Valheim's own peer RPCs (`Ragnarok_Serve
 ## Nearby chest resources (0.2.0)
 
 Craft, upgrade, build and supply stations using resources in player-built chests
-within **20 metres of your character**. Your carried stock of each resource is
+within **100 metres of your character** by default. Your carried stock of each resource is
 used first, then the nearest eligible chests. Materials can be split across chests.
 
 Press Use as usual to add smelter/blast-furnace ore and fuel, kiln inputs, fire/torch
@@ -331,7 +342,7 @@ Edit the `[QualityOfLife.NearbyChests]` section in the config and press **F7**:
 ```ini
 [QualityOfLife.NearbyChests]
 Enabled = true
-Range = 20
+Range = 100
 Crafting = true
 Building = true
 Stations = true

@@ -221,9 +221,6 @@ public sealed class Plugin : BaseUnityPlugin
         }
 
         Equipment.ProvisionKeys.Update();
-        if (ui.StatusLabelsKey.Value.IsDown() && HotbarRows.Playing(Player.m_localPlayer))
-            ui.StatusLabels.Value = !ui.StatusLabels.Value;
-
         if (toggleBadgeKey.Value.IsDown())
             showBadge.Value = !showBadge.Value;
     }

@@ -14,9 +14,9 @@ internal sealed class StorageSettings
     {
         const string section = "QualityOfLife.NearbyChests";
         Enabled = config.Bind(section, "Enabled", true, "Use resources from nearby player-built chests.");
-        Range = config.Bind(section, "Range", 20f, new ConfigDescription(
-            "Maximum distance in metres from the player to a chest. Chest owners enforce their own range for network requests.",
-            new AcceptableValueRange<float>(1f, 50f)));
+        Range = config.Bind(section, "Range", 100f, new ConfigDescription(
+            "Shared radius in metres for nearby chest resources and Quick Stack. Only loaded, accessible player-built chests are available. Server-controlled; chest owners enforce this range for network requests.",
+            new AcceptableValueRange<float>(1f, 500f)));
         Crafting = config.Bind(section, "Crafting", true, "Craft and upgrade using nearby chest resources.");
         Building = config.Bind(section, "Building", true, "Build using nearby chest resources.");
         Stations = config.Bind(section, "Stations", true,

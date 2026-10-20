@@ -563,3 +563,99 @@ manual check in the visible game. Multiplayer is not tested.
   3,000 randomized build-grid viewport checks.
 - Latest Windows Debug build/deployment passed with zero warnings/errors.
   The latest character-book opening correction still needs an in-game retest.
+
+## Health-bar regeneration text removal, 2026-10-20
+
+- Removed the HP-per-second text object and its HUD update/snapshot values.
+  Deleted the now-unused read-only HealthRegeneration estimator; native healing
+  behavior and the current/maximum health display are unchanged.
+- Windows Debug build/deploy passed with zero warnings/errors; diff check passed.
+  No in-game test performed. Reload with F6 to verify the health-bar display.
+
+## Configuration sliders, compact layout and navigation, 2026-10-20
+
+- Running development log confirmed ConfigControls.Slider -> ConfigEntry<T>.BoxedValue
+  InvalidCastException. The numeric conditional promoted integer values to float;
+  explicit boxing now preserves Int32/Single types. Wide float ranges no longer
+  force integer stepping. Unit labels distinguish minutes, metres and percentages.
+- Added regression checks for boxed types, signed penalties, fractional station
+  speeds, minimum durations, opacity precision, range clamping and capacity zero.
+  dev.ps1 test passed all existing suites and the new slider suite.
+- Audited Plugin's sync list: nearby-storage toggles/range, equipment/recovery,
+  chest search, powers, harvest, skills, resource costs and all station/sailing/
+  ballista settings are registered. Retained server LockSettings policy and local
+  HUD preferences. Added UI write guards and locked-default-reset skipping; the
+  server's lock policy is read-only on clients while enforcement is active.
+- Config frame reduced to 1040x680 with smaller text/rows, screen-fit scale,
+  independently folding section groups and hide/show sidebar with page reflow.
+  Existing config subscriptions and owned controls are cleaned up on unload.
+- Windows Debug build/deploy passed with zero warnings/errors; diff check passed.
+  No in-game or multiplayer test performed for this change. Check slider dragging,
+  group/sidebar toggles, host edits reaching a client, locked controls/default reset,
+  and restoration of personal settings after disconnect.
+
+## Configuration numeric input and drag steps, 2026-10-20
+
+- Replaced slider readouts with numeric text boxes plus unit captions. Enter or
+  focus loss commits exact values within the allowed range; invalid/non-finite
+  input restores the existing value. Supports invariant/current-culture numbers,
+  opacity percentages and existing server write guards.
+- Drag steps: percentages 5, capacities/margins 10, ranges 5, minutes 1,
+  scale/opacity 0.05, other floats 0.1 and other integers 1. Slider endpoints stay
+  reachable. Exact text input bypasses steps.
+- Numeric fields join typing registration and remove listeners/registrations on
+  page changes and unload. Build and all regression suites passed, including
+  snapping, negative values, exact entry, opacity conversion, invalid input and
+  clamping. Debug deploy passed with zero warnings/errors; diff check passed.
+- No in-game test performed; F6 reload and slider/text-field interaction checks
+  remain, including server-controlled clients.
+
+## Expanded nearby-storage radius, 2026-10-20
+
+- User selected increased radius with open-chest-only sorting, rather than loaded
+  world or unloaded-world storage. Shared nearby-storage/Quick Stack range now
+  defaults to 100m, configurable 1-500m. Set the isolated development config's
+  existing 50m value to 100m. Chest search has its independent existing setting.
+- ContainerRegistry continues to enforce the same radius on requester and owner;
+  its Range entry remains in server synchronization. No changes to privacy, wards,
+  occupancy, handoff, payment or sort scope. Unloaded bases are not included.
+- Windows Debug build/deploy passed with zero warnings/errors; diff check passed.
+  No in-game/multiplayer test performed; reload F6 (F7 reloads config), then check
+  resource pulling/Quick Stack at 50-100m and rejection beyond the configured radius.
+
+## Always-visible compact status labels, 2026-10-20
+
+- Status labels always render; removed the ShowLabels/LabelsKey bindings and
+  shortcut handler so an old saved key cannot hide them. Tooltip/timers unchanged.
+- Tightened cells from 46x60 to 40x52, row gaps from 4 to 2, and label top from
+  38 to 35. Removed the 6-unit icon inset. Updated food clearance calculations.
+- Default status left margin is zero; layout migration 12 changes the prior
+  TopLeft/150 margin to zero and preserves custom placements.
+- Windows Debug build/deploy passed with zero warnings/errors; diff check passed.
+  No in-game test performed; F6 reload to check alignment and label readability.
+
+## Status alignment correction, 2026-10-20
+
+- User clarified the status strip should start under the character name, not at
+  the screen edge. Restored the 150-unit default origin (40 character margin +
+  110 name offset). Layout migration 13 corrects the prior zero-margin setting.
+  The removed internal 6-unit icon inset stays removed, preserving tighter spacing
+  and always-visible labels. This supersedes the previous left-margin change.
+- Windows Debug build/deploy passed with zero warnings/errors; diff check passed.
+  No in-game test performed; F6 reload to verify the corrected name alignment.
+
+## Center status labels on their icons, 2026-10-20
+
+- Centered the 40-unit label bounds on the 34-unit icon/plate (x=-3), matching
+  the timer's center, and set explicit centered text alignment. Strip origin
+  and compact cell spacing are unchanged.
+- Windows Debug build/deploy passed with zero warnings/errors; diff check passed.
+  No in-game test performed; verify label centering after F6 reload.
+
+## Session wrap-up checks, 2026-10-20
+
+- Final Windows Release build passed with zero warnings/errors. All regression
+  suites passed, including configuration numeric input/drag-step tests. The latest
+  Debug DLL is already deployed to the isolated development scripts directory.
+- User confirmed the centered status labels. Multiplayer configuration locking
+  and expanded nearby-storage access still require real-peer validation.

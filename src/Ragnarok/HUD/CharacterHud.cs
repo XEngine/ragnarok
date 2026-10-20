@@ -84,7 +84,7 @@ internal sealed class CharacterHud : IDisposable
         root.localScale = Vector3.one * settings.HudScale.Value;
         portrait.Tick(preview ? null : Player.m_localPlayer, settings.CharacterPortrait.Value, settings.PortraitHelmet.Value);
         // Leave room for additional buff rows when using the reference placement.
-        float foodY = Mathf.Max(156, 40 + StatusStrip.HeightFor(statusCount, settings.StatusLabels.Value));
+        float foodY = Mathf.Max(156, 40 + StatusStrip.HeightFor(statusCount));
         FoodRoot.anchoredPosition = new Vector2(0, -foodY);
         roster.anchoredPosition = new Vector2(0, -foodY - 104 - (settings.ProvisionBar.Value ? 44 : 0));
         if (Time.unscaledTime >= refresh)

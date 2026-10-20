@@ -48,22 +48,22 @@ internal sealed class StatusStrip : IDisposable
         grid = root.gameObject.AddComponent<GridLayoutGroup>();
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         grid.constraintCount = 4;
-        grid.spacing = new Vector2(0, 4);
-        grid.cellSize = new Vector2(42, 38);
-        root.sizeDelta = new Vector2(168, 38);
+        grid.spacing = new Vector2(0, 2);
+        grid.cellSize = new Vector2(40, 52);
+        root.sizeDelta = new Vector2(160, 52);
     }
 
     internal RectTransform Rect => root;
-    internal static float HeightFor(int count, bool labels)
+    internal static float HeightFor(int count)
     {
         int rows = Mathf.CeilToInt(count / 4f);
-        return rows == 0 ? 0 : rows * (labels ? 60 : 38) + (rows - 1) * 4;
+        return rows == 0 ? 0 : rows * 52 + (rows - 1) * 2;
     }
     internal void SetVisible(bool visible) => root.gameObject.SetActive(visible);
     internal void SetScale(float scale) => root.localScale = Vector3.one * scale;
     internal void Place(HudPlacement placement) => placement.Apply(root);
 
-    internal void Set(List<HudStatus> statuses, int comfort, bool labels, string key)
+    internal void Set(List<HudStatus> statuses, int comfort)
     {
         removed.Clear();
         foreach (int id in tiles.Keys)
@@ -73,11 +73,11 @@ internal sealed class StatusStrip : IDisposable
             UnityEngine.Object.Destroy(tiles[id].Root.gameObject);
             tiles.Remove(id);
         }
-        Vector2 cellSize = new(labels ? 46 : 42, labels ? 60 : 38);
+        Vector2 cellSize = new(40, 52);
         bool layoutChanged = grid.cellSize != cellSize;
         grid.cellSize = cellSize;
-        grid.spacing = new Vector2(0, 4);
-        root.sizeDelta = new Vector2(cellSize.x * 4 + grid.spacing.x * 3, HeightFor(statuses.Count, labels));
+        grid.spacing = new Vector2(0, 2);
+        root.sizeDelta = new Vector2(cellSize.x * 4 + grid.spacing.x * 3, HeightFor(statuses.Count));
         for (int i = 0; i < statuses.Count; i++)
         {
             HudStatus status = statuses[i];
@@ -93,9 +93,9 @@ internal sealed class StatusStrip : IDisposable
                 tile.Timer.enableAutoSizing = true;
                 tile.Timer.fontSizeMin = 8;
                 tile.Timer.fontSizeMax = 9;
-                RectTransform labelBounds = Ugui.Node(tile.Root, "Label bounds").At(1, 38, 44, 20);
+                RectTransform labelBounds = Ugui.Node(tile.Root, "Label bounds").At(-3, 35, 40, 16);
                 labelBounds.gameObject.AddComponent<RectMask2D>();
-                tile.Name = Ugui.Text(labelBounds, "Name", "", theme.Strong, 9, Palette.Bone, TextAlignmentOptions.Top).At(1, 0, 42, 18);
+                tile.Name = Ugui.Text(labelBounds, "Name", "", theme.Strong, 9, Palette.Bone, TextAlignmentOptions.Center).At(0, 0, 40, 15);
                 tile.Name.enableAutoSizing = true;
                 tile.Name.fontSizeMin = 8;
                 tile.Name.fontSizeMax = 9;
@@ -112,7 +112,7 @@ internal sealed class StatusStrip : IDisposable
             }
             if (added || layoutChanged)
             {
-                float x = labels ? 6 : 0;
+                const float x = 0;
                 tile.Plate.At(x, 0, 34, 34);
                 tile.Edge.At(x, 0, 34, 34);
                 tile.Icon.At(x + 9, 3, 16, 16);
@@ -133,7 +133,7 @@ internal sealed class StatusStrip : IDisposable
             tile.Timer.color = wet ? Palette.Frost : Palette.Bone;
             tile.Timer.text = status.Key == SEMan.s_statusEffectResting ? comfort.ToString()
                 : string.IsNullOrEmpty(status.Value) ? "\u2014" : status.Value;
-            tile.Name.gameObject.SetActive(labels);
+            tile.Name.gameObject.SetActive(true);
             tile.Name.text = Localization.instance != null ? Localization.instance.Localize(status.Name) : status.Name;
             if (Time.unscaledTime >= tile.NextTooltip)
             {

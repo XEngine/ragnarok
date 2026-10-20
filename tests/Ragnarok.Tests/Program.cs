@@ -54,3 +54,5 @@ CraftFrameChecks.Run(Check);
 RecipeDetailsChecks.Run(Check);
 GraveRecoveryChecks.Run(Check);
 BuildMenuChecks.Run(Check);
+
+ConfigSliderChecks.Run(Check);

@@ -22,8 +22,6 @@ internal sealed class InterfaceSettings
     internal readonly ConfigEntry<bool> HudFood;
     internal readonly ConfigEntry<bool> HudPower;
     internal readonly ConfigEntry<bool> HudStatus;
-    internal readonly ConfigEntry<bool> StatusLabels;
-    internal readonly ConfigEntry<KeyboardShortcut> StatusLabelsKey;
     internal readonly HudPlacement Character, Power, SkillToast;
     internal readonly ConfigEntry<bool> CharacterPortrait, PortraitHelmet;
     internal readonly ConfigEntry<bool> Party;
@@ -132,10 +130,6 @@ internal sealed class InterfaceSettings
 
         HudStatus = config.Bind(StatusSection, "Enabled", true,
             "Show buffs and debuffs in the Ragnarök status strip. Off brings back Valheim's top-right list.");
-        StatusLabels = config.Bind(StatusSection, "ShowLabels", false,
-            "Name each effect beside its icon (\"Rested 8:29\"). Off shows only the icons and their time left. The labels key flips this in game.");
-        StatusLabelsKey = config.Bind(StatusSection, "LabelsKey", new KeyboardShortcut(KeyCode.B),
-            "Show or hide the status effect names. B by default (V is Valheim's auto-pickup and Ragnarök's weapon dial).");
         Status = new HudPlacement(config, StatusSection, "status effect strip", ScreenAnchor.TopLeft, 150f, 72f);
 
         HudKeys = config.Bind(KeysSection, "Enabled", true,
@@ -209,8 +203,6 @@ internal sealed class InterfaceSettings
         }
         if (layoutVersion.Value < 2)
         {
-            // Adopt the reference's timer-only tiles once; B still toggles names afterward.
-            StatusLabels.Value = false;
             layoutVersion.Value = 2;
         }
         if (layoutVersion.Value < 3)
@@ -262,6 +254,20 @@ internal sealed class InterfaceSettings
         {
             if (BuildColumns.Value == 12 && BuildRows.Value == 6) { BuildColumns.Value = 5; BuildRows.Value = 4; }
             layoutVersion.Value = 11;
+        }
+        if (layoutVersion.Value < 12)
+        {
+            if (Status.Position.Value == ScreenAnchor.TopLeft && Status.MarginX.Value == 150f)
+                Status.MarginX.Value = 0;
+            layoutVersion.Value = 12;
+        }
+        if (layoutVersion.Value < 13)
+        {
+            // Align the strip with the name (character x=40 + name x=110),
+            // rather than the screen edge introduced by layout version 12.
+            if (Status.Position.Value == ScreenAnchor.TopLeft && Status.MarginX.Value == 0f)
+                Status.MarginX.Value = 150;
+            layoutVersion.Value = 13;
         }
     }
 

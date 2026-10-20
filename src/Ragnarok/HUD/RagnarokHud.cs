@@ -19,7 +19,6 @@ internal struct HudFood
 internal struct HudSnapshot
 {
     internal float Health, MaxHealth, Stamina, MaxStamina, Eitr, MaxEitr, Adrenaline, MaxAdrenaline;
-    internal float HealthRegen;
     internal List<HudFood> Foods;
     internal List<HudStatus> Statuses;
     internal int Comfort;
@@ -60,7 +59,6 @@ internal struct HudSnapshot
         return new HudSnapshot
         {
             Health = player.GetHealth(), MaxHealth = player.GetMaxHealth(),
-            HealthRegen = HealthRegeneration.PerSecond(player),
             Stamina = player.GetStamina(), MaxStamina = player.GetMaxStamina(),
             Eitr = player.GetEitr(), MaxEitr = player.GetMaxEitr(),
             Adrenaline = player.GetAdrenaline(), MaxAdrenaline = player.GetMaxAdrenaline(),
@@ -84,7 +82,6 @@ internal struct HudSnapshot
         return new HudSnapshot
         {
             Health = 96 + Mathf.Sin(time * 0.7f) * 30, MaxHealth = 160,
-            HealthRegen = 0.6f,
             Stamina = 88 + Mathf.Sin(time * 1.3f) * 30, MaxStamina = 130,
             Eitr = 42, MaxEitr = 80,
             Foods = buffer, Statuses = statuses, Comfort = 7,
@@ -116,7 +113,6 @@ internal sealed class RagnarokHud : IDisposable
     private ProvisionBar? provisions;
     private RectTransform? knot;
     private TextMeshProUGUI? weaponName;
-    private TextMeshProUGUI? healthRegen;
     private Image? criticalVignette;
     private readonly List<TextOutline> vitalsTextOutlines = new();
 
@@ -162,7 +158,7 @@ internal sealed class RagnarokHud : IDisposable
         {
             strip.SetScale(settings.HudScale.Value);
             strip.Place(settings.Status);
-            strip.Set(data.Statuses, data.Comfort, settings.StatusLabels.Value, Equipment.ProvisionKeys.Label(settings.StatusLabelsKey.Value));
+            strip.Set(data.Statuses, data.Comfort);
         }
         if (settings.HudKeys.Value)
         {
@@ -192,11 +188,6 @@ internal sealed class RagnarokHud : IDisposable
         powerRoot.localScale = Vector3.one * settings.HudScale.Value;
         settings.Power.Apply(powerRoot);
         bars[0].Set(data.Health, data.MaxHealth);
-        float regen = Mathf.Round(data.HealthRegen * 100) / 100;
-        string regenText = regen > 0 ? "+" + regen.ToString("0.##") + "/s" : "0/s";
-        if (healthRegen!.text != regenText) healthRegen.text = regenText;
-        healthRegen.color = regen > 0 ? Palette.Bone : Palette.Muted;
-        healthRegen.enabled = settings.HudNumbers.Value;
         bars[1].Set(data.Stamina, data.MaxStamina);
         bars[2].Root.gameObject.SetActive(data.MaxEitr > 0);
         if (data.MaxEitr > 0) bars[2].Set(data.Eitr, data.MaxEitr);
@@ -303,9 +294,6 @@ internal sealed class RagnarokHud : IDisposable
             new Bar(theme, rect, "Eitr", new Rect(0, 66, VitalsWidth, 6), Palette.Hex(0x9A7BEA), 2, OutlineVitalsText),
             new Bar(theme, rect, "Adrenaline", new Rect(0, 84, VitalsWidth, 6), Palette.Ember, 2, OutlineVitalsText)
         };
-        healthRegen = Ugui.Text(bars[0].Root, "Health regeneration per second", "", theme.Numbers, 9, Palette.Bone)
-            .At(5, -3, 80, 15);
-        OutlineVitalsText(healthRegen);
         knot = Ugui.Node(rect, "Vitals diamond").At(VitalsWidth / 2, 42, 0, 0);
         Ugui.Image(knot, "Rim", theme.Diamond, Palette.Gold).At(-16, -16, 32, 32);
         Ugui.Image(knot, "Core", theme.Diamond, Palette.Ink).At(-14, -14, 28, 28);
