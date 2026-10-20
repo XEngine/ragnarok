@@ -44,6 +44,7 @@ internal sealed class KeyHintsPanel : IDisposable
     private TextAnchor rowAlignment = TextAnchor.MiddleRight, placedAlignment = TextAnchor.MiddleRight;
     // Width of the panel the guide sits under (0 = in its own place on screen).
     private float dockWidth;
+    private bool compact;
     private readonly Vector3[] corners = new Vector3[4];
     private const float DockGap = 10, LineGap = 26;
 
@@ -67,6 +68,16 @@ internal sealed class KeyHintsPanel : IDisposable
 
     internal void SetScale(float scale) => root.localScale = Vector3.one * scale;
 
+    internal static bool CombatActive => KeyHints.instance && KeyHints.instance.m_combatHints &&
+        KeyHints.instance.m_combatHints.activeInHierarchy &&
+        !(KeyHints.instance.m_buildHints && KeyHints.instance.m_buildHints.activeInHierarchy);
+
+    internal static bool ToolActive => KeyHints.instance &&
+        ((KeyHints.instance.m_buildHints && KeyHints.instance.m_buildHints.activeInHierarchy) ||
+         (KeyHints.instance.m_fishingHints && KeyHints.instance.m_fishingHints.activeInHierarchy));
+
+    internal float DockSpace => root.rect.height * root.localScale.y + DockGap * root.localScale.y + 6;
+
     internal void Place(HudPlacement placement)
     {
         placement.Apply(root);
@@ -80,8 +91,14 @@ internal sealed class KeyHintsPanel : IDisposable
     // Sits the guide just under `target` (the open crafting panel), as wide as it and at its scale, the
     // hints flowing in lines; null puts it back in its own place. Where `avoid` (the status list) reaches
     // up beside it, the guide narrows to the room left of it.
-    internal bool Dock(RectTransform? target, RectTransform? avoid = null)
+    internal bool Dock(RectTransform? target, RectTransform? avoid = null, bool compact = false, float bottomInset = 0)
     {
+        bool nextCompact = target && compact;
+        if (this.compact != nextCompact)
+        {
+            this.compact = nextCompact;
+            shown = "";
+        }
         if (!target)
         {
             if (dockWidth > 0)
@@ -97,12 +114,16 @@ internal sealed class KeyHintsPanel : IDisposable
         target!.GetWorldCorners(corners);
         Vector2 left = parent.InverseTransformPoint(corners[0]), right = parent.InverseTransformPoint(corners[3]);
         float scale = parent.lossyScale.x > 0 ? target.lossyScale.x / parent.lossyScale.x : 1f;
+        // The hotbar's visible slots end above its transparent bottom padding.
+        left.y += bottomInset * scale;
         root.anchorMin = root.anchorMax = new Vector2(0.5f, 0.5f);
         root.pivot = new Vector2(0.5f, 1f);
         root.localScale = Vector3.one * scale;
         // Kept on screen: with no room left below the panel it rises over the panel's foot.
         float floor = parent.rect.yMin + 6 + root.rect.height * scale;
-        float top = Mathf.Max(left.y - DockGap * scale, floor);
+        float top = left.y - DockGap * scale;
+        // Follow the moving hotbar instead of clamping up over its slots during the lift.
+        if (bottomInset <= 0) top = Mathf.Max(top, floor);
         if (avoid && avoid!.gameObject.activeInHierarchy)
         {
             avoid.GetWorldCorners(corners);
@@ -261,23 +282,28 @@ internal sealed class KeyHintsPanel : IDisposable
             line.spacing = 6;
             line.childAlignment = docked ? TextAnchor.MiddleLeft : rowAlignment;
             line.childControlWidth = line.childControlHeight = true;
-            line.childForceExpandWidth = line.childForceExpandHeight = false;
-            row.gameObject.AddComponent<LayoutElement>().minHeight = 24;
+            line.childForceExpandWidth = false;
+            line.childForceExpandHeight = compact;
+            row.gameObject.AddComponent<LayoutElement>().minHeight = compact ? 18 : 24;
 
             // As in the style guide: the keys first, then what they do.
             foreach (Part part in data.Keys)
             {
-                if (part.Joiner) Ugui.Text(row, "Joiner", part.Text, theme.Strong, 12, Palette.Muted);
+                if (part.Joiner) Ugui.Text(row, "Joiner", part.Text, theme.Strong, compact ? 10.5f : 12, Palette.Muted,
+                    compact ? TextAlignmentOptions.Midline : TextAlignmentOptions.MidlineLeft);
                 else if (part.Icon) Icon(row, part.Icon!);
                 else Keycap(row, part.Text);
             }
             if (data.Label.Length > 0)
             {
-                TextMeshProUGUI label = Ugui.Text(row, "Label", data.Label, theme.Strong, 13, Palette.Bone);
+                TextMeshProUGUI label = Ugui.Text(row, "Label", data.Label, compact ? theme.Body : theme.Strong,
+                    compact ? 10.5f : 13, compact ? InventoryCategories.Material : Palette.Bone,
+                    TextAlignmentOptions.MidlineLeft);
                 label.margin = new Vector4(3, 0, 0, 0);
             }
         }
         if (docked) Flow(built);
+        LayoutRebuilder.ForceRebuildLayoutImmediate(root);
     }
 
     // Under the crafting panel: the hints side by side, wrapping onto centred lines no wider than the panel.
@@ -285,27 +311,33 @@ internal sealed class KeyHintsPanel : IDisposable
     {
         RectTransform? line = null;
         float used = 0;
+        float spacing = compact ? 18 : LineGap;
         foreach (RectTransform hint in hints)
         {
             LayoutRebuilder.ForceRebuildLayoutImmediate(hint);
             float width = LayoutUtility.GetPreferredWidth(hint);
-            if (!line || used + LineGap + width > dockWidth)
+            if (!line || used + spacing + width > dockWidth)
             {
                 line = Ugui.Node(root, "Line");
                 HorizontalLayoutGroup group = line.gameObject.AddComponent<HorizontalLayoutGroup>();
-                group.spacing = LineGap;
+                group.spacing = spacing;
                 group.childAlignment = TextAnchor.MiddleCenter;
                 group.childControlWidth = group.childControlHeight = true;
                 group.childForceExpandWidth = group.childForceExpandHeight = false;
-                used = -LineGap;
+                used = -spacing;
             }
             hint.SetParent(line, false);
-            used += LineGap + width;
+            used += spacing + width;
         }
     }
 
     private void Keycap(Transform row, string text)
     {
+        if (compact)
+        {
+            Ugui.Text(row, "Key", text, theme.Strong, 10.5f, Color.white, TextAlignmentOptions.Midline);
+            return;
+        }
         Image cap = Ugui.Image(row, "Key", theme.Button, Color.white);
         HorizontalLayoutGroup pad = cap.gameObject.AddComponent<HorizontalLayoutGroup>();
         pad.padding = new RectOffset(8, 8, 3, 3);
@@ -320,9 +352,9 @@ internal sealed class KeyHintsPanel : IDisposable
 
     private void Icon(Transform row, Sprite sprite)
     {
-        Image image = Ugui.Image(row, "Icon", icons.Get(sprite) ?? sprite, Palette.Bone);
+        Image image = Ugui.Image(row, "Icon", icons.Get(sprite) ?? sprite, compact ? Color.white : Palette.Bone);
         image.preserveAspect = true;
         LayoutElement size = image.gameObject.AddComponent<LayoutElement>();
-        size.preferredWidth = size.preferredHeight = 18;
+        size.preferredWidth = size.preferredHeight = compact ? 14 : 18;
     }
 }

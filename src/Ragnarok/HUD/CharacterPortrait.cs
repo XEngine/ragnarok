@@ -24,6 +24,7 @@ internal sealed class CharacterPortrait : IDisposable
     private float nextCheck;
     private int signature;
     private bool ready, failed;
+    private readonly HashSet<int> warnedMeshes = new();
 
     internal CharacterPortrait(Theme theme, Transform parent, Graphic rune)
     {
@@ -83,6 +84,7 @@ internal sealed class CharacterPortrait : IDisposable
             hash = hash * 397 ^ BeardHash(equipment);
             foreach (Renderer renderer in equipment.GetComponentsInChildren<Renderer>())
             {
+                if (!renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
                 if (!(renderer is SkinnedMeshRenderer) && !(renderer is MeshRenderer)) continue;
                 hash = hash * 397 ^ renderer.GetInstanceID();
                 if (renderer is SkinnedMeshRenderer skin && skin.sharedMesh)
@@ -142,7 +144,9 @@ internal sealed class CharacterPortrait : IDisposable
             camera.cullingMask = 1 << PortraitLayer;
             camera.allowHDR = false;
             camera.allowMSAA = false;
-            camera.transform.position = focus + Vector3.forward * 1.2f;
+            // View from slightly above and to the side: the neutral face looks toward
+            // the portrait's lower right without changing its skeleton or live pose.
+            camera.transform.position = focus + new Vector3(0.32f, 0.16f, 1.2f);
             camera.transform.LookAt(focus, Vector3.up);
             AddLight(rig.transform, new Vector3(0.5f, 0.6f, 1), 1.3f, new Color(1, 0.9f, 0.76f));
             AddLight(rig.transform, new Vector3(-0.6f, 0.2f, 1), 0.65f, new Color(0.7f, 0.82f, 1));
@@ -192,7 +196,8 @@ internal sealed class CharacterPortrait : IDisposable
     }
 
     private static void CopyTree(Transform source, Transform parent, Dictionary<Transform, Transform> copies,
-        List<KeyValuePair<Renderer, Renderer>> renderers, GameObject? helmet = null, GameObject? hair = null, GameObject? beard = null)
+        List<KeyValuePair<Renderer, Renderer>> renderers, GameObject? helmet = null, GameObject? hair = null, GameObject? beard = null,
+        bool prefab = false)
     {
         if (source.gameObject == helmet || source.gameObject == hair || source.gameObject == beard) return;
         GameObject node = new(source.name) { layer = PortraitLayer };
@@ -204,11 +209,14 @@ internal sealed class CharacterPortrait : IDisposable
         copies[source] = target;
         foreach (Renderer original in source.GetComponents<Renderer>())
         {
+            // Keep all skeleton transforms, but do not render inactive equipment or hidden body variants.
+            if (!original.enabled || (!prefab && !source.gameObject.activeInHierarchy)) continue;
             Renderer? copy = null;
             if (original is SkinnedMeshRenderer skin)
             {
                 SkinnedMeshRenderer result = node.AddComponent<SkinnedMeshRenderer>();
-                result.sharedMesh = skin.sharedMesh;
+                // Leave the mesh unassigned until its complete portrait skeleton is validated.
+                result.enabled = false;
                 result.updateWhenOffscreen = true;
                 result.localBounds = skin.localBounds;
                 copy = result;
@@ -219,7 +227,7 @@ internal sealed class CharacterPortrait : IDisposable
                 copy = node.AddComponent<MeshRenderer>();
             }
             if (!copy) continue;
-            copy!.enabled = original.enabled;
+            copy!.enabled = !(copy is SkinnedMeshRenderer);
             copy.sharedMaterials = original.sharedMaterials;
             copy.shadowCastingMode = ShadowCastingMode.Off;
             copy.receiveShadows = false;
@@ -228,26 +236,50 @@ internal sealed class CharacterPortrait : IDisposable
             copy.SetPropertyBlock(properties);
             renderers.Add(new KeyValuePair<Renderer, Renderer>(original, copy));
         }
-        for (int i = 0; i < source.childCount; i++) CopyTree(source.GetChild(i), target, copies, renderers, helmet, hair, beard);
+        for (int i = 0; i < source.childCount; i++) CopyTree(source.GetChild(i), target, copies, renderers, helmet, hair, beard, prefab);
         node.SetActive(source.gameObject.activeSelf);
     }
 
-    private static void BindSkins(Dictionary<Transform, Transform> copies, List<KeyValuePair<Renderer, Renderer>> renderers)
+    private void BindSkins(Dictionary<Transform, Transform> copies, List<KeyValuePair<Renderer, Renderer>> renderers)
     {
         foreach (var pair in renderers)
         {
             if (!(pair.Key is SkinnedMeshRenderer original) || !(pair.Value is SkinnedMeshRenderer copy)) continue;
-            Transform[] bones = original.bones;
-            for (int i = 0; i < bones.Length; i++)
-                bones[i] = bones[i] && copies.TryGetValue(bones[i], out Transform bone) ? bone : null!;
-            copy.bones = bones;
-            if (original.rootBone && copies.TryGetValue(original.rootBone, out Transform root)) copy.rootBone = root;
-            if (original.sharedMesh)
-                for (int i = 0; i < original.sharedMesh.blendShapeCount; i++) copy.SetBlendShapeWeight(i, original.GetBlendShapeWeight(i));
+            BindSkin(original, copy, original.bones, original.rootBone, copies);
         }
     }
 
-    private static void AddHair(int hash, Player player, VisEquipment equipment, Dictionary<Transform, Transform> copies)
+    private void BindSkin(SkinnedMeshRenderer original, SkinnedMeshRenderer copy, Transform[] sourceBones,
+        Transform? sourceRoot, Dictionary<Transform, Transform> copies)
+    {
+        Mesh mesh = original.sharedMesh;
+        if (!mesh) return;
+        int bindposes = mesh.bindposes.Length;
+        Transform[] bones = new Transform[sourceBones.Length];
+        bool valid = bones.Length == bindposes;
+        for (int i = 0; i < sourceBones.Length && valid; i++)
+        {
+            if (!sourceBones[i] || !copies.TryGetValue(sourceBones[i], out Transform bone)) valid = false;
+            else bones[i] = bone;
+        }
+        Transform? root = null;
+        if (sourceRoot && !copies.TryGetValue(sourceRoot!, out root)) valid = false;
+        if (!valid)
+        {
+            if (warnedMeshes.Add(mesh.GetInstanceID()))
+                Debug.LogWarning($"[Ragnarok] Portrait skipped incompatible mesh '{mesh.name}' on '{original.name}': " +
+                    $"{sourceBones.Length} bones, {bindposes} bind poses; all bones must exist in the portrait skeleton.");
+            return;
+        }
+        copy.rootBone = root;
+        copy.bones = bones;
+        copy.sharedMesh = mesh;
+        copy.localBounds = original.localBounds;
+        for (int i = 0; i < mesh.blendShapeCount; i++) copy.SetBlendShapeWeight(i, original.GetBlendShapeWeight(i));
+        copy.enabled = original.enabled;
+    }
+
+    private void AddHair(int hash, Player player, VisEquipment equipment, Dictionary<Transform, Transform> copies)
     {
         GameObject? prefab = hash != 0 && ObjectDB.instance ? ObjectDB.instance.GetItemPrefab(hash) : null;
         if (!prefab) return;
@@ -257,7 +289,7 @@ internal sealed class CharacterPortrait : IDisposable
         var extra = new Dictionary<Transform, Transform>();
         var renderers = new List<KeyValuePair<Renderer, Renderer>>();
         Transform parent = copies[skinned ? equipment.m_bodyModel.transform.parent : equipment.m_helmet];
-        CopyTree(attach, parent, extra, renderers);
+        CopyTree(attach, parent, extra, renderers, prefab: true);
         Transform root = extra[attach];
         root.localPosition = Vector3.zero;
         root.localRotation = Quaternion.identity;
@@ -269,10 +301,11 @@ internal sealed class CharacterPortrait : IDisposable
             Renderer renderer = pair.Value;
             if (renderer is SkinnedMeshRenderer skin)
             {
-                Transform[] bones = equipment.m_bodyModel.bones;
-                for (int i = 0; i < bones.Length; i++) bones[i] = copies[bones[i]];
-                skin.bones = bones;
-                skin.rootBone = copies[equipment.m_bodyModel.rootBone];
+                // Valheim binds attach_skin hair to the body skeleton. Retain local bones
+                // for a skinned renderer inside a normal attach object instead.
+                var original = (SkinnedMeshRenderer)pair.Key;
+                BindSkin(original, skin, skinned ? equipment.m_bodyModel.bones : original.bones,
+                    skinned ? equipment.m_bodyModel.rootBone : original.rootBone, skinned ? copies : extra);
             }
             if (equipment.m_overrideHairMaterial) renderer.sharedMaterial = equipment.m_overrideHairMaterial;
             MaterialPropertyBlock properties = new();

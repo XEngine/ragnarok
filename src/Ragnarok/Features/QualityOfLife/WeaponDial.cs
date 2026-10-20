@@ -18,8 +18,8 @@ internal sealed class WeaponDial : IDisposable
     // Ring, hub and icon geometry in 1080p units. Dead and Reach are the invisible stick the mouse moves: a
     // short stick, so the slightest move picks the segment in that direction (only the very centre cancels).
     private const float Inner = 118, Outer = 262, Hub = 100, IconRadius = 190, Icon = 66, Gap = 4, Dead = 5, Reach = 60;
-    private const float Detail = 1.5f; // texture pixels per unit, for crisp edges above 1080p
     private const int MaxItems = 12;
+    private const float BackgroundOpacity = 0.9f;
 
     // Read by the patches below: Valheim treats the dial as one of its radial menus.
     internal static bool Open;
@@ -60,18 +60,18 @@ internal sealed class WeaponDial : IDisposable
         if (ragnarok)
             return new Look
             {
-                Fill = Palette.HudGlass, FillOn = Palette.Hex(0x3A3123, Palette.HudGlassOpacity), FillHand = Palette.Hex(0x222925, Palette.HudGlassOpacity),
+                Fill = Palette.HudGlass.WithAlpha(BackgroundOpacity), FillOn = Palette.Hex(0x3A3123, BackgroundOpacity), FillHand = Palette.Hex(0x222925, BackgroundOpacity),
                 Edge = Palette.Hex(0x626B64, 0.45f), EdgeOn = InventoryCategories.Gold, EdgeHand = Palette.Bone.WithAlpha(0.65f),
-                Hub = Palette.HudGlass, Accent = InventoryCategories.Gold, AccentDim = Palette.GoldDim, Title = Palette.Hex(0xF2D597), Muted = Palette.Bone.WithAlpha(0.85f),
+                Hub = Palette.HudGlass.WithAlpha(BackgroundOpacity), Accent = InventoryCategories.Gold, AccentDim = Palette.GoldDim, Title = Palette.Hex(0xF2D597), Muted = Palette.Bone.WithAlpha(0.85f),
                 Heading = theme.Heading, Body = theme.Strong, Ornate = true, Aura = new Color(0.8f, 0.68f, 0.48f)
             };
         TMP_FontAsset? valheim = InventoryGui.instance && InventoryGui.instance.m_containerName ? InventoryGui.instance.m_containerName.font : theme.Body;
         Color orange = new(1f, 0.62f, 0.16f);
         return new Look
         {
-            Fill = new Color(0, 0, 0, 0.6f), FillOn = orange.WithAlpha(0.7f), FillHand = new Color(0.3f, 0.3f, 0.3f, 0.65f),
+            Fill = new Color(0, 0, 0, BackgroundOpacity), FillOn = orange.WithAlpha(BackgroundOpacity), FillHand = new Color(0.3f, 0.3f, 0.3f, BackgroundOpacity),
             Edge = new Color(1, 1, 1, 0.22f), EdgeOn = new Color(1f, 0.85f, 0.5f), EdgeHand = new Color(1, 1, 1, 0.6f),
-            Hub = new Color(0, 0, 0, 0.78f), Accent = orange, AccentDim = new Color(1, 1, 1, 0.4f), Title = new Color(1f, 0.82f, 0.45f),
+            Hub = new Color(0, 0, 0, BackgroundOpacity), Accent = orange, AccentDim = new Color(1, 1, 1, 0.4f), Title = new Color(1f, 0.82f, 0.45f),
             Muted = new Color(0.85f, 0.85f, 0.85f), Heading = valheim, Body = valheim, Ornate = false, Aura = orange
         };
     }
@@ -80,7 +80,7 @@ internal sealed class WeaponDial : IDisposable
     {
         internal ItemDrop.ItemData Item = null!;
         internal Image Fill = null!, Edge = null!, Icon = null!, Aura = null!;
-        internal Image? Durability;
+        internal Image? Durability, DurabilityTrack;
         internal TextMeshProUGUI Metadata = null!;
         internal RectTransform IconRect = null!, Group = null!;
         internal CanvasGroup Fade = null!;
@@ -93,10 +93,6 @@ internal sealed class WeaponDial : IDisposable
     private readonly InterfaceSettings settings;
     private readonly Theme theme;
     private readonly List<Slot> slots = new();
-    // Generated art: one segment shape per item count (fill and edge), the hub, the soft shadow behind.
-    private readonly Dictionary<int, (Sprite Fill, Sprite Edge)> segments = new();
-    private readonly List<UnityEngine.Object> owned = new();
-    private Sprite? hubSprite, ringSprite, glowSprite, haloSprite;
     private GameObject? canvas;
     private RectTransform? needle, knob;
     private Image? hubRing;
@@ -146,11 +142,7 @@ internal sealed class WeaponDial : IDisposable
     {
         Equipping = null;
         Hide();
-        foreach (UnityEngine.Object o in owned)
-            if (o) UnityEngine.Object.Destroy(o);
-        owned.Clear();
-        segments.Clear();
-        hubSprite = ringSprite = glowSprite = haloSprite = null;
+        ClearCanvas();
     }
 
     // The key went down this frame, with its modifiers held (either Control, Shift or Alt counts).
@@ -183,7 +175,25 @@ internal sealed class WeaponDial : IDisposable
     {
         List<ItemDrop.ItemData> items = Items(player);
         if (items.Count == 0) return;
-        Build(items);
+        Look nextLook = Choose();
+        if (!canvas || slots.Count != items.Count || look.Ornate != nextLook.Ornate ||
+            look.Heading != nextLook.Heading || look.Body != nextLook.Body)
+        {
+            ClearCanvas();
+            Build(items);
+        }
+        else
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                Slot slot = slots[i];
+                slot.Item = items[i];
+                slot.Icon.sprite = items[i].GetIcon();
+                slot.Push = slot.Glow = 0;
+            }
+        }
+        canvas!.SetActive(true);
+        openedAt = Time.unscaledTime;
         Open = true;
         aim = Vector2.zero;
         chosen = -1;
@@ -194,9 +204,20 @@ internal sealed class WeaponDial : IDisposable
     private void Hide()
     {
         Open = false;
+        if (canvas) canvas!.SetActive(false);
+        // Retain UI objects, not references into a character's inventory between openings.
+        foreach (Slot slot in slots) slot.Item = null!;
+    }
+
+    private void ClearCanvas()
+    {
         slots.Clear();
         outlines.Clear();
-        if (canvas) UnityEngine.Object.Destroy(canvas);
+        if (canvas)
+        {
+            canvas!.SetActive(false);
+            UnityEngine.Object.Destroy(canvas);
+        }
         canvas = null;
     }
 
@@ -218,17 +239,16 @@ internal sealed class WeaponDial : IDisposable
         dial = root;
         dialFade = root.gameObject.AddComponent<CanvasGroup>();
         openedAt = Time.unscaledTime;
-        Art();
         look = Choose();
         if (!look.Ornate)
         {
             float shadow = Outer * 2 + 220;
-            Centre(Ugui.Image(root, "Shadow", glowSprite, new Color(0, 0, 0, 0.7f)).rectTransform, Vector2.zero, new Vector2(shadow, shadow));
+            Centre(WeaponDialGraphic.Create(root, "Shadow", new Color(0, 0, 0, 0.7f), 0, Outer + 110, shadow: true).rectTransform,
+                Vector2.zero, new Vector2(shadow, shadow));
         }
 
         // One ring segment per item, turned to its place; its icon at the segment's middle.
-        (Sprite fill, Sprite edge) = Segment(items.Count);
-        float size = (Outer + 4) * 2;
+        float size = (Outer + 2) * 2;
         for (int i = 0; i < items.Count; i++)
         {
             ItemDrop.ItemData item = items[i];
@@ -243,13 +263,13 @@ internal sealed class WeaponDial : IDisposable
             fade.alpha = 0;
 
             // The glow: the segment's own shape, a little larger, behind it.
-            Image aura = Ugui.Image(group, "Aura", fill, look.Aura.WithAlpha(0));
+            Image aura = WeaponDialGraphic.Create(group, "Aura", look.Aura.WithAlpha(0), Inner, Outer, items.Count, Gap);
             Centre(aura.rectTransform, Vector2.zero, new Vector2(size, size));
             aura.rectTransform.localRotation = turn;
-            Image f = Ugui.Image(group, "Segment", fill, look.Fill);
+            Image f = WeaponDialGraphic.Create(group, "Segment", look.Fill, Inner, Outer, items.Count, Gap);
             Centre(f.rectTransform, Vector2.zero, new Vector2(size, size));
             f.rectTransform.localRotation = turn;
-            Image e = Ugui.Image(group, "Edge", edge, look.Edge);
+            Image e = WeaponDialGraphic.Create(group, "Edge", look.Edge, Inner, Outer, items.Count, Gap, border: true);
             Centre(e.rectTransform, Vector2.zero, new Vector2(size, size));
             e.rectTransform.localRotation = turn;
 
@@ -261,10 +281,11 @@ internal sealed class WeaponDial : IDisposable
             Outline(metadata);
             Slot slot = new() { Item = item, Fill = f, Edge = e, Icon = icon, IconRect = icon.rectTransform, Aura = aura, Group = group, Fade = fade, Direction = direction };
             slot.Metadata = metadata;
-            if (item.m_shared.m_useDurability)
+            // Every reusable slot has a durability bar, toggled for its current item in Paint.
             {
                 Vector2 at = direction * IconRadius + new Vector2(0, -64);
-                Centre(Ugui.Image(group, "Durability track", theme.White, Palette.Hex(0x626B64, 0.45f)).rectTransform, at, new Vector2(34, 2));
+                slot.DurabilityTrack = Ugui.Image(group, "Durability track", theme.White, Palette.Hex(0x626B64, 0.45f));
+                Centre(slot.DurabilityTrack.rectTransform, at, new Vector2(34, 2));
                 slot.Durability = Ugui.Image(group, "Durability", theme.White, Palette.Success);
                 Centre(slot.Durability.rectTransform, at, new Vector2(34, 2));
                 slot.Durability.rectTransform.pivot = new Vector2(0, 0.5f);
@@ -289,8 +310,8 @@ internal sealed class WeaponDial : IDisposable
 
         // The hub: a dark disc ringed in gold; the needle and its knob show the aim from the centre.
         if (look.Ornate) Ornaments(root, items.Count);
-        Centre(Ugui.Image(root, "Hub", hubSprite, look.Hub).rectTransform, Vector2.zero, new Vector2(Hub * 2, Hub * 2));
-        hubRing = Ugui.Image(root, "Hub Ring", ringSprite, look.Edge);
+        Centre(WeaponDialGraphic.Create(root, "Hub", look.Hub, 0, Hub).rectTransform, Vector2.zero, new Vector2(Hub * 2, Hub * 2));
+        hubRing = WeaponDialGraphic.Create(root, "Hub Ring", look.Edge, 0, Hub, border: true);
         Centre(hubRing.rectTransform, Vector2.zero, new Vector2(Hub * 2, Hub * 2));
         needle = Ugui.Image(root, "Needle", theme.White, look.Accent).rectTransform;
         needle.anchorMin = needle.anchorMax = new Vector2(0.5f, 0.5f);
@@ -332,7 +353,8 @@ internal sealed class WeaponDial : IDisposable
     private void Ornaments(RectTransform root, int count)
     {
         float halo = (Outer + 14) * 2;
-        Centre(Ugui.Image(root, "Halo", haloSprite, Palette.Gold.WithAlpha(0.7f)).rectTransform, Vector2.zero, new Vector2(halo, halo));
+        Centre(WeaponDialGraphic.Create(root, "Halo", Palette.Gold.WithAlpha(0.7f), 0, Outer + 12, border: true).rectTransform,
+            Vector2.zero, new Vector2(halo, halo));
         for (int i = 0; i < count && count > 1; i++)
         {
             float rad = (i + 0.5f) * Mathf.PI * 2 / count;
@@ -438,6 +460,10 @@ internal sealed class WeaponDial : IDisposable
             slot.Metadata.text = (key + "  " + stack).Trim();
             if (slot.Durability)
             {
+                bool show = slot.Item.m_shared.m_useDurability;
+                slot.Durability!.gameObject.SetActive(show);
+                slot.DurabilityTrack!.gameObject.SetActive(show);
+                if (!show) continue;
                 float remaining = slot.Item.GetDurabilityPercentage();
                 slot.Durability!.rectTransform.sizeDelta = new Vector2(34 * remaining, 2);
                 slot.Durability.color = DurabilityColor(remaining);
@@ -499,69 +525,6 @@ internal sealed class WeaponDial : IDisposable
         return string.Join(" · ", parts);
     }
 
-    // Generated art --------------------------------------------------------------------------
-
-    private void Art()
-    {
-        if (hubSprite) return;
-        // Hub: a filled disc, and a separate thin ring for its edge; the shadow: a soft round falloff.
-        hubSprite = Disc(Hub, (r, max) => Mathf.Clamp01(max - r + 0.5f));
-        ringSprite = Disc(Hub, (r, max) => Mathf.Clamp01(max - r + 0.5f) * Mathf.Clamp01(r - (max - 2.5f) + 0.5f));
-        glowSprite = Disc(Outer + 110, (r, max) => Mathf.SmoothStep(0, 1, Mathf.Clamp01((max - r) / 150f)));
-        // Ragnarök's halo: a gold hairline just outside the ring.
-        haloSprite = Disc(Outer + 12, (r, max) => Mathf.Clamp01(max - r + 0.5f) * Mathf.Clamp01(r - (max - 1.5f) + 0.5f));
-    }
-
-    // A round sprite of radius units; alpha(r, radius) shapes it.
-    private Sprite Disc(float radius, Func<float, float, float> alpha)
-    {
-        int size = Mathf.CeilToInt((radius + 2) * 2 * Detail);
-        Color[] pixels = new Color[size * size];
-        float half = size / 2f;
-        for (int y = 0; y < size; y++)
-            for (int x = 0; x < size; x++)
-            {
-                float r = new Vector2(x + 0.5f - half, y + 0.5f - half).magnitude / Detail;
-                pixels[y * size + x] = new Color(1, 1, 1, alpha(r, radius));
-            }
-        return Sprite(size, pixels);
-    }
-
-    // One ring segment pointing up, 360/count degrees wide less a small gap: its fill and its 2-unit edge.
-    private (Sprite Fill, Sprite Edge) Segment(int count)
-    {
-        if (segments.TryGetValue(count, out var cached)) return cached;
-        int size = Mathf.CeilToInt((Outer + 4) * 2 * Detail);
-        Color[] fill = new Color[size * size], edge = new Color[size * size];
-        float half = size / 2f, span = Mathf.PI / count;
-        for (int y = 0; y < size; y++)
-            for (int x = 0; x < size; x++)
-            {
-                Vector2 p = new Vector2(x + 0.5f - half, y + 0.5f - half) / Detail;
-                float r = p.magnitude;
-                if (r < Inner - 2 || r > Outer + 2) continue;
-                float angle = Mathf.Abs(Mathf.Atan2(p.x, p.y));
-                float side = count == 1 ? 999f : (span - angle) * r - Gap / 2;
-                float inside = Mathf.Min(Mathf.Min(r - Inner, Outer - r), side);
-                float a = Mathf.Clamp01(inside + 0.5f);
-                fill[y * size + x] = new Color(1, 1, 1, a);
-                edge[y * size + x] = new Color(1, 1, 1, a * Mathf.Clamp01(2.5f - inside));
-            }
-        (Sprite, Sprite) made = (Sprite(size, fill), Sprite(size, edge));
-        segments[count] = made;
-        return made;
-    }
-
-    private Sprite Sprite(int size, Color[] pixels)
-    {
-        Texture2D texture = new(size, size, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
-        texture.SetPixels(pixels);
-        texture.Apply(false, true);
-        Sprite sprite = UnityEngine.Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
-        owned.Add(texture);
-        owned.Add(sprite);
-        return sprite;
-    }
 }
 
 // While the dial is open Valheim treats it as one of its radial menus: no attacks, blocks, jumps or

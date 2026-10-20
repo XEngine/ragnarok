@@ -14,7 +14,7 @@ namespace Ragnarok.UI.Windows;
 // handlers, so picking up, splitting, equipping, moving to chests and dropping work unchanged.
 internal sealed class InventoryPanel : IDisposable
 {
-    private const float Pad = 12, Gap = 6, SideGap = 16, FooterHeight = 26, HeaderHeight = 90;
+    private const float Pad = 12, Gap = 6, SideGap = 16, FooterHeight = 26, HeaderHeight = 50;
 
     private static readonly AccessTools.FieldRef<InventoryGui, ItemDrop.ItemData> DragItem = QuickStackCommand.DragItem;
     private static readonly AccessTools.FieldRef<InventoryGrid, Vector2i> GamepadSelection =
@@ -146,7 +146,8 @@ internal sealed class InventoryPanel : IDisposable
         float gridRight = Pad + cols * size + (cols - 1) * Gap;
         float gridBottom = HeaderHeight + Pad + rows * size + (rows - 1) * Gap;
         width = gridRight + Pad;
-        float actionsY = gridBottom + 12;
+        float categoriesY = gridBottom + 12;
+        float actionsY = categoriesY + 28 + 12;
         float hintsY = actionsY + FooterHeight + 10;
         panelHeight = hintsY + 28;
 
@@ -155,7 +156,7 @@ internal sealed class InventoryPanel : IDisposable
         backgrounds.Add(Ugui.Image(root, "Frame", theme.PackSurface, Palette.HudGlass, raycast: true).Stretch());
         Ugui.Image(root, "Frame Edge", theme.PackEdge, Palette.Hex(0x3D4541)).Stretch();
         summary = new InventoryGuide.Summary(theme, root, width, "INVENTORY", withArmor: true);
-        InventoryGuide.Tabs(theme, root, Pad, 50, categoryChips, value => category = value);
+        InventoryGuide.Tabs(theme, root, Pad, categoriesY, categoryChips, value => category = value);
         Ugui.Text(root, "Input Hints", "<color=#FFFFFF><b>LMB</b></color> move    <color=#FFFFFF><b>RMB</b></color> use / equip    <color=#FFFFFF><b>SHIFT + LMB</b></color> split    <color=#FFFFFF><b>1–8</b></color> hotbar",
             theme.Body, 10.5f, InventoryCategories.Material).At(Pad, hintsY, width - Pad * 2 - 65, 18);
         closeHint = Ugui.Text(root, "Close Hint", "", theme.Body, 10.5f, InventoryCategories.Material,

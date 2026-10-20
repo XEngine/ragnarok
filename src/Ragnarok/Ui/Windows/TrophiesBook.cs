@@ -62,23 +62,21 @@ internal sealed class TrophiesBook : BookWindow
         total = Ugui.Text(window!, "Total", "", theme.Strong, 14, Palette.Bone).At(Left, 100, ListWidth, 26);
 
         Scroller(new Rect(Left - 20, Top, ListWidth + 20, Height - Top - 110), out listContent);
-        Ugui.Image(window!, "Column Rule", theme.White, Palette.Gold.WithAlpha(0.45f)).At(TextX - 36, Top, 1, Height - Top - 60);
 
-        Ugui.Image(window!, "Title Gem", theme.Diamond, Palette.Gold).At(TextX, Top + 14, 12, 12);
-        title = Ugui.Text(window!, "Title", "", theme.Heading, 32, Palette.Gold).At(TextX + 24, Top - 10, TextWidth, 50);
-        kind = Ugui.Text(window!, "Kind", "", theme.Subtle, 14, Palette.Muted).At(TextX + 24, Top + 38, TextWidth, 20);
+        title = Ugui.Text(window!, "Title", "", theme.Heading, 28, Palette.Bone).At(TextX, Top - 6, TextWidth, 44);
+        kind = Ugui.Text(window!, "Kind", "", theme.Subtle, 14, Palette.Muted).At(TextX, Top + 38, TextWidth, 20);
 
         // How much of the wall is filled.
         float y = Top + 84;
-        Ugui.Text(window!, "Count Label", "collection", theme.Section, 16, Palette.Muted).At(TextX, y - 4, 200, 24);
+        Ugui.Text(window!, "Count Label", "collection", theme.Strong, 13, Palette.Muted).At(TextX, y - 4, 200, 24);
         countValue = Ugui.Text(window!, "Count Value", "", theme.Strong, 14, Palette.Bone, TextAlignmentOptions.MidlineRight)
             .At(TextX + TextWidth - 160, y, 160, 18);
-        Ugui.Image(window!, "Groove", theme.White, Palette.Ink).At(TextX, y + 24, TextWidth, 6);
-        countFill = Ugui.Image(window!, "Fill", theme.White, Palette.Gold).At(TextX, y + 24, 0, 6).rectTransform;
+        Ugui.Image(window!, "Groove", theme.HudBar, Palette.Hex(0x303631)).At(TextX, y + 24, TextWidth, 6);
+        countFill = Ugui.Image(window!, "Fill", theme.HudBar, Palette.Gold).At(TextX, y + 24, 0, 6).rectTransform;
 
-        body = Ugui.Text(window!, "Body", "", theme.Body, 15, Palette.Muted, TextAlignmentOptions.TopLeft, wrap: true)
+        body = Ugui.Text(window!, "Body", "", theme.Body, 15, Palette.Bone, TextAlignmentOptions.TopLeft, wrap: true)
             .At(TextX, y + 64, TextWidth, Height - y - 64 - 90);
-        body.lineSpacing = 12;
+        body.lineSpacing = 6;
         body.paragraphSpacing = 14;
         body.overflowMode = TextOverflowModes.Overflow;
 
@@ -145,19 +143,16 @@ internal sealed class TrophiesBook : BookWindow
             bool have = taken.Contains(trophy.Prefab), selected = trophy.Prefab == chosen;
             Rect r = new(x0 + i % Columns * (Tile + Gap), i / Columns * (Tile + Gap), Tile, Tile);
 
-            Ugui.Image(listContent!, "Tile", theme.White, have ? Palette.Card : Palette.Ink).At(r);
-            Image[] edge = Ugui.Outline(listContent!, r);
-            Color rest = selected ? Palette.GoldBright : have ? Palette.GoldDim : Palette.Rule;
-            foreach (Image line in edge) line.color = rest;
+            Image edge = Choice(listContent!, r, selected);
+            Color rest = selected ? Palette.Gold : Palette.Hex(0x303631);
             // Taken: the trophy itself. Not yet: its dark shape.
             Image icon = Ugui.Image(listContent!, "Icon", have ? trophy.Icon : icons.Get(trophy.Icon) ?? theme.Diamond,
                 have ? Color.white : Palette.Faint.WithAlpha(0.45f)).At(r.x + 7, r.y + 7, Tile - 14, Tile - 14);
             icon.preserveAspect = true;
-            if (selected) Ugui.Image(listContent!, "Selected Notch", theme.Diamond, Palette.GoldBright).At(r.x + Tile / 2 - 4, r.yMax - 4, 8, 8);
 
             if (!selected)
                 Ugui.HitArea(listContent!, "Pick", () => { chosen = trophy.Prefab; signature = 0; }).At(r)
-                    .OnHover(on => { foreach (Image line in edge) line.color = on ? Palette.GoldBright : rest; });
+                    .OnHover(on => edge.color = on ? Palette.Gold : rest);
         }
         int rows = (all.Count + Columns - 1) / Columns;
         listContent!.sizeDelta = new Vector2(0, rows * (Tile + Gap) + 8);
@@ -170,7 +165,7 @@ internal sealed class TrophiesBook : BookWindow
         kind!.text = have ? "Trophy · taken" : "Trophy · not yet taken";
         kind.color = have ? Palette.Gold : Palette.Muted;
         body!.text = have
-            ? (trophy.Lore.Length > 0 ? trophy.Lore + "\n\n" : "") + $"<color=#5E574D>{trophy.Use}</color>"
+            ? (trophy.Lore.Length > 0 ? trophy.Lore + "\n\n" : "") + $"<color=#AAA79C>{trophy.Use}</color>"
             : "Its shape hangs on the wall, waiting. Take it from the creature it belongs to and its tale is yours.";
 
         Sprite? glyphSprite = icons.Get(trophy.Icon);

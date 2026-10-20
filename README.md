@@ -56,15 +56,41 @@ New characters see an introductory empty state without an activation prompt.
 `[HUD.Vitals] ShowForsakenPower = false` hides it.
 
 The key guide (`[HUD.Keys]`) replaces Valheim's bottom hint bar with a compact vertical
-list at the right centre by default. It mirrors whichever vanilla hint set is active
+list at the right centre by default. Combat, building-tool and fishing hints move below
+the Ragnarök hotbar as centered white keys and muted action labels. It mirrors whichever vanilla hint set is active
 (building, combat, inventory, fishing), so rebinds, gamepad layouts and translations
 carry over. `Enabled = false` restores the vanilla bar.
+
+Building, leveling and cultivation use a compact Rune & Iron task card above the
+vitals and hotbar: selected tool, task icon/name, description and smaller material
+and station requirements. It mirrors Valheim's readouts, including missing-resource
+states and nearby-storage checks. The card follows inventory panel opacity and
+restores the native readouts when switching to the Vanilla HUD.
+
+The hammer build menu uses a category sidebar and compact icon tiles with small
+craftable counts. Piece names appear in the native hover readout. Search matches pieces and materials; Only what I can
+build follows native availability. Nearby preview counts respect the server's
+building-storage rules; the preview toggle does not change actual resource
+withdrawal settings. Favorites and recent pieces use the game's own lists.
+Hover or focus a piece to show the native name, description and requirements;
+click uses the original piece-button handler, including native touch behavior.
+The menu follows inventory opacity and restores the original picker with Vanilla HUD.
+
+The menu opens in a centered 1120 by 580 window, scaling down for smaller screens.
+Local `[HUD.BuildMenu]` settings retain filters, with rebindable category
+(Q/E), favorite (F) and search (/) shortcuts. The close guide reads the native binding.
+Controller navigation supports card selection, trigger category changes, X favorites,
+left-stick search, Y repair and B close. The top-left hammer selects native repair
+mode. Compact column (4-16) and row (3-10) controls sit beside the piece count,
+defaulting to 5 by 4 icon tiles; the old untouched 12 by 6
+default migrates once, preserving other custom density settings. Station upgrades
+retain the native upgrade-arrow marker.
 
 HUD parts draw directly over the world without the optional Shade/Plate backdrops.
 Legacy `Background`/`BackgroundOpacity` HUD keys are ignored and hidden from settings.
 The minimap uses translucent framing and outlined labels; individual HUD slot fills
 retain their smoked-glass styling.
-Rune & Iron inventory, chest and character side panels default to 85% smoked
+Rune & Iron inventory, crafting, chest and character side panels default to 95% smoked
 glass, with lighter inner slot/dashboard fills. `[HUD.Inventory] BackgroundOpacity`
 still adjusts their panel opacity; former defaults migrate automatically. The
 top-left character, food and status HUD hides while the inventory is open.
@@ -186,30 +212,41 @@ Search/category/slot/craftable state resets when moving between station types or
 
 With Valheim's crafting panel the same search and filters sit above its recipe list in Valheim's style
 (`[QualityOfLife.Crafting] VanillaFilters`). Both panels share one filter state (`Features/QualityOfLife/CraftFilter.cs`), which
-filters Valheim's own recipe list after it is built; vanilla keeps native sorting and glyph controls
-(armor-slot filtering is cleared when switching to vanilla). With the vanilla HUD, filled provision slots show
+filters Valheim's own recipe list after it is built. Vanilla adds debounced name/ingredient search
+with the `/` shortcut, a clear button, category/craftable filters, Name/Craftable-first sorting,
+and armor subfilters that reserve space only while Armor is selected. It retains the native
+recipe list, wood/button art, fonts, descriptions, repair, variants and crafting progress.
+New-item crafting gains a typed or stepped quantity, bounded to affordable stock (up to 99);
+upgrades remain one item. Native requirement amounts show total available/required, with the
+bag/chest breakdown in the hover tooltip using the native inventory tooltip backdrop.
+Nearby stock follows the existing server-controlled
+crafting storage settings. With the vanilla HUD, filled provision slots show
 as Valheim hotbar slots just past the hotbar, with their keys (`Features/QualityOfLife/VanillaProvisionBar.cs`).
 
 **Info panel** (follows the inventory style): the wooden board above the inventory, with the character
-name and the Compendium, Skills, Trophies, Achievements and PvP buttons, redrawn as a Ragnarök plate
+name and the Compendium, Skills, Trophies, Achievements and PvP buttons, redrawn with
+rounded charcoal surfaces, thin borders, parchment labels and gold active toggles
 over the hidden original (`Ui/Windows/InfoPanel.cs`). Each Valheim button gets a twin with its glyph and tooltip
 that presses the original, so buttons added by other mods appear too.
 
 **Compendium** (`[HUD.Compendium] Style`, FollowHud by default): Valheim's texts dialog redrawn
 as a Ragnarök screen over the (hidden, still running) original. Tabs to Skills and Trophies on top;
 chapters on the left (Journal: active effects, log, stats; Hugin's Lessons; Runestones; Notes), the
-open one expanded and the rest fading; the entry in the middle; a diagonally cut art panel on the
-right with rising embers and the glyph of the boss the entry mentions (else your Forsaken power).
+open chapter expanded; the entry in the middle; a rounded preview card on the right
+with the glyph of the boss the entry mentions (else your Forsaken power). All four
+books share charcoal surfaces, thin borders, rounded tabs and selection cards,
+parchment text, gold highlights, capsule scrollbars and the inventory opacity setting.
+The framed window scales down to fit narrower displays; Close uses a matching Esc keycap.
 
 **Skills** (`[HUD.Skills] Style`, FollowHud by default): Valheim's skills dialog in the same frame
 (`Ui/Windows/BookWindow.cs`, shared with the Compendium). Every skill on the left with its level and a mastery
 line; the chosen one in the middle with its level large, the bonus from gear and food, progress to the
-next level, mastery towards 100 and its description; its glyph in the art panel.
+next level, mastery towards 100 and its description; its glyph in the preview card.
 
 **Trophies** (`[HUD.Trophies] Style`, FollowHud by default): Valheim's trophy panel in the same
 frame (`Ui/Windows/TrophiesBook.cs`). Every trophy in the game as a tile wall in Valheim's order: the ones you
 have taken in colour, the rest as dark shapes. The chosen one's name, lore and use in the middle, with
-a collection bar (taken / total); its glyph in the art panel.
+a collection bar (taken / total); its glyph in the preview card.
 
 **Achievements** (`[HUD.Achievements] Style`, FollowHud by default): Valheim's achievements panel
 in the same frame (`Ui/Windows/AchievementsBook.cs`), with a fourth tab. Every badge as a tile wall in Valheim's
@@ -240,6 +277,17 @@ the first shows on the character. Right-clicking an extra item makes it the worn
 
 Debug builds can capture a preview from the main menu, then quit:
 `valheim.exe -ragnarok-ui-preview D:\RagnarokDev\preview`.
+
+## Tombstone recovery
+
+With `[QualityOfLife.DeathRecovery] AutoEquipOnReclaim` enabled, using your own
+gravestone takes everything directly when it fits in your bag plus available
+character/provision slots and within your current carry-weight limit. Previously
+worn gear goes straight into empty character slots and re-equips without the
+equip timer, even when the bag grid is full. Take All uses the same slot-aware
+recovery. Genuine overflow stays in the gravestone; being underweight does not
+create more bag slots. Gear must have been recorded at death with recovery enabled.
+Saved provision positions are recorded for deaths after this update.
 
 ## Server settings
 

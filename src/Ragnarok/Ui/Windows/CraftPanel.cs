@@ -53,18 +53,31 @@ internal sealed class CraftPanel : IDisposable
     private readonly Theme theme;
     private readonly List<(UnityEngine.Object Owner, Action Restore)> undo = new();
     private readonly List<Row> rows = new();
-    private readonly List<(Row Row, Image Background, Image Bar)> rowViews = new();
+    private sealed class RowView
+    {
+        internal Row Row;
+        internal Image Background = null!, Bar = null!, Icon = null!, Availability = null!;
+        internal TextMeshProUGUI Title = null!, Kind = null!;
+        internal int BoundIndex = -1;
+        internal int Quality = -1;
+    }
+    private readonly List<RowView> rowViews = new();
+    private int windowStart = -1;
     private readonly List<(CraftCategory? Category, Image Chip, TextMeshProUGUI Label)> chips = new();
     private readonly List<(CraftArmorSlot Slot, Image Chip, TextMeshProUGUI Label)> slotChips = new();
-    private readonly List<(Image Tile, Image Edge, Image Icon, TextMeshProUGUI Name, TextMeshProUGUI Amount)> requirements = new();
+    private readonly List<(Image Tile, Image Edge, Image Icon, TextMeshProUGUI Name, TextMeshProUGUI Amount,
+        TextMeshProUGUI Sources, GuideTooltip Tooltip)> requirements = new();
     private readonly List<TextOutline> outlines = new();
     private readonly List<Image> levels = new();
     private bool dirty = true;
+    private bool resetRowScroll = true;
     private Image? hoveredRow;
     private string shownDescription = "";
     private int signature;
     private InventoryGui? gui;
-    private RectTransform? root, listContent, descriptionContent;
+    private RectTransform? root, listContent, descriptionContent, recipeView, descriptionView;
+    private Image? sortButton, listDivider;
+    private float contentTop = float.NaN;
     private Vector2 builtSize;
     private Image? stationIcon, recipeIcon, recipeRim, craftButton, progressTrack, progressFill, repairButton, repairIcon, variantButton;
     private CraftFrameGraphic? background, frameEdge;
@@ -75,7 +88,7 @@ internal sealed class CraftPanel : IDisposable
     private TMP_InputField? search;
     private (Image Chip, TextMeshProUGUI Label) craftTab, upgradeTab;
     private Image? craftableChip, craftableCheck;
-    private TextMeshProUGUI? countLabel, sortLabel, resourcesLabel, readyLabel, materialsLabel;
+    private TextMeshProUGUI? countLabel, sortLabel, resourcesLabel, readyLabel, materialsLabel, shortcutHint;
     private GuideTooltip? recipeTooltip;
     private GuideTooltip? repairTooltip;
     private bool repairHovered;
@@ -123,7 +136,9 @@ internal sealed class CraftPanel : IDisposable
         if (!root || panel.rect.size != builtSize)
         {
             Build(panel);
-            CraftFilter.Changed();
+            // Opening already built/filtered the native list. Rebuild only when
+            // switching styles on an existing list that has not been sorted for us.
+            if (CraftFilter.LastListOwner != gui || !CraftFilter.LastListSorted) CraftFilter.Changed();
         }
         if (filterContext != CraftFilter.ContextVersion)
         {
@@ -140,8 +155,19 @@ internal sealed class CraftPanel : IDisposable
         }
         if (search && !searchPending && !search!.isFocused && search.text != CraftFilter.Query)
             search.SetTextWithoutNotify(CraftFilter.Query);
-        if (Input.GetKeyDown(KeyCode.Slash) && !UiState.Typing && !UiState.ModalOpen && !Console.IsVisible())
+        // Character input follows the keyboard layout (for example, Shift+7 on Turkish Q).
+        // Retain the dedicated slash key for layouts where it is directly available.
+        bool searchShortcut = Input.inputString.IndexOf('/') >= 0 || Input.GetKeyDown(KeyCode.Slash);
+        if (searchShortcut && !UiState.Typing && !UiState.ModalOpen && !Console.IsVisible() &&
+            !Menu.IsVisible() && (!Chat.instance || !Chat.instance.HasFocus()))
+        {
+            UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(search!.gameObject);
             search!.ActivateInputField();
+        }
+        string close = ZInput.instance != null ? ZInput.instance.GetBoundKeyString("Inventory", true) : "TAB";
+        if (string.IsNullOrEmpty(close)) close = "TAB";
+        shortcutHint!.text = "<color=#FFFFFF><b>/</b></color> search   <color=#FFFFFF><b>" +
+            Localization.instance.Localize(close) + "</b></color> close";
         Refresh(Player.m_localPlayer);
     }
 
@@ -152,13 +178,19 @@ internal sealed class CraftPanel : IDisposable
 
     private void Restore()
     {
+        bool ownedAmount = !ReferenceEquals(root, null);
         RepairExtension = null;
         for (int i = undo.Count - 1; i >= 0; i--)
             if (undo[i].Owner) undo[i].Restore();
         undo.Clear();
         if (root) { root!.gameObject.SetActive(false); UnityEngine.Object.Destroy(root.gameObject); }
         root = null;
+        recipeView = descriptionView = null;
+        sortButton = listDivider = null;
+        contentTop = float.NaN;
         rowViews.Clear();
+        windowStart = -1;
+        resetRowScroll = true;
         chips.Clear();
         requirements.Clear();
         slotChips.Clear();
@@ -171,7 +203,7 @@ internal sealed class CraftPanel : IDisposable
         searchPending = false;
         if (amountField) UiState.TypingFields.Remove(amountField!);
         amountField = null;
-        CraftAmount.Reset();
+        if (ownedAmount) CraftAmount.Reset();
     }
 
     // Construction ---------------------------------------------------------------------------
@@ -218,9 +250,11 @@ internal sealed class CraftPanel : IDisposable
         FilterChips(width);
         countLabel = Ugui.Text(root, "Result count", "", theme.Body, 11, Palette.Muted).At(Pad, ListTop - 24, ListWidth / 2, 18);
         Image sort = Ugui.Image(root, "Sort", theme.PackPill, Color.clear).At(Pad + ListWidth / 2, ListTop - 24, ListWidth / 2, 18);
+        sortButton = sort;
         sortLabel = Ugui.Text(sort.transform, "Label", "", theme.Body, 10, Palette.Muted, TextAlignmentOptions.MidlineRight).Stretch();
         Ugui.HitArea(sort.transform, "Hit", () => { CraftFilter.CraftableFirst = !CraftFilter.CraftableFirst; CraftFilter.Changed(); }).Stretch();
         RectTransform view = Ugui.Node(root, "Recipes").At(Pad, ListTop, ListWidth, height - ListTop - Pad - 26);
+        recipeView = view;
         listContent = Scroll(view);
         emptyNote = Ugui.Text(view, "Empty", "No matching recipes", theme.Body, 13, Palette.Muted, TextAlignmentOptions.Center)
             .At(0, 16, ListWidth, 32);
@@ -237,12 +271,12 @@ internal sealed class CraftPanel : IDisposable
         }).Stretch();
         clear.gameObject.SetActive(false);
         clearEmpty = clear;
-        Ugui.Image(root, "List divider", theme.White, Palette.Hex(0x626B64, 0.4f))
+        listDivider = Ugui.Image(root, "List divider", theme.White, Palette.Hex(0x626B64, 0.4f))
             .At(Pad + ListWidth + Gap / 2, ListTop - 24, 1, height - ListTop - Pad - 2);
         Ugui.Image(root, "Footer rule", theme.White, Palette.Hex(0x626B64, 0.4f)).At(Pad, height - Pad - 21, width - Pad * 2, 1);
         resourcesLabel = Ugui.Text(root, "Material sources", "", theme.Body, 10, Palette.Muted)
             .At(Pad, height - Pad - 14, ListWidth, 16);
-        Ugui.Text(root, "Search shortcut", "<color=#ECE5D6>/</color> search   <color=#ECE5D6>Tab</color> close", theme.Body, 10, Palette.Muted,
+        shortcutHint = Ugui.Text(root, "Search shortcut", "", theme.Body, 10.5f, InventoryCategories.Material,
             TextAlignmentOptions.MidlineRight).At(width - Pad - 210, height - Pad - 14, 210, 16);
         Detail(width, height);
         foreach (TMP_Text label in new[] { stationName, recipeName!, recipeType!, stationNeed!, readyLabel! })
@@ -371,6 +405,7 @@ internal sealed class CraftPanel : IDisposable
         requirementY = height - Pad - Bottom - 32 - 74 - 20;
         float descTop = ListTop + 65;
         RectTransform view = Ugui.Node(root!, "Description").At(x, descTop, w, Mathf.Max(24, requirementY - descTop - 24));
+        descriptionView = view;
         descriptionContent = Scroll(view);
         description = Ugui.Text(descriptionContent, "Text", "", theme.Body, 13, Palette.Bone.WithAlpha(0.95f), TextAlignmentOptions.TopLeft, wrap: true);
         RectTransform d = description.rectTransform;
@@ -386,7 +421,9 @@ internal sealed class CraftPanel : IDisposable
             .At(x + w / 2, requirementY - 15, w / 2, 13);
         for (int i = 0; i < 4; i++)
         {
-            Image tile = Well(root!, "Requirement", x, requirementY, w / 4, 60);
+            Image tile = Well(root!, "Requirement", x, requirementY, w / 4, 74);
+            tile.raycastTarget = true;
+            GuideTooltip tooltip = GuideTooltip.Attach(theme, tile.rectTransform);
             Image edge = tile.GetComponentsInChildren<Image>()[1];
             Image icon = Ugui.Image(tile.transform, "Icon", null, Color.white).At(12, 4, 24, 24);
             Ugui.ItemIcon(icon);
@@ -397,7 +434,12 @@ internal sealed class CraftPanel : IDisposable
             name.fontSizeMax = 11;
             TextMeshProUGUI amount = Ugui.Text(tile.transform, "Amount", "", theme.Numbers, 14, Palette.Bone, TextAlignmentOptions.Center).At(2, 42, 64, 17);
             amount.overflowMode = TextOverflowModes.Overflow;
-            requirements.Add((tile, edge, icon, name, amount));
+            TextMeshProUGUI sources = Ugui.Text(tile.transform, "Sources", "", theme.Body, 9, Palette.Muted, TextAlignmentOptions.Center)
+                .At(2, 59, 64, 13);
+            sources.enableAutoSizing = true;
+            sources.fontSizeMin = 7;
+            sources.fontSizeMax = 9;
+            requirements.Add((tile, edge, icon, name, amount, sources, tooltip));
         }
         detailX = x;
         detailWidth = w;
@@ -578,6 +620,7 @@ internal sealed class CraftPanel : IDisposable
             chip.color = on ? InventoryCategories.Gold.WithAlpha(0.14f) : Color.clear;
             label.color = on ? Palette.Bone : Palette.Muted;
         }
+        ArrangeFilterSpace(armor);
         craftableChip!.color = CraftFilter.CraftableOnly ? InventoryCategories.Gold.WithAlpha(0.16f) : Color.clear;
         craftableCheck!.color = CraftFilter.CraftableOnly ? InventoryCategories.Gold : Palette.Muted.WithAlpha(0.4f);
         sortLabel!.text = CraftFilter.CraftableFirst ? "Craftable first" : "Name A–Z";
@@ -594,6 +637,27 @@ internal sealed class CraftPanel : IDisposable
         foreach (TextOutline outline in outlines) outline.Sync();
     }
 
+    private void ArrangeFilterSpace(bool hasSubfilters)
+    {
+        float top = hasSubfilters ? ListTop : ListTop - 32;
+        if (contentTop == top) return;
+        contentTop = top;
+        countLabel!.At(Pad, top - 24, ListWidth / 2, 18);
+        sortButton!.At(Pad + ListWidth / 2, top - 24, ListWidth / 2, 18);
+        recipeView!.At(Pad, top, ListWidth, builtSize.y - top - Pad - 26);
+        listDivider!.At(Pad + ListWidth + Gap / 2, top - 24, 1, builtSize.y - top - Pad - 2);
+        recipeRim!.At(detailX, top, 54, 54);
+        recipeName!.At(detailX + 66, top - 2, detailWidth - 66, 32);
+        recipeType!.At(detailX + 66, top + 28, detailWidth - 66, 18);
+        stationNeed!.At(detailX + 66, top + 43, detailWidth - 66, 16);
+        float descriptionTop = top + 65;
+        descriptionView!.At(detailX, descriptionTop, detailWidth, Mathf.Max(24, requirementY - descriptionTop - 24));
+        // Keep scrolling within the resized viewport and let gamepad selection recheck visibility.
+        listContent!.anchoredPosition = new Vector2(0, Mathf.Clamp(listContent.anchoredPosition.y, 0,
+            Mathf.Max(0, listContent.rect.height - recipeView!.rect.height)));
+        padSelection = -1;
+    }
+
     private void SetTab((Image Chip, TextMeshProUGUI Label) tab, bool visible, bool selected)
     {
         if (tab.Chip.gameObject.activeSelf != visible) tab.Chip.gameObject.SetActive(visible);
@@ -605,16 +669,23 @@ internal sealed class CraftPanel : IDisposable
     {
         IList list = (IList)Available.GetValue(g);
         int hash = list.Count;
-        rows.Clear();
+        bool changedOrder = rows.Count != list.Count;
         for (int i = 0; i < list.Count; i++)
         {
             object pair = list[i];
             Recipe recipe = (Recipe)PairRecipe.GetValue(pair);
             ItemDrop.ItemData? item = PairItem.GetValue(pair) as ItemDrop.ItemData;
             bool can = (bool)PairCan.GetValue(pair);
-            rows.Add(new Row(recipe, item, can, i));
+            if (i < rows.Count)
+            {
+                changedOrder |= rows[i].Recipe != recipe || rows[i].Item != item;
+                rows[i] = new Row(recipe, item, can, i);
+            }
+            else rows.Add(new Row(recipe, item, can, i));
             unchecked { hash = hash * 31 + (recipe ? recipe.GetInstanceID() : 0) * 7 + (item?.GetHashCode() ?? 0) + (can ? 1 : 0); }
         }
+        if (rows.Count > list.Count) rows.RemoveRange(list.Count, rows.Count - list.Count);
+        resetRowScroll |= changedOrder;
         if (hash != signature)
         {
             signature = hash;
@@ -625,43 +696,75 @@ internal sealed class CraftPanel : IDisposable
     private void RebuildRows()
     {
         dirty = false;
-        Ugui.Clear(listContent!);
-        rowViews.Clear();
         hoveredRow = null;
         padSelection = -1;
-        float y = 0;
-        foreach (Row row in rows)
+        windowStart = -1;
+        foreach (RowView view in rowViews) view.BoundIndex = -1;
+        listContent!.sizeDelta = new Vector2(0, rows.Count * RowHeight);
+        if (resetRowScroll) { listContent.anchoredPosition = Vector2.zero; resetRowScroll = false; }
+        // Keep scroll position when only material availability changes.
+        float height = ((RectTransform)listContent.parent).rect.height;
+        listContent.anchoredPosition = new Vector2(0, Mathf.Clamp(listContent.anchoredPosition.y, 0,
+            Mathf.Max(0, rows.Count * RowHeight - height)));
+        emptyNote!.enabled = rows.Count == 0;
+        clearEmpty!.gameObject.SetActive(rows.Count == 0);
+    }
+
+    private void UpdateRowWindow()
+    {
+        float height = ((RectTransform)listContent!.parent).rect.height;
+        int first = Mathf.Clamp(Mathf.FloorToInt(listContent.anchoredPosition.y / RowHeight), 0, Mathf.Max(0, rows.Count - 1));
+        int count = Mathf.Min(rows.Count, Mathf.CeilToInt(height / RowHeight) + 2);
+        bool moved = windowStart != first;
+        windowStart = first;
+        if (moved) hoveredRow = null;
+        while (rowViews.Count < count)
         {
-            Row r = row;
+            RowView view = new();
             Image bg = Ugui.Image(listContent!, "Recipe", theme.PackSurface, Palette.Hex(0x111716, 0.18f), raycast: true)
-                .At(0, y, ListWidth - 6, RowHeight - 5);
-            Image edge = Ugui.Image(bg.transform, "Selection edge", theme.PackEdge, InventoryCategories.Gold).Stretch();
-            edge.enabled = false;
-            Image icon = Ugui.Image(bg.transform, "Icon", r.Recipe.m_item.m_itemData.GetIcon(), Color.white).At(7, 6, 30, 30);
-            Ugui.ItemIcon(icon);
+                .At(0, 0, ListWidth - 6, RowHeight - 5);
+            view.Background = bg;
+            view.Bar = Ugui.Image(bg.transform, "Selection edge", theme.PackEdge, InventoryCategories.Gold).Stretch();
+            view.Bar.enabled = false;
+            view.Icon = Ugui.ItemIcon(Ugui.Image(bg.transform, "Icon", null, Color.white).At(7, 6, 30, 30));
+            view.Title = Ugui.Text(bg.transform, "Name", "", theme.Strong, 13, Palette.Bone).At(44, 4, ListWidth - 64, 19);
+            view.Title.enableAutoSizing = true; view.Title.fontSizeMin = 10; view.Title.fontSizeMax = 13;
+            view.Kind = Ugui.Text(bg.transform, "Kind", "", theme.Body, 10, Palette.Muted).At(44, 23, ListWidth - 64, 14);
+            view.Availability = Ugui.Image(bg.transform, "Availability", theme.Disc, Color.white).At(ListWidth - 16, 18, 5, 5);
+            Ugui.HitArea(bg.transform, "Hit", () =>
+            {
+                if (view.BoundIndex < 0 || view.BoundIndex >= rows.Count) return;
+                CraftAmount.Amount = 1;
+                SetRecipe.Invoke(gui, new object[] { view.Row.Index, false });
+            }).Stretch().OnHover(on => hoveredRow = on ? bg : hoveredRow == bg ? null : hoveredRow);
+            rowViews.Add(view);
+        }
+        for (int i = 0; i < rowViews.Count; i++)
+        {
+            RowView view = rowViews[i];
+            int index = first + i;
+            bool visible = i < count && index < rows.Count;
+            if (view.Background.gameObject.activeSelf != visible) view.Background.gameObject.SetActive(visible);
+            if (!visible) { view.BoundIndex = -1; view.Row = default; continue; }
+            Row r = rows[index];
+            bool rebind = view.BoundIndex != index || view.Row.Recipe != r.Recipe || view.Row.Item != r.Item ||
+                view.Row.Can != r.Can || view.Quality != (r.Item?.m_quality ?? 0);
+            view.Row = r;
+            if (!rebind) continue;
+            view.BoundIndex = index;
+            view.Quality = r.Item?.m_quality ?? 0;
+            view.Background.At(0, index * RowHeight, ListWidth - 6, RowHeight - 5);
+            view.Icon.sprite = r.Recipe.m_item.m_itemData.GetIcon();
             ItemDrop.ItemData.SharedData shared = r.Recipe.m_item.m_itemData.m_shared;
             string name = Localization.instance.Localize(shared.m_name);
             if (r.Recipe.m_amount > 1) name += " ×" + r.Recipe.m_amount;
-            TextMeshProUGUI title = Ugui.Text(bg.transform, "Name", name, theme.Strong, 13, Palette.Bone)
-                .At(44, 4, ListWidth - 64, 19);
-            title.enableAutoSizing = true;
-            title.fontSizeMin = 10;
-            title.fontSizeMax = 13;
+            view.Title.text = name;
             string kind = CraftFilter.Of(shared).ToString();
             if (CraftFilter.Of(shared) == CraftCategory.Armor) kind += " · " + CraftFilter.Slot(shared.m_itemType);
             if (r.Item != null) kind = "Quality " + r.Item.m_quality + " to " + (r.Item.m_quality + 1);
-            Ugui.Text(bg.transform, "Kind", kind, theme.Body, 10, Palette.Muted).At(44, 23, ListWidth - 64, 14);
-            Ugui.Image(bg.transform, "Availability", theme.Disc, r.Can ? Palette.Hex(0x9BC48A) : Palette.Hex(0xF08B80))
-                .At(ListWidth - 16, 18, 5, 5);
-            Ugui.HitArea(bg.transform, "Hit", () => { CraftAmount.Amount = 1; SetRecipe.Invoke(gui, new object[] { r.Index, false }); }).Stretch()
-                .OnHover(on => hoveredRow = on ? bg : hoveredRow == bg ? null : hoveredRow);
-            rowViews.Add((r, bg, edge));
-            y += RowHeight;
+            view.Kind.text = kind;
+            view.Availability.color = r.Can ? Palette.Hex(0x9BC48A) : Palette.Hex(0xF08B80);
         }
-        listContent!.sizeDelta = new Vector2(0, y);
-        listContent.anchoredPosition = Vector2.zero;
-        emptyNote!.enabled = rowViews.Count == 0;
-        clearEmpty!.gameObject.SetActive(rowViews.Count == 0);
     }
 
     private void Highlight(InventoryGui g)
@@ -669,14 +772,12 @@ internal sealed class CraftPanel : IDisposable
         object selected = SelectedField.GetValue(g);
         Recipe? recipe = PairRecipe.GetValue(selected) as Recipe;
         ItemDrop.ItemData? item = PairItem.GetValue(selected) as ItemDrop.ItemData;
-        foreach (var (row, bg, bar) in rowViews)
+        // Scroll to the selected logical recipe before binding the visible row pool.
+        if (recipe && ZInput.IsGamepadActive() && !ZInput.IsMouseActive())
         {
-            bool on = recipe && row.Recipe == recipe && row.Item == item;
-            if (bar.enabled != on) bar.enabled = on;
-            // Availability stays readable; selection uses the guide's restrained gold fill/edge.
-            bg.color = on ? InventoryCategories.Gold.WithAlpha(0.18f) : bg == hoveredRow ? Palette.Bone.WithAlpha(0.08f) : Palette.Hex(0x111716, 0.18f);
-            if (on && ZInput.IsGamepadActive() && !ZInput.IsMouseActive() && padSelection != row.Index)
+            foreach (Row row in rows)
             {
+                if (row.Recipe != recipe || row.Item != item || padSelection == row.Index) continue;
                 padSelection = row.Index;
                 float height = ((RectTransform)listContent!.parent).rect.height;
                 float scroll = listContent.anchoredPosition.y, top = row.Index * RowHeight;
@@ -684,7 +785,17 @@ internal sealed class CraftPanel : IDisposable
                 else if (top + RowHeight > scroll + height) scroll = top + RowHeight - height;
                 scroll = Mathf.Clamp(scroll, 0, Mathf.Max(0, listContent.rect.height - height));
                 listContent.anchoredPosition = new Vector2(0, scroll);
+                break;
             }
+        }
+        UpdateRowWindow();
+        foreach (RowView view in rowViews)
+        {
+            if (view.BoundIndex < 0) continue;
+            bool on = recipe && view.Row.Recipe == recipe && view.Row.Item == item;
+            if (view.Bar.enabled != on) view.Bar.enabled = on;
+            view.Background.color = on ? InventoryCategories.Gold.WithAlpha(0.18f) :
+                view.Background == hoveredRow ? Palette.Bone.WithAlpha(0.08f) : Palette.Hex(0x111716, 0.18f);
         }
     }
 
@@ -772,7 +883,8 @@ internal sealed class CraftPanel : IDisposable
     }
 
     // The selected recipe's requirements worked out as Valheim does (same station and upgrader rules),
-    // shown as have / need: "100/2". "Have" counts nearby chests when Nearby Chests crafting is on.
+    // The total have / need count includes eligible nearby chests when nearby crafting is on.
+    // A second line separates the bag and chest contributions without changing resource authority.
     // More than four page through every two seconds, like Valheim's list.
     private readonly List<Piece.Requirement> needed = new();
     private bool missingMaterials;
@@ -812,7 +924,7 @@ internal sealed class CraftPanel : IDisposable
             float tileWidth = (detailWidth - Mathf.Max(0, shownCount - 1) * 6) / Mathf.Max(1, shownCount);
             for (int i = 0; i < requirements.Count; i++)
             {
-                var (tile, edge, icon, name, amount) = requirements[i];
+                var (tile, edge, icon, name, amount, sources, tooltip) = requirements[i];
                 int index = first + i;
                 bool shown = index < needed.Count;
                 if (tile.gameObject.activeSelf != shown) tile.gameObject.SetActive(shown);
@@ -820,14 +932,23 @@ internal sealed class CraftPanel : IDisposable
                 Piece.Requirement req = needed[index];
                 ItemDrop.ItemData.SharedData shared = req.m_resItem.m_itemData.m_shared;
                 int need = req.GetAmount(quality) * multiplier;
-                int have = player.GetInventory().CountItems(shared.m_name);
+                int have = player.GetInventory().CountItems(shared.m_name, -1, true);
+                // CountItems is augmented by the active scope; subtract the same chest count
+                // to recover carried stock without counting the chests twice.
+                int inChests = scope?.Count(shared.m_name, -1, true) ?? 0;
+                int inBag = have - inChests;
                 icon.sprite = req.m_resItem.m_itemData.GetIcon();
                 name.text = Localization.instance.Localize(shared.m_name);
-                tile.At(detailX + i * (tileWidth + 6), requirementY, tileWidth, 60);
+                tile.At(detailX + i * (tileWidth + 6), requirementY, tileWidth, 74);
                 icon.At(tileWidth / 2 - 12, 4, 24, 24);
                 name.At(4, 28, tileWidth - 8, 14);
                 amount.At(2, 41, tileWidth - 4, 18);
                 amount.text = have + " / " + need;
+                sources.At(2, 59, tileWidth - 4, 13);
+                sources.text = scope != null ? "Bag " + inBag + " · Chests " + inChests : "Bag " + inBag;
+                tooltip.Set(name.text, "Crafting materials", "In your bag: " + inBag +
+                    "\nNearby chests: " + inChests + (scope == null ? " (nearby crafting disabled)" : "") +
+                    "\nTotal available: " + have + "\nRequired: " + need);
                 bool available = have >= need;
                 amount.color = available ? Palette.Hex(0x9BC48A) : Palette.Hex(0xF08B80);
                 edge.color = available ? Palette.Hex(0x626B64, 0.45f) : Palette.Hex(0xD64A3E, 0.65f);

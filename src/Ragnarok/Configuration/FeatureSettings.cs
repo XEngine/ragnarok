@@ -49,9 +49,11 @@ internal sealed class FeatureSettings
             "effect too (Megingjord, wishbone, Wisplight at once). Only the first shows on your character.");
         AutoEquipOnReclaim = config.Bind("QualityOfLife.DeathRecovery", "AutoEquipOnReclaim", true,
             "Immediately equip the gear worn at death when reclaiming your own tombstone, including extra utility slots. " +
+            "Use takes everything directly when it fits, counting empty character/provision slots as well as the backpack and respecting carry weight. " +
+            "Take All restores marked gear into empty character slots before filling the backpack. " +
             "Applies to deaths recorded while this option is enabled; spare equipment stays in the backpack.");
         CraftFilters = config.Bind("QualityOfLife.Crafting", "VanillaFilters", true,
-            "With Valheim's crafting panel, add the search box and category filters above its recipe list.");
+            "With Valheim's crafting panel, add recipe/ingredient search, category and armor filters, sorting, quantity controls and bag/nearby material counts using native art and fonts.");
         SortKeepHotbar = config.Bind("QualityOfLife.InventorySort", "KeepHotbar", true,
             "Sorting leaves the hotbar rows (the top row, and the second one when HUD.Hotbar SecondRow is on) as they are and sorts the rows below them.");
         QuickStack = config.Bind("QualityOfLife.QuickStack", "Enabled", true,

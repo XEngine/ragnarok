@@ -60,23 +60,21 @@ internal sealed class AchievementsBook : BookWindow
             .At(Left, Height - 104, TextX - 36 - Left - 20, 34);
 
         Scroller(new Rect(Left - 20, Top, ListWidth + 20, Height - Top - 120), out listContent);
-        Ugui.Image(window!, "Column Rule", theme.White, Palette.Gold.WithAlpha(0.45f)).At(TextX - 36, Top, 1, Height - Top - 60);
 
-        Ugui.Image(window!, "Title Gem", theme.Diamond, Palette.Gold).At(TextX, Top + 14, 12, 12);
-        title = Ugui.Text(window!, "Title", "", theme.Heading, 32, Palette.Gold).At(TextX + 24, Top - 10, TextWidth, 50);
-        kind = Ugui.Text(window!, "Kind", "", theme.Subtle, 14, Palette.Muted).At(TextX + 24, Top + 38, TextWidth, 20);
+        title = Ugui.Text(window!, "Title", "", theme.Heading, 28, Palette.Bone).At(TextX, Top - 6, TextWidth, 44);
+        kind = Ugui.Text(window!, "Kind", "", theme.Subtle, 14, Palette.Muted).At(TextX, Top + 38, TextWidth, 20);
 
         float y = Top + 84;
-        Ugui.Text(window!, "Count Label", "completion", theme.Section, 16, Palette.Muted).At(TextX, y - 4, 200, 24);
+        Ugui.Text(window!, "Count Label", "completion", theme.Strong, 13, Palette.Muted).At(TextX, y - 4, 200, 24);
         countValue = Ugui.Text(window!, "Count Value", "", theme.Strong, 14, Palette.Bone, TextAlignmentOptions.MidlineRight)
             .At(TextX + TextWidth - 160, y, 160, 18);
-        Ugui.Image(window!, "Groove", theme.White, Palette.Ink).At(TextX, y + 24, TextWidth, 6);
-        countFill = Ugui.Image(window!, "Fill", theme.White, Palette.Gold).At(TextX, y + 24, 0, 6).rectTransform;
+        Ugui.Image(window!, "Groove", theme.HudBar, Palette.Hex(0x303631)).At(TextX, y + 24, TextWidth, 6);
+        countFill = Ugui.Image(window!, "Fill", theme.HudBar, Palette.Gold).At(TextX, y + 24, 0, 6).rectTransform;
 
-        body = Ugui.Text(window!, "Body", "", theme.Body, 15, Palette.Muted, TextAlignmentOptions.TopLeft, wrap: true)
+        body = Ugui.Text(window!, "Body", "", theme.Body, 15, Palette.Bone, TextAlignmentOptions.TopLeft, wrap: true)
             .At(TextX, y + 60, TextWidth, 70);
-        body.lineSpacing = 12;
-        conditionsLabel = Ugui.Text(window!, "Conditions Label", "", theme.Section, 16, Palette.Muted).At(TextX, y + 140, TextWidth, 24);
+        body.lineSpacing = 6;
+        conditionsLabel = Ugui.Text(window!, "Conditions Label", "", theme.Strong, 13, Palette.Muted).At(TextX, y + 140, TextWidth, 24);
         Scroller(new Rect(TextX, y + 170, TextWidth + 20, Height - (y + 170) - 80), out conditions);
 
         signature = 0;
@@ -130,19 +128,16 @@ internal sealed class AchievementsBook : BookWindow
             bool lit = achievement.m_unlocked, selected = achievement == chosen;
             Rect r = new(20 + i % Columns * (Tile + Gap), i / Columns * (Tile + Gap), Tile, Tile);
 
-            Ugui.Image(listContent!, "Tile", theme.White, lit ? Palette.Card : Palette.Ink).At(r);
-            Image[] edge = Ugui.Outline(listContent!, r);
-            Color rest = selected ? Palette.GoldBright : lit ? Palette.GoldDim : Palette.Rule;
-            foreach (Image line in edge) line.color = rest;
+            Image edge = Choice(listContent!, r, selected);
+            Color rest = selected ? Palette.Gold : Palette.Hex(0x303631);
             // Unlocked: the badge itself. Locked: Valheim's locked badge, dimmed.
             Image icon = Ugui.Image(listContent!, "Icon", lit ? achievement.m_icon : achievement.m_iconLocked,
                 lit ? Color.white : new Color(1, 1, 1, 0.35f)).At(r.x + 6, r.y + 6, Tile - 12, Tile - 12);
             icon.preserveAspect = true;
-            if (selected) Ugui.Image(listContent!, "Selected Notch", theme.Diamond, Palette.GoldBright).At(r.x + Tile / 2 - 4, r.yMax - 4, 8, 8);
 
             if (!selected)
                 Ugui.HitArea(listContent!, "Pick", () => { chosen = achievement; signature = 0; }).At(r)
-                    .OnHover(on => { foreach (Image line in edge) line.color = on ? Palette.GoldBright : rest; });
+                    .OnHover(on => edge.color = on ? Palette.Gold : rest);
         }
         int rows = (all.Count + Columns - 1) / Columns;
         listContent!.sizeDelta = new Vector2(0, rows * (Tile + Gap) + 8);
@@ -217,7 +212,7 @@ internal sealed class AchievementsBook : BookWindow
             Ugui.Text(conditions!, "Name", met ? label : "???", theme.Body, 14, met ? Palette.Bone : Palette.Faint).At(18, y, width - 130, 24);
             Ugui.Text(conditions!, "Count", met ? $"{have:0} / {need:0}" : "??? / ???", theme.Body, 13, met ? Palette.Gold : Palette.Faint,
                 TextAlignmentOptions.MidlineRight).At(width - 120, y, 120, 24);
-            Ugui.Image(conditions!, "Groove", theme.White, Palette.Ink).At(18, y + 24, width - 18, 2);
+            Ugui.Image(conditions!, "Groove", theme.HudBar, Palette.Hex(0x303631)).At(18, y + 24, width - 18, 2);
             if (met) Ugui.Image(conditions!, "Fill", theme.White, Palette.GoldDim).At(18, y + 24, width - 18, 2);
             y += Line;
         }

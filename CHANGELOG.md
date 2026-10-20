@@ -17,6 +17,31 @@ published release. Later refinements supersede earlier trials in the dated
 
 ### Shared styling and HUD
 
+- Refresh Skills, Compendium, Trophies and Achievements with the same rounded
+  charcoal frame, tabs, selection cards, parchment text and gold highlights as
+  the character shortcuts. Add capsule scrollbars and matching Close keycap;
+  replace the diagonal ember scene with a quiet rounded glyph preview.
+
+- Refresh the character shortcut panel above crafting with the current rounded
+  charcoal frame and cards, parchment typography and gold active-toggle borders.
+  Preserve native shortcut actions, tooltips and inventory opacity.
+
+- Replace the build-picker skin with a reference-inspired category sidebar,
+  pooled icon tiles, craftable counts and searchable materials in a
+  compact centered window. Keep native building selection and authority. Remove
+  the experimental menu quickbar, pinning controls and number-key shortcuts.
+  Remove the right detail panel, widen the grid and place compact density steppers
+  beside the piece count. Restore native station-upgrade arrows, compact the header
+  with matching action heights and select repair through the top-left hammer. Shrink the window to 1120 by 580, remove permanent piece names
+  and restore native hover readouts, controller focus and piece-button clicks.
+- Theme the native hammer build picker with dark rounded surfaces, gold selection
+  outlines and matching fonts, retaining search, tags, favorites and native input.
+- Add persistent row/column controls below the build grid, inventory-style piece
+  slots, an outer menu frame, capsule scrollbars and replacement tab rules; remove
+  the native material divider and its layout gap.
+- Compact themed building/terrain/cultivation task card above the vitals and
+  hotbar, mirroring native task, resource, snapping and station readouts. Smaller
+  icons/type and wrapped requirement tiles keep the center aiming area clear.
 - Licensed Cinzel, Barlow Semi Condensed and Noto Sans Runic fonts embedded with
   sources, hashes and license texts. Native item icons retained.
 - Rune & Iron colors, rounded surfaces and outlined text; stronger world-label
@@ -35,6 +60,16 @@ published release. Later refinements supersede earlier trials in the dated
 
 ### Inventory, chest and equipment
 
+- Bring search shortcuts/debounce, collapsible armor filters, sorting, bounded
+  craft quantity and bag/nearby material counts to vanilla crafting using native
+  fonts and button art, retaining its recipe list, descriptions and actions.
+- Reduce inventory/crafting opening work with pooled visible recipe rows, cropped
+  icon conversion instead of full-atlas copies, and no redundant native recipe
+  rebuild when the opening list already has Ragnarök filtering/sorting applied.
+- Slot-aware tombstone recovery restores previously worn gear into empty
+  character slots before filling the bag, and restores saved provision positions
+  for new deaths. Use reclaims directly when the combined inventory fits within
+  carry weight, retaining native access/ownership approval and overflow handling.
 - Matching rounded inventory/chest slots, muted empty outlines, category tabs and
   unified name/armor/weight headers. Supplied shield outline and rounded weight meter.
   Removed extra inventory hotbar strip/category legend; white keys, muted actions.

@@ -52,30 +52,28 @@ internal sealed class SkillsBook : BookWindow
         total = Ugui.Text(window!, "Total", "", theme.Strong, 14, Palette.Bone).At(Left, 100, ListWidth, 26);
 
         Scroller(new Rect(Left - 20, Top, ListWidth + 20, Height - Top - 110), out listContent);
-        Ugui.Image(window!, "Column Rule", theme.White, Palette.Gold.WithAlpha(0.45f)).At(TextX - 36, Top, 1, Height - Top - 60);
 
-        Ugui.Image(window!, "Title Gem", theme.Diamond, Palette.Gold).At(TextX, Top + 14, 12, 12);
-        title = Ugui.Text(window!, "Title", "", theme.Heading, 32, Palette.Gold).At(TextX + 24, Top - 10, TextWidth, 50);
+        title = Ugui.Text(window!, "Title", "", theme.Heading, 28, Palette.Bone).At(TextX, Top - 6, TextWidth, 44);
 
         // The level, large, with the bonus from gear and food beside it.
         level = Ugui.Text(window!, "Level", "", theme.Display, 76, Palette.Bone).At(TextX, Top + 38, 160, 112);
         level.overflowMode = TextOverflowModes.Overflow;
         bonus = Ugui.Text(window!, "Bonus", "", theme.Display, 28, Palette.Gold).At(TextX + 130, Top + 63, 200, 42);
-        Ugui.Text(window!, "Level Label", "level", theme.Section, 16, Palette.Muted).At(TextX + 4, Top + 136 - 4, 160, 24);
+        Ugui.Text(window!, "Level Label", "level", theme.Strong, 13, Palette.Muted).At(TextX + 4, Top + 136 - 4, 160, 24);
 
         // Progress to the next level, then mastery towards 100 (the bonus shown past the trained level).
         float y = Top + 178;
-        Ugui.Text(window!, "Next Label", "next level", theme.Section, 16, Palette.Muted).At(TextX, y - 4, 200, 24);
+        Ugui.Text(window!, "Next Label", "next level", theme.Strong, 13, Palette.Muted).At(TextX, y - 4, 200, 24);
         nextValue = Ugui.Text(window!, "Next Value", "", theme.Strong, 14, Palette.Bone, TextAlignmentOptions.MidlineRight)
             .At(TextX + TextWidth - 120, y, 120, 18);
         nextFill = Bar(y + 24, out _);
         y += 52;
-        Ugui.Text(window!, "Mastery Label", "mastery", theme.Section, 16, Palette.Muted).At(TextX, y - 4, 200, 24);
+        Ugui.Text(window!, "Mastery Label", "mastery", theme.Strong, 13, Palette.Muted).At(TextX, y - 4, 200, 24);
         masteryFill = Bar(y + 24, out bonusFill);
 
-        description = Ugui.Text(window!, "Description", "", theme.Body, 15, Palette.Muted, TextAlignmentOptions.TopLeft, wrap: true)
+        description = Ugui.Text(window!, "Description", "", theme.Body, 15, Palette.Bone, TextAlignmentOptions.TopLeft, wrap: true)
             .At(TextX, y + 64, TextWidth, Height - y - 64 - 90);
-        description.lineSpacing = 12;
+        description.lineSpacing = 6;
         description.overflowMode = TextOverflowModes.Overflow;
 
         signature = 0;
@@ -85,9 +83,9 @@ internal sealed class SkillsBook : BookWindow
     // A thin gold bar across the column, in a dark groove; returns its fill (and a dimmer fill behind it).
     private RectTransform Bar(float y, out RectTransform under)
     {
-        Ugui.Image(window!, "Groove", theme.White, Palette.Ink).At(TextX, y, TextWidth, 6);
-        under = Ugui.Image(window!, "Under", theme.White, Palette.GoldDim.WithAlpha(0.6f)).At(TextX, y, 0, 6).rectTransform;
-        return Ugui.Image(window!, "Fill", theme.White, Palette.Gold).At(TextX, y, 0, 6).rectTransform;
+        Ugui.Image(window!, "Groove", theme.HudBar, Palette.Hex(0x303631)).At(TextX, y, TextWidth, 6);
+        under = Ugui.Image(window!, "Under", theme.HudBar, Palette.GoldDim.WithAlpha(0.6f)).At(TextX, y, 0, 6).rectTransform;
+        return Ugui.Image(window!, "Fill", theme.HudBar, Palette.Gold).At(TextX, y, 0, 6).rectTransform;
     }
 
     // Rebuilt when a level, its progress or the choice changes.
@@ -121,19 +119,19 @@ internal sealed class SkillsBook : BookWindow
         {
             Skills.SkillType type = skill.m_info.m_skill;
             bool selected = type == chosen;
-            if (selected) Ugui.Image(listContent!, "Open Mark", theme.White, Palette.GoldBright).At(0, y + 9, 3, 30);
+            Choice(listContent!, new Rect(8, y, ListWidth - 8, Row - 4), selected);
             Ugui.Image(listContent!, "Icon", icons.Get(skill.m_info.m_icon) ?? theme.Diamond, selected ? Palette.Bone : Palette.Muted)
                 .At(20, y + 10, 28, 28).preserveAspect = true;
             TextMeshProUGUI name = Ugui.Text(listContent!, "Name", SkillName(skill), theme.Strong, 14,
-                selected ? Palette.Bone : Palette.Muted).At(58, y + 6, lineWidth - 40, 24);
+                selected ? Palette.Gold : Palette.Bone).At(58, y + 6, lineWidth - 40, 24);
             Ugui.Text(listContent!, "Level", Mathf.FloorToInt(skills.GetSkillLevel(type)).ToString(), theme.Body, 22,
                 selected ? Palette.Gold : Palette.Muted, TextAlignmentOptions.MidlineRight).At(ListWidth - 70, y + 4, 66, 28);
-            Ugui.Image(listContent!, "Line", theme.White, Palette.Ink).At(58, y + 34, lineWidth, 2);
-            Ugui.Image(listContent!, "Line Fill", theme.White, selected ? Palette.Gold : Palette.GoldDim)
+            Ugui.Image(listContent!, "Line", theme.HudBar, Palette.Hex(0x303631)).At(58, y + 34, lineWidth, 2);
+            Ugui.Image(listContent!, "Line Fill", theme.HudBar, selected ? Palette.Gold : Palette.Muted)
                 .At(58, y + 34, lineWidth * Mathf.Clamp01(skill.m_level / 100f), 2);
             if (!selected)
                 Ugui.HitArea(listContent!, "Pick", () => { chosen = type; signature = 0; }).At(0, y, ListWidth, Row)
-                    .OnHover(on => name.color = on ? Palette.GoldBright : Palette.Muted);
+                    .OnHover(on => name.color = on ? Palette.Gold : Palette.Bone);
             y += Row;
         }
         listContent!.sizeDelta = new Vector2(0, y);

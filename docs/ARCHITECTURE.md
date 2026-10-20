@@ -43,6 +43,21 @@ The synchronization protocol continues to send legacy section names for existing
 
 ## Verification
 
+Tombstone recovery keeps the existing synchronized `AutoEquipOnReclaim`, character
+slot and extra-utility settings. `GraveRecoveryPlan` makes a read-only prediction
+of available special slots followed by native MoveAll's preferred-position and
+fallback stacking passes. The Use fit check retains the native carry-weight gate;
+native Interact/Container.TakeAll access checks, RPC approval and callbacks still
+run. Actual special-slot transfers occur only for the local player's own grave
+after the local ZNetView has ownership, using native positioned inventory moves.
+No ownership is claimed by recovery code and no new RPC is registered.
+
+Existing owner-tagged equipment is supported. New provision-slot tags live in
+item custom data alongside equipment markers and survive grave serialization.
+Occupied slots are never overwritten by direct restoration; leftovers follow
+normal transfers or remain in the grave. Equip retries/slot settling run after
+transfers, and the existing Reset/unpatch lifecycle clears pending work on unload.
+
 Native Linux equivalents are `./dev.sh test`, `./dev.sh build` and
 `./dev.sh build --configuration Release`; see [LINUX.md](LINUX.md) for isolation,
 setup and development deployment. LocalSaves is development-only and uses the
@@ -66,3 +81,58 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/check-config.ps1
 `check-config.ps1` exercises the built migration code against the installed BepInEx reader with temporary files. It neither starts Valheim nor edits the development game's actual configuration. The regression suite covers allocation, death penalties, config migration precedence, idempotence and legacy wire names.
 
 In-game acceptance still requires F6 reload, inspecting the three settings groups, verifying server locks with a client, reconnecting, and checking vanilla/custom UI restoration. No new in-game test was performed for this refactor because the development game was already running; its session was not interrupted to run the startup smoke script.
+
+Vanilla crafting enhancements use the same CraftFilter state and the existing
+CraftAmount/native multi-craft path as the custom panel. They introduce no new
+RPC, resource withdrawal path, server settings or crafting permissions. Material
+source counts are read-only snapshots refreshed at 5 Hz through the existing
+ResourceScope, whose access/range/world-level and server-controlled crafting
+storage checks remain in force. Quantity affordability uses native
+HaveRequirements and native crafting still validates/pays the final job.
+VanillaCraftExtras owns its input controls and uses the native inventory tooltip
+prefab for backed material hovers, with no extra material source labels; it restores
+native button geometry, amount text sizing and tooltip state on disposal. The
+custom panel resets shared quantity only when it actually owned a panel, so its
+inactive Tick does not overwrite the vanilla quantity input every frame.
+
+## Reference-based build menu, 2026-10-20
+
+The reference build-menu layout is implemented as an owned view over active native
+BuildUi. A separate owned CanvasGroup masks it without changing existing native
+or other-mod groups; it is neutralized and removed on unload. TabHandler enabled
+state is saved/restored. A plugin-owned Harmony prefix bypasses only
+BuildUi.NavigationUpdate while this view owns input, and the plugin's existing
+Harmony owner removes that patch on unload. Native BuildUi still manages available
+pieces, discovery, lists, favorite persistence and tool changes. Native piece
+selection is invoked only for a piece available in the current build tool; the
+card click selects the building preview and does not spawn or pay for a piece.
+
+The owned window is centered at 1120 by 580 canvas units, scales down to fit with
+24-unit outer margins, and never scales above its designed size. Only this window
+has a backdrop and frame; its fullscreen layout host has no graphic or raycast
+surface. The sidebar and widened card grid scroll within the window. The right detail
+panel is removed; card clicks invoke the original BuildUiPieceButton.OnClickButton. Pointer hover
+and controller focus forward to BuildUi.OnHoverPiece with the matching native
+button, updating the existing HUD readout. Exit/deselection/unload clear hover.
+No permanent piece-name text or reserved name area remains in icon tiles. Compact density steppers sit between the category heading and piece count, outside
+the clipped card viewport. The header uses matching 36-unit search/action controls.
+Station upgrade markers use Piece.m_isUpgrade and the native button arrow sprite.
+The experimental quickbar, pinning, saved shortcuts and number-key handling are
+removed. HUD.BuildMenu density, preview toggles and keyboard bindings remain
+local UI preferences, not synchronized server rules.
+Nearby preview counting uses the existing read-only ResourceScope and
+requires the server-controlled Enabled/Building storage flags. Its local toggle
+changes displayed stock only, never actual withdrawal, ownership or access policy.
+No new RPC, ownership claim, resource payment, placement rule or external dependency
+is added. Counts cannot guarantee placement: native station, collision, terrain,
+DLC and other final placement rules still run through the original game path.
+
+Card objects are pooled to the visible rows plus one overscan row. Full logical
+piece lists remain native; the owned top-left hammer selects native repair mode and does not
+inherit native repair-button recreation flashes. Search descriptions and craftable counts come from
+real Piece data and stock snapshots. Search and read-only counts refresh on a bounded
+schedule. Owned roots, listeners, typing registrations, focus callbacks and active
+static references are removed/restored on HUD replacement/style change/unload.
+The design follows the user's supplied reference image; no pixels, outside code
+or new assets were copied. Existing licensed fonts/generated theme and installed
+native icons are reused.

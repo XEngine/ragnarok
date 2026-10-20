@@ -34,6 +34,9 @@ internal sealed class InterfaceSettings
     internal readonly ConfigEntry<InventoryStyle> Inventory;
     internal readonly ConfigEntry<float> InventoryOpacity;
     internal readonly ConfigEntry<float> InventoryScale;
+    internal readonly ConfigEntry<int> BuildColumns, BuildRows;
+    internal readonly ConfigEntry<bool> BuildOnlyAvailable, BuildCountNearby;
+    internal readonly ConfigEntry<KeyboardShortcut> BuildPreviousCategory, BuildNextCategory, BuildFavoriteKey, BuildSearchKey;
     internal readonly ConfigEntry<bool> ChestPreview;
     internal readonly ConfigEntry<float> ChestPreviewX, ChestPreviewY, ChestPreviewScale;
     internal readonly ConfigEntry<int> ChestPreviewColumns;
@@ -146,8 +149,19 @@ internal sealed class InterfaceSettings
             "Size of the Ragnarök inventory and its character column, growing from the top-left into the free space " +
             "before the info board and crafting panel. Vanilla uses its native size and shrinks only as needed to fit the new panels. " +
             "1 is Valheim's own size.", new AcceptableValueRange<float>(0.75f, 1.3f)));
-        InventoryOpacity = config.Bind("HUD.Inventory", "BackgroundOpacity", 0.85f, new ConfigDescription(
-            "Smoked-glass opacity of the Ragnarök inventory, chest and character panels.", new AcceptableValueRange<float>(0.2f, 1f)));
+        InventoryOpacity = config.Bind("HUD.Inventory", "BackgroundOpacity", 0.95f, new ConfigDescription(
+            "Smoked-glass opacity of the Ragnarök inventory, crafting, chest and character panels.", new AcceptableValueRange<float>(0.2f, 1f)));
+        BuildColumns = config.Bind("HUD.BuildMenu", "Columns", 5, new ConfigDescription(
+            "Number of build-piece columns in the Ragnarök picker. Also adjustable below the grid.", new AcceptableValueRange<int>(4, 16)));
+        BuildRows = config.Bind("HUD.BuildMenu", "Rows", 4, new ConfigDescription(
+            "Number of fully visible build-piece rows in the Ragnarök picker. Also adjustable below the grid.", new AcceptableValueRange<int>(3, 10)));
+        BuildOnlyAvailable = config.Bind("HUD.BuildMenu", "OnlyBuildable", false, "Show only pieces the native game currently considers buildable.");
+        BuildCountNearby = config.Bind("HUD.BuildMenu", "CountNearbyChests", true,
+            "Include permitted nearby building stock in preview counts. Server building-storage rules still control actual resource use.");
+        BuildPreviousCategory = config.Bind("HUD.BuildMenu", "PreviousCategoryKey", new KeyboardShortcut(KeyCode.Q), "Previous category while the build menu is open.");
+        BuildNextCategory = config.Bind("HUD.BuildMenu", "NextCategoryKey", new KeyboardShortcut(KeyCode.E), "Next category while the build menu is open.");
+        BuildFavoriteKey = config.Bind("HUD.BuildMenu", "FavoriteKey", new KeyboardShortcut(KeyCode.F), "Toggle the inspected piece's native favorite while the build menu is open.");
+        BuildSearchKey = config.Bind("HUD.BuildMenu", "SearchKey", new KeyboardShortcut(KeyCode.Slash), "Focus build-piece search. The slash character is also recognized on non-US keyboard layouts.");
 
 
         ProvisionBar = config.Bind("HUD.Provisions", "ShowInHud", true,
@@ -237,6 +251,17 @@ internal sealed class InterfaceSettings
             if (Mathf.Approximately(InventoryOpacity.Value, 0.72f))
                 InventoryOpacity.Value = (float)InventoryOpacity.DefaultValue;
             layoutVersion.Value = 9;
+        }
+        if (layoutVersion.Value < 10)
+        {
+            if (Mathf.Approximately(InventoryOpacity.Value, 0.85f))
+                InventoryOpacity.Value = (float)InventoryOpacity.DefaultValue;
+            layoutVersion.Value = 10;
+        }
+        if (layoutVersion.Value < 11)
+        {
+            if (BuildColumns.Value == 12 && BuildRows.Value == 6) { BuildColumns.Value = 5; BuildRows.Value = 4; }
+            layoutVersion.Value = 11;
         }
     }
 

@@ -34,6 +34,8 @@ public sealed class Plugin : BaseUnityPlugin
     private HoverPrompt? hoverPrompt;
     private ChestHoverPreview? chestHoverPreview;
     private RagnarokActionBar? actionBar;
+    private BuildTaskPanel? buildTask;
+    private BuildMenuPanel? buildMenu;
     private ChestSearch? chestSearch;
     private WeaponDial? weaponDial;
     private VanillaQuickStack? vanillaQuickStack;
@@ -157,6 +159,8 @@ public sealed class Plugin : BaseUnityPlugin
         hoverPrompt = new HoverPrompt(ui, theme);
         chestHoverPreview = new ChestHoverPreview(ui, theme);
         actionBar = new RagnarokActionBar(ui, theme);
+        buildTask = new BuildTaskPanel(ui, theme);
+        buildMenu = new BuildMenuPanel(ui, theme);
         chestSearch = new ChestSearch(ui, theme);
         weaponDial = new WeaponDial(ui, theme);
         infoPanel = new InfoPanel(ui, theme, () => inventoryPanel.Wanted);
@@ -179,7 +183,7 @@ public sealed class Plugin : BaseUnityPlugin
         vanillaProvisions = new VanillaProvisionBar(ui, () => hud.Active);
         // The filters apply to Valheim's recipe list whenever a panel shows them.
         CraftFilter.Enabled = () => craftPanel.Wanted || ui.Features.CraftFilters.Value;
-        CraftFilter.SortEnabled = () => craftPanel.Wanted;
+        CraftFilter.SortEnabled = () => craftPanel.Wanted || ui.Features.CraftFilters.Value;
         Theme.ChipEdges = () => ui.Edges.Value == FrameEdges.Chipped;
         Ugui.ScrollRows = () => (ui.FollowSystemScroll.Value ? SystemScroll.Lines() : null) ?? ui.ScrollSpeed.Value;
         compass = new CompassStrip(ui, theme);
@@ -240,6 +244,8 @@ public sealed class Plugin : BaseUnityPlugin
         chestHoverPreview?.Tick();
         Equipment.TombstoneRecovery.Tick();
         hud?.Tick();
+        buildTask?.Tick();
+        buildMenu?.Tick();
         // Restore native sizing before the guide panels measure their frames.
         if (inventoryPanel?.Wanted == true)
         {
@@ -325,6 +331,8 @@ public sealed class Plugin : BaseUnityPlugin
         weaponDial?.Dispose();
         PlantHoverStatus.Enabled = () => false;
         actionBar?.Dispose();
+        buildTask?.Dispose();
+        buildMenu?.Dispose();
         hoverPrompt?.Dispose();
         chestHoverPreview?.Dispose();
         SailingAndTurrets.Current = null;

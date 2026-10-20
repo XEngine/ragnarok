@@ -63,18 +63,16 @@ internal sealed class Compendium : BookWindow
 
         // Chapters scroll on the left; the entry scrolls in the middle.
         Scroller(new Rect(Left - 20, Top, ListWidth + 20, Height - Top - 110), out listContent);
-        Ugui.Image(window!, "Column Rule", theme.White, Palette.Gold.WithAlpha(0.45f)).At(TextX - 36, Top, 1, Height - Top - 60);
 
-        Ugui.Image(window!, "Title Gem", theme.Diamond, Palette.Gold).At(TextX, Top + 14, 12, 12);
-        title = Ugui.Text(window!, "Title", "", theme.Heading, 32, Palette.Gold).At(TextX + 24, Top - 10, TextWidth, 50);
+        title = Ugui.Text(window!, "Title", "", theme.Heading, 28, Palette.Bone).At(TextX, Top - 6, TextWidth, 44);
         Scroller(new Rect(TextX, Top + 60, TextWidth + 20, Height - Top - 130), out bodyContent);
-        body = Ugui.Text(bodyContent, "Body", "", theme.Body, 15, Palette.Muted, TextAlignmentOptions.TopLeft, wrap: true);
+        body = Ugui.Text(bodyContent, "Body", "", theme.Body, 15, Palette.Bone, TextAlignmentOptions.TopLeft, wrap: true);
         body.rectTransform.anchorMin = new Vector2(0, 1);
         body.rectTransform.anchorMax = new Vector2(1, 1);
         body.rectTransform.pivot = new Vector2(0, 1);
         body.rectTransform.offsetMin = new Vector2(0, 0);
         body.rectTransform.offsetMax = new Vector2(-20, 0);
-        body.lineSpacing = 12;
+        body.lineSpacing = 6;
         body.paragraphSpacing = 14;
         body.overflowMode = TextOverflowModes.Overflow;
 
@@ -120,27 +118,26 @@ internal sealed class Compendium : BookWindow
         {
             int index = c;
             bool open = c == openChapter;
-            Color color = open ? Palette.Bone : Palette.Muted.WithAlpha(Mathf.Max(0.25f, 0.75f - 0.15f * Mathf.Abs(c - openChapter)));
-            if (open)
-                Ugui.Image(listContent!, "Open Mark", theme.White, Palette.GoldBright).At(0, y + 12, 3, 30);
-            TextMeshProUGUI heading = Ugui.Text(listContent!, chapters[c].Name, chapters[c].Name, theme.Heading,
-                open ? 32 : 26, color).At(20, y, ListWidth, 54);
+            Color color = open ? Palette.Gold : Palette.Bone;
+            Choice(listContent!, new Rect(8, y, ListWidth - 8, 38), open);
+            TextMeshProUGUI heading = Ugui.Text(listContent!, chapters[c].Name, chapters[c].Name, theme.Strong,
+                15, color).At(20, y, ListWidth - 24, 38);
             if (!open)
                 Ugui.HitArea(listContent!, "Open " + chapters[c].Name, () => { openChapter = index; openEntry = 0; ShowChapters(); ShowEntry(); })
-                    .At(20, y, ListWidth, 54).OnHover(on => heading.color = on ? Palette.GoldBright : color);
-            y += 60;
+                    .At(8, y, ListWidth - 8, 38).OnHover(on => heading.color = on ? Palette.GoldBright : color);
+            y += 44;
             if (!open) continue;
 
             for (int e = 0; e < chapters[c].Entries.Count; e++)
             {
                 int entry = e;
                 bool selected = e == openEntry;
-                if (selected) Ugui.Image(listContent!, "Selected Gem", theme.Diamond, Palette.GoldBright).At(20, y + 11, 8, 8);
+                Choice(listContent!, new Rect(20, y, ListWidth - 20, 28), selected);
                 TextMeshProUGUI name = Ugui.Text(listContent!, "Entry", chapters[c].Entries[e].Topic, theme.Strong, 14,
-                    selected ? Palette.Bone : Palette.Muted).At(36, y, ListWidth - 20, 30);
+                    selected ? Palette.Gold : Palette.Bone).At(30, y, ListWidth - 36, 28);
                 if (!selected)
-                    Ugui.HitArea(listContent!, "Pick", () => { openEntry = entry; ShowChapters(); ShowEntry(); }).At(20, y, ListWidth, 30)
-                        .OnHover(on => name.color = on ? Palette.GoldBright : Palette.Muted);
+                    Ugui.HitArea(listContent!, "Pick", () => { openEntry = entry; ShowChapters(); ShowEntry(); }).At(20, y, ListWidth - 20, 28)
+                        .OnHover(on => name.color = on ? Palette.Gold : Palette.Bone);
                 y += 32;
             }
             y += 14;

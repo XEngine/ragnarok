@@ -166,12 +166,26 @@ internal sealed class RagnarokHud : IDisposable
         }
         if (settings.HudKeys.Value)
         {
-            if (!keys.Dock(Preview ? null : KeysDock(), showCharacter && settings.HudStatus.Value ? strip.Rect : null))
+            RectTransform? dock = Preview ? null : KeysDock();
+            Player player = Player.m_localPlayer;
+            ItemDrop.ItemData? held = player ? player.GetCurrentWeapon() : null;
+            // Tools are not returned by GetCurrentWeapon; use their native hint contexts.
+            bool heldControls = KeyHintsPanel.ToolActive || (KeyHintsPanel.CombatActive &&
+                held != null && held.m_equipped && player!.GetInventory().ContainsItem(held));
+            bool dockAtHotbar = !Preview && !dock && !InventoryGui.IsVisible() && heldControls && RagnarokActionBar.Shown;
+            if (dockAtHotbar) dock = RagnarokActionBar.Shown;
+            if (!keys.Dock(dock, showCharacter && settings.HudStatus.Value ? strip.Rect : null, compact: true,
+                bottomInset: dockAtHotbar ? RagnarokActionBar.KeyDockInset : 0))
             {
                 keys.SetScale(settings.HudScale.Value);
                 keys.Place(settings.Keys);
             }
             keys.Tick(Preview);
+            if (dockAtHotbar)
+            {
+                RagnarokActionBar.MakeRoomForKeys(keys.DockSpace);
+                keys.Dock(dock, compact: true, bottomInset: RagnarokActionBar.KeyDockInset);
+            }
         }
         root.transform.localScale = Vector3.one * settings.HudScale.Value;
         if (showCharacter) character.Tick(Preview, data.Statuses.Count);

@@ -185,14 +185,17 @@ internal sealed class MonochromeIcons : IDisposable
     {
         Texture2D atlas = source.texture;
         Rect r = source.textureRect;
+        int width = Mathf.Min(128, (int)r.width), height = Mathf.Min(128, (int)r.height);
         RenderTexture previous = RenderTexture.active;
-        RenderTexture temp = RenderTexture.GetTemporary(atlas.width, atlas.height, 0, RenderTextureFormat.ARGB32);
-        Texture2D copy = new((int)r.width, (int)r.height, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
+        RenderTexture temp = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
+        Texture2D copy = new(width, height, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
         try
         {
-            Graphics.Blit(atlas, temp);
+            // Crop on the GPU before readback; never allocate/blit a whole atlas for a tiny glyph.
+            Graphics.Blit(atlas, temp, new Vector2(r.width / atlas.width, r.height / atlas.height),
+                new Vector2(r.x / atlas.width, r.y / atlas.height));
             RenderTexture.active = temp;
-            copy.ReadPixels(new Rect(r.x, r.y, r.width, r.height), 0, 0);
+            copy.ReadPixels(new Rect(0, 0, width, height), 0, 0, false);
         }
         catch
         {

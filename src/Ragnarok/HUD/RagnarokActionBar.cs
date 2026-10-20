@@ -35,6 +35,10 @@ internal sealed class RagnarokActionBar : IDisposable
     private float oldAlpha;
     private RectTransform? root;
     internal static RectTransform? EquippedCard { get; private set; }
+    internal static RectTransform? Shown { get; private set; }
+    internal static float KeyDockInset { get; private set; }
+    private static float requestedGuideSpace;
+    private float guideLift, guideVelocity;
     private TMP_Text? inventoryKey, switchKey;
     private GameObject? switcher;
     private Image? upper, lower;
@@ -55,6 +59,9 @@ internal sealed class RagnarokActionBar : IDisposable
 
     internal void Tick()
     {
+        // The HUD measures its guide later in the frame; consume that request once next frame.
+        float guideSpace = requestedGuideSpace;
+        requestedGuideSpace = 0;
         var hud = global::Hud.instance;
         var bar = hud ? hud.GetComponentInChildren<HotkeyBar>(true) : null;
         if (settings.Hud.Value != HudStyle.Ragnarok || !settings.ActionBar.Value || !bar)
@@ -80,13 +87,24 @@ internal sealed class RagnarokActionBar : IDisposable
         var player = Player.m_localPlayer;
         bool show = player && !player.IsDead() && original!.gameObject.activeInHierarchy;
         root!.gameObject.SetActive(show);
+        Shown = show ? root : null;
+        KeyDockInset = show ? PaddingY : 0;
         if (!show) return;
         var parent = (RectTransform)root.parent;
         float scale = Math.Min(settings.ActionBarScale.Value, (parent.rect.width - 20) / Width);
         root.localScale = Vector3.one * scale;
         float limit = Math.Max(0, (parent.rect.width - Width * scale) / 2 - 8);
+        float maxBottom = Mathf.Max(0, parent.rect.height - Height * scale);
+        float bottom = Mathf.Clamp(settings.ActionBarBottom.Value, 0, maxBottom);
+        float wantedLift = Mathf.Clamp(guideSpace - PaddingY * scale - bottom, 0, maxBottom - bottom);
+        guideLift = Mathf.SmoothDamp(guideLift, wantedLift, ref guideVelocity, 0.16f, Mathf.Infinity, Time.unscaledDeltaTime);
+        if (Mathf.Abs(guideLift - wantedLift) < 0.05f && Mathf.Abs(guideVelocity) < 0.05f)
+        {
+            guideLift = wantedLift;
+            guideVelocity = 0;
+        }
         root.anchoredPosition = new Vector2(Mathf.Clamp(settings.ActionBarX.Value, -limit, limit),
-            Mathf.Clamp(settings.ActionBarBottom.Value, 0, Math.Max(0, parent.rect.height - Height * scale)));
+            Mathf.Clamp(bottom + guideLift, 0, maxBottom));
         bool gamepad = ZInput.IsGamepadActive();
         // The inventory key sits beside the bar; armor and weight live under the profile.
         Inventory inventory = player!.GetInventory();
@@ -163,6 +181,12 @@ internal sealed class RagnarokActionBar : IDisposable
             }
         }
         foreach (TextOutline outline in textOutlines) outline.Sync();
+    }
+
+    // Reserve space for held-item hints without changing the user's saved bottom margin.
+    internal static void MakeRoomForKeys(float space)
+    {
+        if (Shown) requestedGuideSpace = Mathf.Max(0, space);
     }
 
     private void Build(Transform parent)
@@ -268,6 +292,13 @@ internal sealed class RagnarokActionBar : IDisposable
             if (ownsMask) UnityEngine.Object.Destroy(mask);
         }
         if (root) UnityEngine.Object.Destroy(root!.gameObject);
+        if (Shown == root)
+        {
+            Shown = null;
+            KeyDockInset = 0;
+            requestedGuideSpace = 0;
+        }
+        guideLift = guideVelocity = 0;
         root = null;
         EquippedCard = null;
         mask = null;

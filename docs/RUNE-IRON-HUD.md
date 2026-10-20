@@ -11,7 +11,7 @@ iterations; later refinements supersede earlier values and layouts.
 - Character/food alignment, backed circular outlines, muted dashed empty food slots
   and no fabricated cooldown dash. Character/food/status HUD hides with inventory.
 - Shared 58% glass on HUD fills with outlined world labels; optional backdrop
-  plating removed. Inventory, chest, side dashboard and crafting use 85% glass by
+  plating removed. Inventory, chest, side dashboard and crafting use 95% glass by
   default, independently adjustable through inventory opacity.
 - Inventory/chest header, shield and rounded weight meter; category-scoped Quick
   Stack; Name/Kind/Weight sorting; white keys with muted actions. Native artwork

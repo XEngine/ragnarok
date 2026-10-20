@@ -52,3 +52,5 @@ ConfigSchemaChecks.Run(Check);
 CraftSearchChecks.Run(Check);
 CraftFrameChecks.Run(Check);
 RecipeDetailsChecks.Run(Check);
+GraveRecoveryChecks.Run(Check);
+BuildMenuChecks.Run(Check);

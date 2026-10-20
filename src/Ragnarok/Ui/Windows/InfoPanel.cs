@@ -7,13 +7,11 @@ using UnityEngine.UI;
 
 namespace Ragnarok.UI.Windows;
 
-// The Ragnarök info panel: the wooden board above the inventory (character name, and the buttons for the
-// Compendium, skills, trophies, achievements and PvP) redrawn as a Ragnarök plate. Valheim's board keeps
-// running unseen; each of its buttons gets a chamfered twin with the same glyph and tooltip that presses
-// the original (toggles flip it), so whatever buttons Valheim or other mods put there keep working.
+// Owned character shortcuts over the live native info panel. Each rounded card
+// forwards to its original button/toggle, including other mods' shortcuts.
 internal sealed class InfoPanel : IDisposable
 {
-    private const float Pad = 16, Header = 46, ButtonMax = 60, LabelHeight = 20;
+    private const float Pad = 12, Header = 46, Gap = 8;
 
     // Valheim's button names; anything else (other mods' buttons) is named by its tooltip.
     private static readonly Dictionary<string, string> Names = new()
@@ -27,7 +25,7 @@ internal sealed class InfoPanel : IDisposable
     private readonly Func<bool> wanted;
     private readonly MonochromeIcons icons = new();
     private readonly List<(UnityEngine.Object Owner, Action Restore)> undo = new();
-    private readonly List<(Selectable Source, Image Chip, Image Icon, Button Button)> buttons = new();
+    private readonly List<(Selectable Source, Image Edge, Image Icon, TMP_Text Label, Button Button)> buttons = new();
     private InventoryGui? gui;
     private RectTransform? root;
     private Image? background;
@@ -47,8 +45,7 @@ internal sealed class InfoPanel : IDisposable
         InventoryGui current = InventoryGui.instance;
         if (current != gui)
         {
-            undo.Clear();
-            root = null;
+            Restore();
             gui = current;
         }
         if (!gui) return;
@@ -76,7 +73,13 @@ internal sealed class InfoPanel : IDisposable
         for (int i = undo.Count - 1; i >= 0; i--)
             if (undo[i].Owner) undo[i].Restore();
         undo.Clear();
-        if (root) UnityEngine.Object.Destroy(root!.gameObject);
+        foreach (var entry in buttons)
+            if (entry.Button) entry.Button.onClick.RemoveAllListeners();
+        if (root)
+        {
+            root!.gameObject.SetActive(false);
+            UnityEngine.Object.Destroy(root.gameObject);
+        }
         root = null;
         buttons.Clear();
     }
@@ -101,39 +104,52 @@ internal sealed class InfoPanel : IDisposable
 
         root = Ugui.Node(panel, "Ragnarok Info");
         root.Stretch();
-        background = Ugui.Image(root, "Frame", theme.Window, Color.white, raycast: true).Stretch();
+        background = Ugui.Image(root, "Background", theme.PackSurface,
+            Palette.Hex(0x0C0F11, settings.InventoryOpacity.Value), raycast: true).Stretch();
+        Ugui.Image(root, "Frame", theme.PackEdge, Palette.Hex(0x3D4541)).Stretch();
+        title = Ugui.Text(root, "Name", "", theme.Heading, 22, Palette.Bone)
+            .At(Pad, 8, width - Pad * 2, 30);
+        title.richText = false;
+        title.enableAutoSizing = true; title.fontSizeMin = 13; title.fontSizeMax = 22;
+        Ugui.Image(root, "Divider", theme.White, Palette.Hex(0x303631))
+            .At(Pad, Header, width - Pad * 2, 1);
 
-        // The character's name as the window title (Alegreya, 24) over the guide's divider.
-        title = Ugui.Text(root, "Name", "", theme.Heading, 24, Palette.Gold, TextAlignmentOptions.Center).At(Pad, 6, width - Pad * 2, 34);
-        Ornaments.Rule(root, theme, Pad, Header, width - Pad * 2);
-
-        // The buttons, evenly spread in the space under the rule, each named beneath.
         int count = sources.Count;
         if (count == 0) return;
-        float top = Header + 12, area = height - top - Pad - LabelHeight;
-        float size = Mathf.Floor(Mathf.Min(ButtonMax, area, (width - Pad * 2) / count - 10));
-        float step = (width - Pad * 2) / count;
+        float top = Header + 10;
+        float cardHeight = Mathf.Max(1, height - top - Pad);
+        float cardWidth = Mathf.Max(1, (width - Pad * 2 - Gap * (count - 1)) / count);
+        float iconSize = Mathf.Max(1, Mathf.Min(28, cardWidth - 16, cardHeight * 0.4f));
         for (int i = 0; i < count; i++)
         {
             Selectable source = sources[i];
-            Button button = Ugui.Button(root, source.name, theme.Button, theme.ButtonHover, () => Press(source));
-            Image chip = (Image)button.targetGraphic;
-            float y = top + (area - size) / 2;
-            chip.At(Pad + step * i + (step - size) / 2, y, size, size);
-            Ugui.Text(root, "Label", Label(source), theme.Strong, 12, Palette.Muted, TextAlignmentOptions.Center)
-                .At(Pad + step * i, y + size + 3, step, LabelHeight - 2);
+            Button button = Ugui.Button(root, source.name, theme.PackPill, theme.PackPill, () => Press(source));
+            button.At(Pad + (cardWidth + Gap) * i, top, cardWidth, cardHeight);
+            button.transition = Selectable.Transition.ColorTint;
+            ColorBlock colors = button.colors;
+            colors.normalColor = Palette.Hex(0x141A1B);
+            colors.highlightedColor = colors.selectedColor = Palette.Hex(0x29291F);
+            colors.pressedColor = Palette.Hex(0x493D25);
+            colors.disabledColor = Palette.Hex(0x101314);
+            colors.colorMultiplier = 1; colors.fadeDuration = 0.08f;
+            button.colors = colors;
+            Image edge = Ugui.Image(button.transform, "Edge", theme.PackPillEdge, Palette.Hex(0x303631)).Stretch();
+            float contentTop = Mathf.Max(4, (cardHeight - iconSize - 24) / 2);
+            TMP_Text label = Ugui.Text(button.transform, "Label", Label(source), theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Midline)
+                .At(4, contentTop + iconSize + 6, cardWidth - 8, 18);
+            label.enableAutoSizing = true; label.fontSizeMin = 9; label.fontSizeMax = 12;
             Sprite? glyph = Glyph(source);
-            Image icon = Ugui.Image(chip.transform, "Icon", icons.Get(glyph) ?? theme.Diamond, Palette.Gold)
-                .Stretch(size * 0.18f, size * 0.18f, size * 0.18f, size * 0.18f);
+            Image icon = Ugui.Image(button.transform, "Icon", icons.Get(glyph) ?? theme.Diamond, Palette.Bone)
+                .At((cardWidth - iconSize) / 2, contentTop, iconSize, iconSize);
             icon.preserveAspect = true;
             if (source.GetComponent<UITooltip>() is { } original)
             {
-                UITooltip tip = chip.gameObject.AddComponent<UITooltip>();
+                UITooltip tip = button.gameObject.AddComponent<UITooltip>();
                 tip.m_tooltipPrefab = original.m_tooltipPrefab;
                 tip.m_text = original.m_text;
                 tip.m_topic = original.m_topic;
             }
-            buttons.Add((source, chip, icon, button));
+            buttons.Add((source, edge, icon, label, button));
         }
     }
 
@@ -167,19 +183,18 @@ internal sealed class InfoPanel : IDisposable
 
     private void Refresh()
     {
-        background!.color = Color.white.WithAlpha(settings.InventoryOpacity.Value);
+        background!.color = Palette.Hex(0x0C0F11, settings.InventoryOpacity.Value);
         string name = Game.instance ? Game.instance.GetPlayerProfile().GetName() : "";
         if (title!.text != name) title.text = name;
-        foreach (var (source, chip, icon, button) in buttons)
+        foreach (var (source, edge, icon, label, button) in buttons)
         {
             if (!source) continue;
             bool usable = source.IsInteractable();
             bool on = source is Toggle { isOn: true };
-            Sprite normal = on ? theme.SegmentOn : theme.Button, hover = on ? theme.SegmentOnHover : theme.ButtonHover;
-            // Swap only on a change: ChipSkin may have replaced the sprite with its sized version.
-            if (button.spriteState.highlightedSprite != hover) Ugui.SpriteSwap(button, normal, hover);
             button.interactable = usable;
-            icon.color = on ? Palette.GoldBright : usable ? Palette.Gold : Palette.Gold.WithAlpha(0.35f);
+            edge.color = on ? Palette.Gold : Palette.Hex(0x303631);
+            label.color = on ? Palette.Gold : usable ? Palette.Bone : Palette.Dim;
+            icon.color = on ? Palette.Gold : usable ? Palette.Bone : Palette.Dim;
         }
     }
 
@@ -196,14 +211,15 @@ internal sealed class InfoPanel : IDisposable
             bool added = !child.TryGetComponent(out CanvasGroup group);
             if (added) group = child.gameObject.AddComponent<CanvasGroup>();
             float alpha = group.alpha;
-            bool blocks = group.blocksRaycasts, interactable = group.interactable;
+            bool blocks = group.blocksRaycasts;
             group.alpha = 0;
+            // Keep native Selectable.IsInteractable checks intact.
             group.blocksRaycasts = false;
-            CanvasGroup g = group;
-            undo.Add((g, () =>
+            undo.Add((group, () =>
             {
-                if (added) UnityEngine.Object.Destroy(g);
-                else { g.alpha = alpha; g.blocksRaycasts = blocks; g.interactable = interactable; }
+                group.alpha = alpha;
+                group.blocksRaycasts = blocks;
+                if (added) UnityEngine.Object.Destroy(group);
             }));
         }
     }
