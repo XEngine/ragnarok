@@ -50,6 +50,8 @@ switch ($Action) {
         try {
             & $sdk run --project (Join-Path $projectRoot 'tests/Ragnarok.Tests/Ragnarok.Tests.csproj')
             if ($LASTEXITCODE -ne 0) { throw 'Regression tests failed.' }
+            & $sdk run --project (Join-Path $projectRoot 'tests/Ragnarok.Jotunn.Tests/Ragnarok.Jotunn.Tests.csproj')
+            if ($LASTEXITCODE -ne 0) { throw 'Jotunn input/UI regression tests failed.' }
         } finally { Pop-Location }
     }
     'build' { Build-Mod }
@@ -82,6 +84,11 @@ switch ($Action) {
         }
         & $sdk --version
         if ($LASTEXITCODE -ne 0) { throw 'SDK check failed.' }
+        $jotunnCopies = @(Get-ChildItem -LiteralPath (Join-Path $gamePath 'BepInEx/plugins') -Recurse -File -Filter 'Jotunn.dll')
+        if ($jotunnCopies.Count -ne 1) { throw 'Install exactly one Jotunn 2.30.2 or newer in the development BepInEx/plugins folder.' }
+        $jotunnVersion = [Reflection.AssemblyName]::GetAssemblyName($jotunnCopies[0].FullName).Version
+        if ($jotunnVersion -lt [Version]'2.30.2') { throw "Jotunn $jotunnVersion is too old; install 2.30.2 or newer." }
+        Write-Host "OK: Jotunn $jotunnVersion ($($jotunnCopies[0].FullName))"
         Write-Host "Separate test saves: $($local.savePath)"
     }
     'package' {
@@ -96,7 +103,7 @@ switch ($Action) {
         Copy-Item -LiteralPath (Join-Path $projectRoot 'docs/INSTALL.md') -Destination $staging
         $zip = Join-Path $artifacts 'Ragnarok-local.zip'
         Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $zip -Force
-        Write-Host "Created $zip (our plugin only; install BepInEx separately)."
+        Write-Host "Created $zip (our plugin only; install BepInEx and Jotunn separately)."
     }
     'watch' {
         function Get-SourceFingerprint {

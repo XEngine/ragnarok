@@ -6,6 +6,7 @@ using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using Ragnarok.Features.NearbyStorage;
+using Ragnarok.Features.Mounts;
 using Ragnarok.UI;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -15,13 +16,21 @@ namespace Ragnarok;
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
 // Soft: loads Better Archery first when present, so its quiver API can be patched and read.
 [BepInDependency(Equipment.BetterArcheryCompat.Guid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(JotunnIntegration.Guid, JotunnIntegration.MinimumVersion)]
+#if !DEBUG
+// ScriptEngine's eager Cecil reader cannot resolve enum attributes from nested plugins.
+// Jotunn discovers release plugins at startup; development instances use our config handshake.
+[Jotunn.Utils.NetworkCompatibility(Jotunn.Utils.CompatibilityLevel.VersionCheckOnly, Jotunn.Utils.VersionStrictness.Minor)]
+#endif
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string PluginGuid = "com.kernelpanic.ragnarok";
     public const string PluginName = "Ragnarök";
-    public const string PluginVersion = "0.3.0";
+    public const string PluginVersion = "0.5.4";
 
     private Harmony? harmony;
+    private JotunnIntegration? jotunn;
+    private UiLocalization? localization;
     private ContainerRegistry? containers;
     private InterfaceSettings ui = null!;
     private ConfigWindow? window;
@@ -32,6 +41,9 @@ public sealed class Plugin : BaseUnityPlugin
     private InventoryScale? inventoryScale;
     private ChestPanel? chestPanel;
     private HoverPrompt? hoverPrompt;
+    private CrosshairAmmo? crosshairAmmo;
+    private MountHudLayout? mountHud;
+    private CombatIndicator? combatIndicator;
     private ChestHoverPreview? chestHoverPreview;
     private RagnarokActionBar? actionBar;
     private BuildTaskPanel? buildTask;
@@ -43,6 +55,7 @@ public sealed class Plugin : BaseUnityPlugin
     private VanillaCharacterPanel? vanillaCharacter;
     private MinimapInfo? minimapInfo;
     private MinimapSkin? minimapSkin;
+    private TamedAnimalMarkers? tamedAnimals;
     private NotificationFeed? notifications;
     private PopupCommands? popupCommands;
     private Compendium? compendium;
@@ -50,11 +63,12 @@ public sealed class Plugin : BaseUnityPlugin
     private TrophiesBook? trophiesBook;
     private AchievementsBook? achievementsBook;
     private CraftPanel? craftPanel;
-    private HotbarRows? hotbarRows;
     private VanillaCraftFilter? vanillaCraftFilter;
     private VanillaProvisionBar? vanillaProvisions;
     private CompassStrip? compass;
     private ServerConfig? serverConfig;
+    private MountService? mounts;
+    private MountClient? mountClient;
     private StationModifiers? stationModifiers;
 
     private ConfigEntry<bool> showBadge = null!;
@@ -85,6 +99,7 @@ public sealed class Plugin : BaseUnityPlugin
 
     private void Initialize()
     {
+        JotunnIntegration.Require();
         showBadge = Config.Bind("HUD.Development", "ShowBadge", false,
             "Show the development status badge. F8 toggles it.");
         badgeText = Config.Bind("HUD.Development", "BadgeText", "Ragnarök loaded",
@@ -106,18 +121,21 @@ public sealed class Plugin : BaseUnityPlugin
         stationModifiers = new StationModifiers(Config);
         StationModifiers.Current = stationModifiers;
         Equipment.TombstoneRecovery.Enabled = () => ui.Features.AutoEquipOnReclaim.Value;
+        Equipment.BetterArcheryQuiverSlotsPatch.ShownByRagnarok = () => InventoryPanel.LayoutOf(ui) > 0;
         StorageRuntime.Settings = new StorageSettings(Config);
         containers = new ContainerRegistry(StorageRuntime.Settings);
         StorageRuntime.Registry = containers;
+        mounts = new MountService(new MountSettings(Config), Logger);
         serverConfig = new ServerConfig(Config, Logger, PluginVersion, new ConfigEntryBase[]
         {
-            StorageRuntime.Settings.Enabled, StorageRuntime.Settings.Range, StorageRuntime.Settings.Crafting,
-            StorageRuntime.Settings.Building, StorageRuntime.Settings.Stations, ui.Features.QuickStack, ui.Features.CharacterSlots, ui.Features.ExtraUtilitySlots,
+            StorageRuntime.Settings.Enabled, StorageRuntime.Settings.Range, ui.Features.CharacterSlots, ui.Features.ExtraUtilitySlots,
             ui.Features.AutoEquipOnReclaim, gameplay.PowerDuration, gameplay.PowerCooldown, gameplay.HarvestMultiplier,
             gameplay.SkillLossModifier, gameplay.SkillXpModifier,
-            gameplay.RunCost, gameplay.AttackCost, gameplay.JumpCost, gameplay.EitrCost,
-            ui.Features.ChestSearch, ui.Features.ChestSearchRange
-        }.Concat(stationModifiers.Synced).Concat(sailingAndTurrets.Synced));
+            gameplay.RunCost, gameplay.AttackCost, gameplay.JumpCost, gameplay.EitrCost
+        }.Concat(stationModifiers.Synced).Concat(sailingAndTurrets.Synced).Concat(mounts.Settings.Synced), new ConfigEntryBase[]
+        {
+            StorageRuntime.Settings.Enabled, StorageRuntime.Settings.Range, ui.Features.AutoEquipOnReclaim
+        }.Concat(mounts.Settings.Synced));
         // A dedicated server has no screen: it runs the gameplay side and the settings sync only.
         if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null) BuildInterface();
         harmony = new Harmony(PluginGuid + "." + Guid.NewGuid().ToString("N"));
@@ -132,8 +150,18 @@ public sealed class Plugin : BaseUnityPlugin
                 StorageRuntimeChecks.Run(Logger);
                 StationRuntimeChecks.Run(Logger);
                 SkillExperienceChecks.Run(Logger);
+                PolicyRuntimeChecks.Run(Logger);
+                if (theme != null) UiLifecycleRuntimeChecks.Run(theme, ui, Logger);
             }
             int preview = Array.IndexOf(args, "-ragnarok-ui-preview");
+            int mountChecks = Array.IndexOf(args, "-ragnarok-mount-checks");
+            if (mountChecks >= 0 && mountChecks + 1 < args.Length)
+            {
+                string directory = Path.GetFullPath(args[mountChecks + 1]);
+                if (!WorldPreview.Isolate(Path.Combine(directory, "saves")))
+                    throw new InvalidOperationException("Mount checks require isolated throwaway saves.");
+                StartCoroutine(MountRuntimeChecks.Run(directory));
+            }
             if (preview >= 0 && preview + 1 < args.Length)
                 StartCoroutine(CapturePreview(args[preview + 1]));
             int inventory = Array.IndexOf(args, "-ragnarok-inventory-preview");
@@ -151,24 +179,31 @@ public sealed class Plugin : BaseUnityPlugin
 
     private void BuildInterface()
     {
+        localization = new UiLocalization(Info.Metadata);
+        jotunn = JotunnIntegration.Create(Logger);
+        mountClient = new MountClient(mounts!, jotunn);
         theme = new Theme();
         hud = new RagnarokHud(ui, theme);
         inventoryPanel = new InventoryPanel(ui, theme);
         inventoryScale = new InventoryScale(ui, () => inventoryPanel.Wanted);
         chestPanel = new ChestPanel(ui, theme, () => inventoryPanel.Wanted, () => inventoryPanel.SlotSize);
         hoverPrompt = new HoverPrompt(ui, theme);
+        crosshairAmmo = new CrosshairAmmo(ui, theme);
+        mountHud = new MountHudLayout(ui, theme);
+        combatIndicator = new CombatIndicator(ui, theme);
         chestHoverPreview = new ChestHoverPreview(ui, theme);
         actionBar = new RagnarokActionBar(ui, theme);
         buildTask = new BuildTaskPanel(ui, theme);
         buildMenu = new BuildMenuPanel(ui, theme);
         chestSearch = new ChestSearch(ui, theme);
-        weaponDial = new WeaponDial(ui, theme);
+        weaponDial = new WeaponDial(ui, theme, jotunn);
         infoPanel = new InfoPanel(ui, theme, () => inventoryPanel.Wanted);
         vanillaQuickStack = new VanillaQuickStack(ui, theme, inventoryPanel);
         vanillaChestSort = new VanillaChestSort(theme, () => inventoryPanel.Wanted);
         vanillaCharacter = new VanillaCharacterPanel(ui, theme, inventoryPanel);
         minimapInfo = new MinimapInfo(ui, theme);
         minimapSkin = new MinimapSkin(ui, theme);
+        tamedAnimals = new TamedAnimalMarkers(ui);
         notifications = new NotificationFeed(ui, theme);
         popupCommands = new PopupCommands(notifications);
         compendium = new Compendium(ui, theme);
@@ -179,7 +214,6 @@ public sealed class Plugin : BaseUnityPlugin
         vanillaCraftFilter = new VanillaCraftFilter(ui, theme, () => craftPanel.Wanted);
         // The key guide moves under the Ragnarök crafting panel while it is open.
         hud.KeysDock = () => craftPanel.Shown;
-        hotbarRows = new HotbarRows(ui);
         vanillaProvisions = new VanillaProvisionBar(ui, () => hud.Active);
         // The filters apply to Valheim's recipe list whenever a panel shows them.
         CraftFilter.Enabled = () => craftPanel.Wanted || ui.Features.CraftFilters.Value;
@@ -188,10 +222,15 @@ public sealed class Plugin : BaseUnityPlugin
         Ugui.ScrollRows = () => (ui.FollowSystemScroll.Value ? SystemScroll.Lines() : null) ?? ui.ScrollSpeed.Value;
         compass = new CompassStrip(ui, theme);
         // Both inventories draw the slots: the Ragnarök panel, or the vanilla-style character panel.
-        window = new ConfigWindow(Config, ui, theme, PluginVersion, ChestsInRange);
+        window = new ConfigWindow(Config, ui, theme, PluginVersion, ChestsInRange, jotunn);
+        if (jotunn != null) jotunn.GuiRecreated = () => window?.SetOpen(false);
         window.AddAction("HUD.Notifications", "Test notifications",
             "Sends a sample unlock and two small messages through Valheim, so they show in the style that is on. In a world only.",
             NotificationFeed.Test);
+        window.AddAction("QualityOfLife.Mounts", "Release mount bond",
+            "Release your bond without approaching the mount. Its saddle and position are preserved.",
+            () => mounts?.Send(2, ZDOID.None));
+        window.AddStatus("QualityOfLife.Mounts", () => mounts!.Available ? mounts.CompanionSummary : "Waiting for a Ragnarok mount server, or enter a local world.");
         VanillaHudPatch.HideVanilla = () => hud.Active;
         VanillaHudPatch.HideStatus = () => hud.Active && ui.HudStatus.Value;
         VanillaHudPatch.HidePower = () => hud.Active && ui.HudPower.Value;
@@ -201,10 +240,13 @@ public sealed class Plugin : BaseUnityPlugin
     private void Update()
     {
         serverConfig?.Tick();
+        mounts?.Tick();
+        mountClient?.Tick();
         stationModifiers?.Tick();
         window?.Update();
         chestSearch?.Update();
         weaponDial?.Update();
+        jotunn?.Tick();
         if (UiState.WindowOpen) return;
 
         if (reloadConfigKey.Value.IsDown())
@@ -235,11 +277,23 @@ public sealed class Plugin : BaseUnityPlugin
 
     private void LateUpdate()
     {
+        mountClient?.LateUpdate();
+        // Slot persistence and equipment effects must not depend on a UI instance.
+        if (Player.m_localPlayer)
+        {
+            if (Equipment.CharacterSlots.Enabled())
+                Equipment.CharacterSlots.Settle(Player.m_localPlayer,
+                    InventoryGui.instance ? Equipment.SlotActions.DragItem(InventoryGui.instance) : null);
+            else Equipment.CharacterSlots.Empty(Player.m_localPlayer.GetInventory());
+            Equipment.CharacterSlots.SyncEffects(Player.m_localPlayer);
+        }
         chestSearch?.LateUpdate();
         actionBar?.Tick();
         hoverPrompt?.Tick();
+        crosshairAmmo?.Tick();
         chestHoverPreview?.Tick();
         Equipment.TombstoneRecovery.Tick();
+        combatIndicator?.Tick();
         hud?.Tick();
         buildTask?.Tick();
         buildMenu?.Tick();
@@ -259,6 +313,7 @@ public sealed class Plugin : BaseUnityPlugin
         inventoryScale?.Tick();
         minimapInfo?.Tick();
         minimapSkin?.Tick();
+        tamedAnimals?.Tick();
         notifications?.Tick();
         popupCommands?.Tick();
         compendium?.Tick();
@@ -269,6 +324,10 @@ public sealed class Plugin : BaseUnityPlugin
         vanillaCraftFilter?.Tick();
         vanillaProvisions?.Tick();
         compass?.Tick();
+        // Place after vitals/build cards have settled for this frame.
+        mountHud?.Tick();
+        // UI focus can change after Update; share the resulting state before the next frame.
+        jotunn?.Tick();
     }
 
     private static string ChestsInRange()
@@ -323,64 +382,84 @@ public sealed class Plugin : BaseUnityPlugin
     {
         if (disposed) return;
         disposed = true;
-        StopAllCoroutines();
-        chestSearch?.Dispose();
-        weaponDial?.Dispose();
+        void Release(string name, Action release) => UiLifetime.Cleanup(release,
+            exception => Logger.LogError($"Ragnarok cleanup failed ({name}): {exception}"));
+        // Release input and patches before UI cleanup: a broken renderer must not
+        // leave its game-input/cursor hooks active after unloading.
+        UiState.Reset();
+        WeaponDial.Open = false;
+        Release("input integration", () => jotunn?.Dispose());
+        Release("patches", () => harmony?.UnpatchSelf());
+        Release("coroutines", StopAllCoroutines);
+        Release("mount controls", () => mountClient?.Dispose());
+        Release("mount service", () => mounts?.Dispose());
+        Release("chestSearch", () => chestSearch?.Dispose());
+        Release("weaponDial", () => weaponDial?.Dispose());
         PlantHoverStatus.Enabled = () => false;
-        actionBar?.Dispose();
-        buildTask?.Dispose();
-        buildMenu?.Dispose();
-        hoverPrompt?.Dispose();
-        chestHoverPreview?.Dispose();
+        Release("actionBar", () => actionBar?.Dispose());
+        Release("buildTask", () => buildTask?.Dispose());
+        Release("buildMenu", () => buildMenu?.Dispose());
+        Release("hoverPrompt", () => hoverPrompt?.Dispose());
+        Release("crosshairAmmo", () => crosshairAmmo?.Dispose());
+        Release("mount HUD layout", () => mountHud?.Dispose());
+        Release("combat indicator", () => combatIndicator?.Dispose());
+        Release("chestHoverPreview", () => chestHoverPreview?.Dispose());
         SailingAndTurrets.Current = null;
-        foreach (var turret in UnityEngine.Object.FindObjectsByType<Turret>(FindObjectsSortMode.None))
-            if (turret.m_marker) turret.m_marker.m_radius = turret.m_viewDistance;
-        stationModifiers?.Dispose();
+        Release("turret markers", () =>
+        {
+            foreach (var turret in UnityEngine.Object.FindObjectsByType<Turret>(FindObjectsSortMode.None))
+                if (turret.m_marker) turret.m_marker.m_radius = turret.m_viewDistance;
+        });
+        Release("stationModifiers", () => stationModifiers?.Dispose());
         GameplaySettings.Current = null;
-        Equipment.TombstoneRecovery.Reset();
-        serverConfig?.Dispose();
-        harmony?.UnpatchSelf();
-        containers?.Dispose();
-        VanillaHudPatch.Restore();
+        Release("Equipment.TombstoneRecovery.Reset", () => Equipment.TombstoneRecovery.Reset());
+        Release("serverConfig", () => serverConfig?.Dispose());
+        Release("containers", () => containers?.Dispose());
+        Release("VanillaHudPatch.Restore", () => VanillaHudPatch.Restore());
         VanillaHudPatch.HideVanilla = () => false;
         VanillaHudPatch.HideStatus = () => false;
         VanillaHudPatch.HidePower = () => false;
         VanillaHudPatch.HideKeys = () => false;
         Equipment.CharacterSlots.Enabled = () => false;
         Equipment.CharacterSlots.ExtraUtilityEnabled = () => false;
-        Equipment.CharacterSlots.ClearEffects();
+        Release("Equipment.CharacterSlots.ClearEffects", () => Equipment.CharacterSlots.ClearEffects());
         UiState.Reset();
-        window?.Dispose();
-        vanillaQuickStack?.Dispose();
-        vanillaChestSort?.Dispose();
-        vanillaCharacter?.Dispose();
-        minimapInfo?.Dispose();
-        minimapSkin?.Dispose();
-        popupCommands?.Dispose();
-        notifications?.Dispose();
-        compendium?.Dispose();
-        skillsBook?.Dispose();
-        trophiesBook?.Dispose();
-        achievementsBook?.Dispose();
-        craftPanel?.Dispose();
-        hotbarRows?.Dispose();
-        vanillaCraftFilter?.Dispose();
-        vanillaProvisions?.Dispose();
+        Release("window", () => window?.Dispose());
+        Release("vanillaQuickStack", () => vanillaQuickStack?.Dispose());
+        Release("vanillaChestSort", () => vanillaChestSort?.Dispose());
+        Release("vanillaCharacter", () => vanillaCharacter?.Dispose());
+        Release("minimapInfo", () => minimapInfo?.Dispose());
+        Release("minimapSkin", () => minimapSkin?.Dispose());
+        Release("tamedAnimals", () => tamedAnimals?.Dispose());
+        Release("popupCommands", () => popupCommands?.Dispose());
+        Release("notifications", () => notifications?.Dispose());
+        Release("compendium", () => compendium?.Dispose());
+        Release("skillsBook", () => skillsBook?.Dispose());
+        Release("trophiesBook", () => trophiesBook?.Dispose());
+        Release("achievementsBook", () => achievementsBook?.Dispose());
+        Release("craftPanel", () => craftPanel?.Dispose());
+        Release("vanillaCraftFilter", () => vanillaCraftFilter?.Dispose());
+        Release("CraftAmount.Unload", () => CraftAmount.Unload());
+        Release("vanillaProvisions", () => vanillaProvisions?.Dispose());
         CraftFilter.Enabled = () => false;
         CraftFilter.SortEnabled = () => false;
-        CraftFilter.Reset();
-        if (InventoryGui.instance && Player.m_localPlayer && InventoryGui.IsVisible()) CraftFilter.Changed();
+        Release("CraftFilter.Reset", () => CraftFilter.Reset());
+        Release("crafting refresh", () => { if (InventoryGui.instance && Player.m_localPlayer && InventoryGui.IsVisible()) CraftFilter.Changed(); });
         NotificationFeed.Instance = null;
-        compass?.Dispose();
-        infoPanel?.Dispose();
-        chestPanel?.Dispose();
-        inventoryScale?.Dispose();
-        inventoryPanel?.Dispose();
-        hud?.Dispose();
-        theme?.Dispose();
+        Release("compass", () => compass?.Dispose());
+        Release("infoPanel", () => infoPanel?.Dispose());
+        Release("chestPanel", () => chestPanel?.Dispose());
+        Release("inventoryScale", () => inventoryScale?.Dispose());
+        Release("inventoryPanel", () => inventoryPanel?.Dispose());
+        Release("hud", () => hud?.Dispose());
+        Release("theme", () => theme?.Dispose());
+        Release("localization", () => localization?.Dispose());
         ResourceScope.Current = null;
+        Release("CraftingChestGate.Reset", () => CraftingChestGate.Reset());
         StorageRuntime.Registry = null!;
         Equipment.ProvisionKeys.Keys = Array.Empty<ConfigEntry<KeyboardShortcut>>();
+        Equipment.BetterArcheryQuiverSlotsPatch.ShownByRagnarok = () => false;
+        Release("Features.QualityOfLife.ItemTrash.Reset", () => Features.QualityOfLife.ItemTrash.Reset());
         Theme.ChipEdges = () => false;
         Ugui.ScrollRows = () => 3f;
         Logger.LogInfo("Ragnarok unloaded.");

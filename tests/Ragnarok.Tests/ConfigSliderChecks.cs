@@ -31,6 +31,10 @@ internal static class ConfigSliderChecks
             check(!ConfigSliderValue.TryRead(invalid, false, false, 0, 1, out _), "Invalid numeric text rejected");
         check(ConfigSliderValue.Step("FuelCapacity", true) == 10 && ConfigSliderValue.Step("SkillLossModifierPercent", true) == 5,
             "Setting-specific drag steps");
+        check(ConfigSliderValue.Step("PersonalRange", false) == 5, "Personal radius uses metre-scale steps");
+        check(ConfigSliderValue.TryRead("100", false, false, 1, 25, out object capped) && (float)capped == 25,
+            "Personal radius input respects the current server maximum");
+        check((float)ConfigSliderValue.Snap(25, false, 1, 25, 5) == 25, "Server maximum remains reachable");
         Console.WriteLine("PASS: config slider runtime types, fractional ranges, signed values, bounds, snapping and exact text input.");
     }
 }

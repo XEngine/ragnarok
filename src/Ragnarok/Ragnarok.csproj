@@ -6,13 +6,23 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>Ragnarok</AssemblyName>
     <RootNamespace>Ragnarok</RootNamespace>
-    <Version>0.3.0</Version>
+    <Version>0.5.4</Version>
     <Authors>KernelPanic</Authors>
     <Description>Ragnarök: a custom Valheim experience for friends.</Description>
     <DebugType>portable</DebugType>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Assets/Translations/*.json" LogicalName="Ragnarok.Translations.%(Filename)%(Extension)" />
+    <!-- Resolve the user's installed library in either manual or mod-manager layouts. -->
+    <_InstalledJotunn Include="$(GamePath)/BepInEx/plugins/**/Jotunn.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Jotunn">
+      <HintPath Condition="'$(JotunnPath)' != ''">$(JotunnPath)</HintPath>
+      <HintPath Condition="'$(JotunnPath)' == ''">@(_InstalledJotunn)</HintPath>
+      <Private>false</Private>
+    </Reference>
     <!-- Forsaken power glyphs, loaded by name: Ragnarok.Powers.GP_Eikthyr.png and so on. -->
     <EmbeddedResource Include="Assets/Powers/*.png" LogicalName="Ragnarok.Powers.%(Filename)%(Extension)" />
     <!-- Rune & Iron fonts and their redistribution licenses; see Assets/Fonts/SOURCES.md. -->
@@ -38,12 +48,28 @@
       <HintPath>$(GamePath)/valheim_Data/Managed/assembly_valheim.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="Splatform">
+      <HintPath>$(GamePath)/valheim_Data/Managed/Splatform.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine">
       <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.AudioModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ParticleSystemModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.ParticleSystemModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
@@ -80,6 +106,8 @@
     </Reference>
   </ItemGroup>
   <Target Name="ValidateGamePath" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(JotunnPath)' == '' and '@(_InstalledJotunn->Count())' != '1'" Text="Install Jotunn 2.30.2 or newer in the development game's BepInEx/plugins (one copy), or set JotunnPath to its installed DLL." />
+    <Error Condition="'$(JotunnPath)' != '' and !Exists('$(JotunnPath)')" Text="JotunnPath does not point to an installed Jotunn DLL." />
     <Error Condition="!Exists('$(GamePath)/BepInEx/core/BepInEx.dll')" Text="Set GamePath to the development Valheim installation. Use dev.ps1 build." />
     <Error Condition="!Exists('$(GamePath)/valheim_Data/Managed/assembly_valheim.dll')" Text="Valheim managed assemblies are missing from GamePath." />
   </Target>

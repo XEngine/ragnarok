@@ -9,8 +9,7 @@ using UnityEngine.UI;
 
 namespace Ragnarok.HUD;
 
-// Guide 02: four glass cards, semantic accents, merged pickups, separate skill
-// pills/milestones and a non-interactive centre-message channel. Native log stays intact.
+// Separate pickup, unlock, skill and general-message channels. Native log stays intact.
 internal sealed class NotificationFeed : IDisposable
 {
     private const float Width = 360, Height = 46, Spacing = 6, Life = 4;
@@ -22,7 +21,9 @@ internal sealed class NotificationFeed : IDisposable
     private RectTransform? root, skillRoot;
     private Entry? skill;
     private CentreMessages? centre;
+    private ItemNotifications? items;
     internal static NotificationFeed? Instance;
+    internal bool VitalsSpaceBusy => Wanted && (items?.HasPickup == true || skill != null);
 
     internal NotificationFeed(InterfaceSettings settings, Theme theme)
     {
@@ -53,12 +54,14 @@ internal sealed class NotificationFeed : IDisposable
         GameObject? parent = global::Hud.instance ? global::Hud.instance.m_rootObject : null;
         if (parent != hudRoot) { Dispose(); hudRoot = parent; }
         if (!hudRoot || !Wanted) { Dispose(); return; }
-        if (!root)
+        if (!root || !skillRoot || items == null || !items.Alive)
         {
+            Dispose();
             root = Ugui.Node(hudRoot!.transform, "Ragnarok Notifications");
             skillRoot = Ugui.Node(hudRoot.transform, "Ragnarok Skill Toasts");
             skillRoot.sizeDelta = new Vector2(Width, 52);
             centre = new CentreMessages(theme, hudRoot.transform);
+            items = new ItemNotifications(theme, hudRoot.transform);
         }
         float now = Time.unscaledTime;
         for (int i = entries.Count - 1; i >= 0; i--)
@@ -76,7 +79,7 @@ internal sealed class NotificationFeed : IDisposable
             settings.SkillToast.MarginX.Value == 0 && settings.SkillToast.MarginY.Value == 228)
         {
             skillRoot.position = vitals.TransformPoint(new Vector3(vitals.rect.center.x, vitals.rect.yMax, 0));
-            skillRoot.position += vitals.TransformVector(new Vector3(0, 12, 0));
+            skillRoot.position += vitals.TransformVector(new Vector3(0, items?.HasPickup == true ? 76 : 12, 0));
             Utils.ClampUIToScreen(skillRoot);
         }
         root.gameObject.SetActive(!global::Hud.IsUserHidden());
@@ -89,6 +92,7 @@ internal sealed class NotificationFeed : IDisposable
             else skill.Place(0, now, settings.SkillToast);
         }
         centre!.Tick(settings.HudScale.Value);
+        items!.Tick(settings.HudScale.Value);
     }
 
     public void Dispose()
@@ -97,8 +101,12 @@ internal sealed class NotificationFeed : IDisposable
         entries.Clear();
         skill?.Destroy();
         skill = null;
-        centre?.Dispose();
+        var oldItems = items;
+        items = null;
+        oldItems?.Dispose();
+        var oldCentre = centre;
         centre = null;
+        oldCentre?.Dispose();
         if (root) { root!.gameObject.SetActive(false); UnityEngine.Object.Destroy(root.gameObject); }
         if (skillRoot) { skillRoot!.gameObject.SetActive(false); UnityEngine.Object.Destroy(skillRoot.gameObject); }
         root = skillRoot = null;
@@ -110,11 +118,9 @@ internal sealed class NotificationFeed : IDisposable
         entries.Add(entry);
     }
 
-    internal void Unlock(Sprite? icon, string topic, string name)
-    {
-        if (root) Add(Entry.Card(theme, root!, icon ?? theme.IconHammer, topic.ToUpperInvariant(), name,
-            InventoryCategories.Gold, Palette.Hex(0x0C0F11, CardOpacity), 0));
-    }
+    internal void Unlock(Sprite? icon, string topic, string name) => items?.Unlock(icon, topic, name);
+
+    internal void Pickup(string name, int amount) => items?.Pickup(name, amount);
 
     internal static string Highlight(string text) => "<b>" + text + "</b>";
 
@@ -154,12 +160,13 @@ internal sealed class NotificationFeed : IDisposable
                 skill?.Destroy();
                 skill = null;
                 centre?.Clear();
+                items?.Clear();
                 break;
             case "pickup":
                 ItemDrop.ItemData? wood = ObjectDB.instance?.GetItemPrefab("Wood")?.GetComponent<ItemDrop>()?.m_itemData;
-                string text = "Picked up " + Highlight(Local(wood?.m_shared.m_name ?? "Wood"));
-                Message(wood?.GetIcon(), text, 2);
-                Message(wood?.GetIcon(), text, 3);
+                string text = Local(wood?.m_shared.m_name ?? "Wood");
+                Pickup(text, 2);
+                Pickup(text, 3);
                 break;
             case "unlock": Unlock(null, "New recipe", "Bronze Mace · Forge"); break;
             case "rested": Message(null, "You feel rested", 0, "rested"); break;
@@ -196,8 +203,8 @@ internal sealed class NotificationFeed : IDisposable
         ItemDrop.ItemData? sword = ObjectDB.instance?.GetItemPrefab("SwordIron")?.GetComponent<ItemDrop>()?.m_itemData;
         ItemDrop.ItemData? wood = ObjectDB.instance?.GetItemPrefab("Wood")?.GetComponent<ItemDrop>()?.m_itemData;
         MessageHud.instance.QueueUnlockMsg(sword?.GetIcon(), "$msg_newrecipe", sword?.m_shared.m_name ?? "Iron sword");
-        MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, wood?.m_shared.m_name ?? "Wood", 3, wood?.GetIcon());
-        MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, wood?.m_shared.m_name ?? "Wood", 2, wood?.GetIcon());
+        MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, "$msg_added " + (wood?.m_shared.m_name ?? "Wood"), 3, wood?.GetIcon());
+        MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, "$msg_added " + (wood?.m_shared.m_name ?? "Wood"), 2, wood?.GetIcon());
         MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "The path ahead is clear");
         MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, "$msg_skillup $skill_run: 42");
     }
@@ -319,6 +326,8 @@ internal static class TopLeftMessagePatch
         string localized = Localization.instance.Localize(text);
         if (skill) feed.SkillImproved(icon, text.Substring("$msg_skillup ".Length));
         else if (type == MessageHud.MessageType.Center) feed.Centre(text);
+        else if (amount > 0 && text.StartsWith("$msg_added ", StringComparison.Ordinal))
+            feed.Pickup(Localization.instance.Localize(text.Substring("$msg_added ".Length)), amount);
         else
         {
             string styled = text;

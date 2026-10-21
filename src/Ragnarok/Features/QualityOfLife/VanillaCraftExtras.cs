@@ -155,7 +155,7 @@ internal sealed class VanillaCraftExtras : IDisposable
         }
         int quality = upgrade == null ? 1 : upgrade.m_quality + 1;
         int multiplier = upgrade == null && (CraftAmount.Amount > 1 || ZInput.GetButton("AltPlace")) ? gui.m_multiCraftAmount : 1;
-        bool nearby = StorageRuntime.Settings is { } storage && storage.Enabled.Value && storage.Crafting.Value && StorageRuntime.Registry != null;
+        bool nearby = StorageRuntime.Settings is { } storage && storage.Enabled.Value && StorageRuntime.Registry != null;
         if (Time.unscaledTime >= nextCounts || nearby != nearbyCounts)
         {
             nextCounts = Time.unscaledTime + 0.2f; nearbyCounts = nearby;

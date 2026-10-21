@@ -33,7 +33,9 @@ internal static class QuickStack
         // With a chest open, only that chest is filled (it is "in use", so never among the nearby ones);
         // otherwise every chest in range, nearest first.
         bool hasOpen = open && open!.IsOwner() && open.GetInventory() != null;
-        List<Container> chests = hasOpen ? new List<Container> { open! } : registry.Nearby(player);
+        if (open && (!hasOpen || !registry.CanAccess(open!, player, allowOpen: true)))
+            return new QuickStackResult(0, 0, false);
+        List<Container> chests = hasOpen ? new List<Container> { open! } : registry.Nearby(player, true);
         foreach (Container chest in chests)
             if (chest != open) registry.Refresh(chest);
 
@@ -46,7 +48,7 @@ internal static class QuickStack
             foreach (Container chest in chests)
             {
                 bool isOpen = hasOpen && chest == open;
-                if (!isOpen && !registry.CanAccess(chest, player)) continue;
+                if (!registry.CanAccess(chest, player, allowOpen: isOpen)) continue;
                 Inventory target = chest.GetInventory();
                 if (!target.ContainsItemByName(item.m_shared.m_name)) continue;
                 if (!isOpen && !registry.IsOwned(chest))
@@ -73,6 +75,7 @@ internal static class QuickStack
                 }
             }
         }
+        if (moved > 0) registry.InvalidatePreview();
         return new QuickStackResult(moved, used.Count, pending);
     }
 }

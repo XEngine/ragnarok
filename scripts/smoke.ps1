@@ -39,6 +39,8 @@ try {
             if ($loadCount -ge 2 -and $log.Contains('Ragnarok unloaded.')) {
                 if ($log -match '\[Error') { throw 'Errors appeared during the runtime test. Inspect LogOutput.log.' }
                 if ([regex]::Matches($log, 'Ragnarok inventory checks PASS').Count -lt 2) { throw 'Inventory runtime checks did not pass on both loads.' }
+                if ([regex]::Matches($log, 'Ragnarok policy checks PASS').Count -lt 2) { throw 'Policy/slot/craft runtime checks did not pass on both loads.' }
+                if ([regex]::Matches($log, 'Ragnarok UI lifecycle checks PASS').Count -lt 2) { throw 'Destroyed-UI lifecycle checks did not pass on both loads.' }
                 Write-Host 'PASS: Old instance unloaded and new plugin instance loaded.'
                 $passed = $true
                 break

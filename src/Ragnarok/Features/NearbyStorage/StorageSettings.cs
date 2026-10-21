@@ -1,4 +1,6 @@
 using BepInEx.Configuration;
+using Ragnarok.Configuration;
+using UnityEngine;
 
 namespace Ragnarok.Features.NearbyStorage;
 
@@ -6,20 +8,22 @@ internal sealed class StorageSettings
 {
     internal readonly ConfigEntry<bool> Enabled;
     internal readonly ConfigEntry<float> Range;
-    internal readonly ConfigEntry<bool> Crafting;
-    internal readonly ConfigEntry<bool> Building;
-    internal readonly ConfigEntry<bool> Stations;
+    internal readonly ConfigEntry<float> PersonalRange;
+    internal float EffectiveRange => RangeLimit.Effective(PersonalRange, Range);
+
+    internal readonly ConfigEntry<KeyboardShortcut> ChestSearchKey;
 
     internal StorageSettings(ConfigFile config)
     {
         const string section = "QualityOfLife.NearbyChests";
-        Enabled = config.Bind(section, "Enabled", true, "Use resources from nearby player-built chests.");
+        ChestSearchKey = config.Bind("QualityOfLife.NearbyChests", "Shortcut", new KeyboardShortcut(KeyCode.F, KeyCode.LeftControl), "Open item search. Ctrl+F by default.");
+
+        Enabled = config.Bind(section, "Enabled", true, "Use nearby player-built chests for crafting, building, station supplies, Quick Stack and item search. One switch controls all chest actions. Defined and locked by the server.");
         Range = config.Bind(section, "Range", 100f, new ConfigDescription(
-            "Shared radius in metres for nearby chest resources and Quick Stack. Only loaded, accessible player-built chests are available. Server-controlled; chest owners enforce this range for network requests.",
+            "Shared maximum radius in metres for crafting, building, station supplies, Quick Stack and search. Only loaded, accessible player-built chests are available. Defined and locked by the server; chest owners enforce this maximum for network requests.",
             new AcceptableValueRange<float>(1f, 500f)));
-        Crafting = config.Bind(section, "Crafting", true, "Craft and upgrade using nearby chest resources.");
-        Building = config.Bind(section, "Building", true, "Build using nearby chest resources.");
-        Stations = config.Bind(section, "Stations", true,
-            "Pull fuel and ingredients when using smelters, kilns, fires, cooking stations and fermenters. No automatic refilling.");
+        PersonalRange = config.Bind(section, "PersonalRange", 500f, new ConfigDescription(
+            "Your shared radius in metres for all nearby chest actions, limited to the server maximum. Your preference is retained when changing servers.",
+            new AcceptableValueRange<float>(1f, 500f), new RangeLimit(Range)));
     }
 }

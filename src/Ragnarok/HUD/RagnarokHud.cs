@@ -25,6 +25,9 @@ internal struct HudSnapshot
     internal HudPower Power;
 
     private static readonly List<StatusEffect> effects = new();
+    private static readonly HashSet<int> equipmentEffects = new();
+    private static readonly AccessTools.FieldRef<Humanoid, HashSet<StatusEffect>> EquippedEffects =
+        AccessTools.FieldRefAccess<Humanoid, HashSet<StatusEffect>>("m_equipmentStatusEffects");
 
     internal static HudSnapshot? FromLocalPlayer(List<HudFood> buffer, List<HudStatus> statuses)
     {
@@ -32,6 +35,10 @@ internal struct HudSnapshot
         if (!player || player.IsDead()) return null;
         statuses.Clear();
         effects.Clear();
+        equipmentEffects.Clear();
+        var equipped = EquippedEffects(player);
+        if (equipped != null)
+            foreach (StatusEffect effect in equipped) if (effect) equipmentEffects.Add(effect.NameHash());
         player.GetSEMan().GetHUDStatusEffects(effects);
         foreach (StatusEffect effect in effects)
         {
@@ -41,9 +48,12 @@ internal struct HudSnapshot
             statuses.Add(new HudStatus
             {
                 Key = key, Name = effect.m_name, Value = comfort ? "" : effect.GetIconText() ?? "",
-                Icon = effect.m_icon, Flash = effect.m_flashIcon, Comfort = comfort
+                Icon = effect.m_icon, Flash = effect.m_flashIcon, Comfort = comfort,
+                Category = StatusCategories.Classify(effect.name, equipmentEffects.Contains(key),
+                    effect is SE_Poison || effect is SE_Burning || effect is SE_Smoke)
             });
         }
+        if (CombatIndicator.Status is { } combat) statuses.Add(combat);
         buffer.Clear();
         foreach (Player.Food food in player.GetFoods())
         {
@@ -79,6 +89,10 @@ internal struct HudSnapshot
         buffer.Add(new HudFood { Remaining = 0.82f, Seconds = 1460, Health = 35, Stamina = 12 });
         buffer.Add(new HudFood { Remaining = 0.55f, Seconds = 980, Health = 13, Stamina = 40 });
         buffer.Add(new HudFood { Remaining = 0.28f, Seconds = 42, CanEat = true, Health = 15, Stamina = 15, Eitr = 60 });
+        for (int i = 0; i < statuses.Count; i++)
+        {
+            var status = statuses[i]; status.Category = StatusCategory.Ongoing; statuses[i] = status;
+        }
         return new HudSnapshot
         {
             Health = 96 + Mathf.Sin(time * 0.7f) * 30, MaxHealth = 160,
@@ -90,12 +104,12 @@ internal struct HudSnapshot
     }
 }
 
-// Rune & Iron: identity and food at top left, vitals above the action bar,
-// and an independent Forsaken seal at bottom left. All follow the game's HUD root.
+// Identity at top left, vitals above the action bar, food beside the Forsaken seal.
+// All follow the game's HUD root.
 internal sealed class RagnarokHud : IDisposable
 {
     internal static RectTransform? ShownVitals { get; private set; }
-    private const float VitalsWidth = 513, FoodStep = 60;
+    private const float VitalsWidth = 513, FoodStep = 60, FoodWidth = FoodStep * 2 + CharacterHud.FoodSize;
 
     private readonly InterfaceSettings settings;
     private readonly Theme theme;
@@ -103,14 +117,14 @@ internal sealed class RagnarokHud : IDisposable
     private readonly List<HudStatus> statuses = new();
     private readonly MonochromeIcons icons = new();
     private GameObject? root, previewCanvas;
-    private StatusStrip? strip;
+    private StatusStrip? strip, debuffs;
+    private readonly List<HudStatus> positiveStatuses = new(), harmfulStatuses = new();
     private CharacterHud? character;
     private RectTransform? powerRoot, foodRoot;
     private KeyHintsPanel? keys;
     private Bar[] bars = Array.Empty<Bar>();
     private FoodSlot[] slots = Array.Empty<FoodSlot>();
     private PowerEmblem? emblem;
-    private ProvisionBar? provisions;
     private RectTransform? knot;
     private TextMeshProUGUI? weaponName;
     private Image? criticalVignette;
@@ -150,24 +164,30 @@ internal sealed class RagnarokHud : IDisposable
         bool showCharacter = snapshot.HasValue && (Preview || !InventoryGui.IsVisible());
         character!.SetVisible(showCharacter);
         powerRoot!.gameObject.SetActive(snapshot.HasValue && settings.HudPower.Value);
+        foodRoot!.gameObject.SetActive(showCharacter && settings.HudFood.Value);
         strip!.SetVisible(showCharacter && settings.HudStatus.Value);
+        debuffs!.SetVisible(showCharacter && settings.HudStatus.Value);
         keys!.SetVisible(snapshot.HasValue && settings.HudKeys.Value);
         criticalVignette!.gameObject.SetActive(snapshot.HasValue);
         if (snapshot is not { } data) return;
         if (showCharacter && settings.HudStatus.Value)
         {
+            positiveStatuses.Clear();
+            harmfulStatuses.Clear();
+            foreach (HudStatus status in data.Statuses)
+                (status.Category == StatusCategory.Debuff ? harmfulStatuses : positiveStatuses).Add(status);
             strip.SetScale(settings.HudScale.Value);
             strip.Place(settings.Status);
-            strip.Set(data.Statuses, data.Comfort);
+            strip.Set(positiveStatuses, data.Comfort);
+            debuffs.SetScale(settings.HudScale.Value);
+            debuffs.Set(harmfulStatuses, data.Comfort);
+            debuffs.BelowCompass(Preview ? null : CompassStrip.Shown);
         }
         if (settings.HudKeys.Value)
         {
             RectTransform? dock = Preview ? null : KeysDock();
-            Player player = Player.m_localPlayer;
-            ItemDrop.ItemData? held = player ? player.GetCurrentWeapon() : null;
             // Tools are not returned by GetCurrentWeapon; use their native hint contexts.
-            bool heldControls = KeyHintsPanel.ToolActive || (KeyHintsPanel.CombatActive &&
-                held != null && held.m_equipped && player!.GetInventory().ContainsItem(held));
+            bool heldControls = KeyHintsPanel.ToolActive || (KeyHintsPanel.CombatActive && KeyHintsPanel.HeldWeapon);
             bool dockAtHotbar = !Preview && !dock && !InventoryGui.IsVisible() && heldControls && RagnarokActionBar.Shown;
             if (dockAtHotbar) dock = RagnarokActionBar.Shown;
             if (!keys.Dock(dock, showCharacter && settings.HudStatus.Value ? strip.Rect : null, compact: true,
@@ -184,9 +204,15 @@ internal sealed class RagnarokHud : IDisposable
             }
         }
         root.transform.localScale = Vector3.one * settings.HudScale.Value;
-        if (showCharacter) character.Tick(Preview, data.Statuses.Count);
+        if (showCharacter) character.Tick(Preview, settings.HudStatus.Value ? strip.Rect.rect.height : 0);
         powerRoot.localScale = Vector3.one * settings.HudScale.Value;
         settings.Power.Apply(powerRoot);
+        foodRoot!.localScale = Vector3.one * settings.HudScale.Value;
+        foodRoot.position = powerRoot.TransformPoint(new Vector3(powerRoot.rect.xMax + 24, powerRoot.rect.yMax, 0));
+        if (parent is RectTransform canvas &&
+            canvas.InverseTransformPoint(foodRoot.position).x + FoodWidth * settings.HudScale.Value > canvas.rect.xMax - 12)
+            foodRoot.position = powerRoot.TransformPoint(new Vector3(powerRoot.rect.xMin - 24 - FoodWidth, powerRoot.rect.yMax, 0));
+        Utils.ClampUIToScreen(foodRoot);
         bars[0].Set(data.Health, data.MaxHealth);
         bars[1].Set(data.Stamina, data.MaxStamina);
         bars[2].Root.gameObject.SetActive(data.MaxEitr > 0);
@@ -206,7 +232,6 @@ internal sealed class RagnarokHud : IDisposable
         ItemDrop.ItemData? weapon = Preview ? null : Player.m_localPlayer.GetCurrentWeapon();
         weaponName!.text = Preview ? "Bronze axe" : weapon != null ? Localization.instance.Localize(weapon.m_shared.m_name) : "";
         foreach (TextOutline textOutline in vitalsTextOutlines) textOutline.Sync();
-        provisions!.Set(Preview ? null : Player.m_localPlayer, settings.ProvisionBar.Value);
         RectTransform rootRect = (RectTransform)root.transform;
         rootRect.sizeDelta = new Vector2(VitalsWidth, adrenaline && data.MaxEitr > 0 ? 94 : 76);
         settings.Vitals.Apply(rootRect);
@@ -237,10 +262,16 @@ internal sealed class RagnarokHud : IDisposable
         emblem = null;
         if (powerRoot) UnityEngine.Object.Destroy(powerRoot!.gameObject);
         powerRoot = null;
+        if (foodRoot) UnityEngine.Object.Destroy(foodRoot!.gameObject);
+        foodRoot = null;
         character?.Dispose();
         character = null;
         strip?.Dispose();
         strip = null;
+        debuffs?.Dispose();
+        debuffs = null;
+        positiveStatuses.Clear();
+        harmfulStatuses.Clear();
         keys?.Dispose();
         keys = null;
     }
@@ -269,20 +300,22 @@ internal sealed class RagnarokHud : IDisposable
         rect.sizeDelta = new Vector2(420, 200);
         settings.Vitals.Apply(rect);
         root = rect.gameObject;
-        strip = new StatusStrip(theme, icons, parent);
+        strip = new StatusStrip(theme, parent);
+        debuffs = new StatusStrip(theme, parent, centered: true, debuffStyle: true);
         keys = new KeyHintsPanel(theme, icons, parent);
 
         character = new CharacterHud(settings, theme, parent);
-        foodRoot = character.FoodRoot;
         powerRoot = Ugui.Node(parent, "Ragnarok Power");
         powerRoot.sizeDelta = new Vector2(PowerEmblem.Width, PowerEmblem.Size);
         emblem = settings.HudPower.Value ? new PowerEmblem(theme, icons, powerRoot, new Rect(0, 0, PowerEmblem.Width, PowerEmblem.Size)) : null;
 
-        OutlineVitalsText(Ugui.Text(foodRoot, "Food label", "FOOD", theme.Strong, 11, Palette.Bone, spacing: 3).At(CharacterHud.FoodLabelLeft, 0, 200, 18));
+        foodRoot = Ugui.Node(parent, "Ragnarok Active Food");
+        foodRoot.anchorMin = foodRoot.anchorMax = foodRoot.pivot = new Vector2(0, 1);
+        foodRoot.sizeDelta = new Vector2(FoodWidth, 92);
+        OutlineVitalsText(Ugui.Text(foodRoot, "Food label", "FOOD", theme.Strong, 11, Palette.Bone, spacing: 3).At(0, 0, FoodWidth, 18));
         slots = new FoodSlot[3];
         for (int i = 0; i < slots.Length; i++)
-            slots[i] = new FoodSlot(theme, foodRoot, new Rect(CharacterHud.FoodLeft + i * FoodStep, 24, CharacterHud.FoodSize, 64));
-        provisions = new ProvisionBar(theme, foodRoot, CharacterHud.FoodLeft, 96);
+            slots[i] = new FoodSlot(theme, foodRoot, new Rect(i * FoodStep, 24, CharacterHud.FoodSize, 64));
         weaponName = Ugui.Text(rect, "Equipped weapon", "", theme.Heading, 16.5f, Palette.Bone, TextAlignmentOptions.Center)
             .At(0, -2, VitalsWidth, 28);
         weaponName.overflowMode = TextOverflowModes.Overflow;
@@ -452,7 +485,7 @@ internal sealed class RagnarokHud : IDisposable
             progress.fillMethod = Image.FillMethod.Radial360;
             progress.fillOrigin = (int)Image.Origin360.Top;
             progress.fillClockwise = true;
-            icon = Ugui.Image(rect, "Food Kind", theme.IconFood, Palette.Tan).At(12, 12, 22, 22);
+            icon = Ugui.ItemIcon(Ugui.Image(rect, "Food item", null, Color.white)).At(8, 8, 30, 30);
             countdown = Ugui.Text(rect, "Countdown", "", theme.Numbers, 11, Palette.Bone, TextAlignmentOptions.Center).At(-3, 49, 52, 18);
             countdown.overflowMode = TextOverflowModes.Overflow;
             countdownOutline = new TextOutline(countdown);
@@ -467,7 +500,8 @@ internal sealed class RagnarokHud : IDisposable
             ring.color = has ? Palette.Hex(0x514C3D) : Palette.Muted.WithAlpha(0.5f);
             silhouette.enabled = has;
             well.color = has ? Palette.HudGlass : Palette.Hex(0x101B1E, 0.28f);
-            progress.enabled = icon.enabled = has;
+            progress.enabled = has;
+            icon.enabled = false;
             countdown.enabled = (food?.Seconds ?? 0) > 0;
             countdown.text = "";
             if (food is not { } f)
@@ -476,10 +510,9 @@ internal sealed class RagnarokHud : IDisposable
                 return;
             }
             progress.fillAmount = Mathf.Clamp01(f.Remaining);
-            bool magic = f.Eitr > 0;
-            bool stamina = !magic && f.Stamina > f.Health;
-            icon.sprite = magic ? theme.HudBottle : stamina ? theme.HudBowl : theme.IconFood;
-            icon.color = magic ? Palette.Hex(0xB672A2) : stamina ? Palette.Hex(0xE8A052) : Palette.Hex(0xE1AB82);
+            icon.sprite = f.Icon;
+            icon.color = Color.white;
+            icon.enabled = f.Icon;
             int seconds = Mathf.CeilToInt(f.Seconds);
             countdown.text = seconds >= 60 ? Mathf.CeilToInt(seconds / 60f) + "m" : Mathf.Max(0, seconds) + "s";
             // Keep the number legible when food can be refreshed; pulse the ring instead.
@@ -512,25 +545,27 @@ internal static class VanillaHudPatch
             else Restore(__instance.m_statusEffectListRoot);
             if (HidePower()) Hide(__instance.m_gpRoot);
             else Restore(__instance.m_gpRoot);
-            if (HideKeys()) HideKeyHints();
-            else RestoreKeyHints();
+            SyncKeyHints(KeyHints.instance);
         }
         else Restore();
     }
 
     internal static Func<bool> HideKeys = () => false;
     private static CanvasGroup? keyHintsFade;
+    private static KeyHints? keyHintsOwner;
     private static bool addedFade;
     private static float keyHintsAlpha;
 
     // The key guide is hidden by transparency, not scale: the Ragnarök panel reads the vanilla
     // hints' on-screen positions to keep their order, and a zero scale would collapse them.
-    private static void HideKeyHints()
+    internal static void SyncKeyHints(KeyHints hints)
     {
-        KeyHints hints = KeyHints.instance;
+        if (!HideVanilla() || !HideKeys()) { RestoreKeyHints(); return; }
         if (!hints) return;
+        if (keyHintsOwner != hints) RestoreKeyHints();
         if (!keyHintsFade)
         {
+            keyHintsOwner = hints;
             addedFade = !hints.TryGetComponent(out CanvasGroup existing);
             keyHintsFade = addedFade ? hints.gameObject.AddComponent<CanvasGroup>() : existing;
             keyHintsAlpha = keyHintsFade!.alpha;
@@ -542,10 +577,10 @@ internal static class VanillaHudPatch
     {
         if (keyHintsFade)
         {
+            keyHintsFade!.alpha = keyHintsAlpha;
             if (addedFade) UnityEngine.Object.Destroy(keyHintsFade);
-            else keyHintsFade!.alpha = keyHintsAlpha;
         }
-        keyHintsFade = null;
+        keyHintsFade = null; keyHintsOwner = null;
     }
 
     private static void Hide(RectTransform root)
@@ -569,6 +604,18 @@ internal static class VanillaHudPatch
         hidden.Clear();
         RestoreKeyHints();
     }
+}
+
+[HarmonyPatch(typeof(KeyHints), "Awake")]
+internal static class VanillaKeyHintsAwakePatch
+{
+    private static void Postfix(KeyHints __instance) => VanillaHudPatch.SyncKeyHints(__instance);
+}
+
+[HarmonyPatch(typeof(KeyHints), "UpdateHints")]
+internal static class VanillaKeyHintsUpdatePatch
+{
+    private static void Postfix(KeyHints __instance) => VanillaHudPatch.SyncKeyHints(__instance);
 }
 
 

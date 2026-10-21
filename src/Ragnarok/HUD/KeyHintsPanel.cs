@@ -76,6 +76,16 @@ internal sealed class KeyHintsPanel : IDisposable
         ((KeyHints.instance.m_buildHints && KeyHints.instance.m_buildHints.activeInHierarchy) ||
          (KeyHints.instance.m_fishingHints && KeyHints.instance.m_fishingHints.activeInHierarchy));
 
+    internal static bool HeldWeapon
+    {
+        get
+        {
+            Player player = Player.m_localPlayer;
+            ItemDrop.ItemData? held = player ? player.GetCurrentWeapon() : null;
+            return held != null && held.m_equipped && player!.GetInventory().ContainsItem(held);
+        }
+    }
+
     internal float DockSpace => root.rect.height * root.localScale.y + DockGap * root.localScale.y + 6;
 
     internal void Place(HudPlacement placement)
@@ -144,7 +154,7 @@ internal sealed class KeyHintsPanel : IDisposable
     internal void Tick(bool preview)
     {
         float now = Time.unscaledTime;
-        if (now < nextScan && shown.Length > 0) return;
+        if (now < nextScan && shown.Length > 0 && (preview || !CombatActive || HeldWeapon)) return;
         nextScan = now + 0.15f;
         if (preview) Demo();
         else Scan();
@@ -177,6 +187,9 @@ internal sealed class KeyHintsPanel : IDisposable
         GameObject? group = FirstActive(hints.m_buildHints, hints.m_combatHints, hints.m_inventoryHints,
             hints.m_inventoryWithContainerHints, hints.m_fishingHints, hints.m_barberHints, hints.m_radialHints);
         if (!group) return;
+        // Native targeting starts active on entry and can enable fist hints.
+        // Our combat guide belongs to an actually equipped inventory weapon.
+        if (group == hints.m_combatHints && !HeldWeapon) return;
 
         elements.Clear();
         foreach (TMP_Text text in group!.GetComponentsInChildren<TMP_Text>(false))

@@ -16,7 +16,7 @@ internal static class InventorySort
     {
         if (dragged != null) return -1;
         Inventory inventory = player.GetInventory();
-        int start = keepHotbar ? HotbarRows.Count : 0, rows = CharacterSlots.GridRows(inventory), width = inventory.GetWidth();
+        int start = keepHotbar ? 1 : 0, rows = CharacterSlots.GridRows(inventory), width = inventory.GetWidth();
         List<ItemDrop.ItemData> items = inventory.GetAllItems()
             .Where(i => CharacterSlots.InGrid(inventory, i.m_gridPos) && i.m_gridPos.y >= start).ToList();
 

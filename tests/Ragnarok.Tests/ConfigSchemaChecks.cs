@@ -18,14 +18,9 @@ internal static class ConfigSchemaChecks
             ("HUD.WeaponDial", "Enabled", "QualityOfLife.WeaponDial"),
             ("HUD.WeaponDial", "Key", "QualityOfLife.WeaponDial"),
             ("HUD.WeaponDial", "Style", "HUD.WeaponDial"),
-            ("HUD.Hotbar", "SecondRow", "QualityOfLife.Hotbar"),
-            ("HUD.Hotbar", "SwitchRowKey", "QualityOfLife.Hotbar"),
             ("HUD.Hotbar", "Scale", "HUD.Hotbar"),
-            ("HUD.ChestSearch", "Enabled", "QualityOfLife.ChestSearch"),
-            ("HUD.ChestSearch", "Range", "QualityOfLife.ChestSearch"),
             ("HUD.Plants", "ShowGrowthStatus", "QualityOfLife.Plants"),
             ("Inventory.Sort", "KeepHotbar", "QualityOfLife.InventorySort"),
-            ("Inventory.QuickStack", "Enabled", "QualityOfLife.QuickStack"),
             ("NearbyChests", "Range", "QualityOfLife.NearbyChests"),
             ("QoL.Death", "SkillLossModifierPercent", "Gameplay.Death"),
             ("QoL.Skills", "ExperienceGainModifierPercent", "Gameplay.Skills"),
@@ -55,6 +50,42 @@ internal static class ConfigSchemaChecks
             ConfigSchema.Migrate(legacyOnly);
             check(legacyOnly.Count == 1 && legacyOnly[(item.New, item.Key)] == "user value", "Saved value was reset");
         }
+        var unified = new Dictionary<(string Section, string Key), string>
+        {
+            [("QualityOfLife.NearbyChests", "Enabled")] = "false",
+            [("QualityOfLife.NearbyChests", "Range")] = "80",
+            [("QualityOfLife.NearbyChests", "PersonalRange")] = "60",
+            [("QualityOfLife.NearbyChests", "Crafting")] = "false",
+            [("NearbyChests", "Stations")] = "false",
+            [("QualityOfLife.ChestSearch", "Enabled")] = "true",
+            [("HUD.ChestSearch", "Range")] = "20",
+            [("QualityOfLife.ChestSearch", "PersonalRange")] = "10",
+            [("QualityOfLife.ChestSearch", "Shortcut")] = "F + LeftControl",
+            [("QualityOfLife.QuickStack", "Enabled")] = "true",
+            [("Inventory.QuickStack", "KeepTools")] = "false",
+            [("HUD.Minimap", "ChestSearchMarker")] = "true"
+        };
+        foreach (string section in new[] { "QualityOfLife.NearbyChests", "NearbyChests", "QualityOfLife.QuickStack", "Inventory.QuickStack" })
+            foreach (string key in new[] { "KeepWeapons", "KeepConsumables", "KeepTools" })
+                unified[(section, key)] = "true";
+        ConfigSchema.Migrate(unified);
+        ConfigSchema.Migrate(unified);
+        check(unified.Count == 5, "Obsolete chest switches/ranges survived migration");
+        check(unified.All(e => e.Key.Section == "QualityOfLife.NearbyChests"), "Chest settings did not consolidate");
+        check(unified[("QualityOfLife.NearbyChests", "Enabled")] == "false", "Separate switches overrode unified policy");
+        check(unified[("QualityOfLife.NearbyChests", "Range")] == "80" && unified[("QualityOfLife.NearbyChests", "PersonalRange")] == "60", "Shared radius changed during migration");
+        check(unified[("QualityOfLife.NearbyChests", "Shortcut")] == "F + LeftControl", "Chest preferences lost");
+        var hotbar = new Dictionary<(string Section, string Key), string>
+        {
+            [("HUD.Hotbar", "SecondRow")] = "true",
+            [("HUD.Hotbar", "SwitchRowKey")] = "LeftAlt",
+            [("QualityOfLife.Hotbar", "SecondRow")] = "true",
+            [("QualityOfLife.Hotbar", "SwitchRowKey")] = "LeftControl",
+            [("HUD.Hotbar", "Scale")] = "1.2"
+        };
+        ConfigSchema.Migrate(hotbar);
+        ConfigSchema.Migrate(hotbar);
+        check(hotbar.Count == 1 && hotbar[("HUD.Hotbar", "Scale")] == "1.2", "Removed second hotbar settings survived or normal hotbar settings were lost");
         check(!ConfigSchema.Visible("HUD", "LayoutVersion"), "Internal migration marker exposed as a user control");
         check(ConfigSchema.Visible("HUD", "Style"), "HUD style was hidden");
         foreach (string section in new[] { "Vitals", "Status", "Keys", "Minimap", "Compass", "Character", "Power", "Notifications", "SkillToast" })

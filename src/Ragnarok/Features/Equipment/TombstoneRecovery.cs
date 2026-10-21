@@ -89,10 +89,10 @@ internal static class TombstoneRecovery
             return Array.IndexOf(CharacterSlots.ExtraUtility, extra) >= 0 && CharacterSlots.ExtraUtilityEnabled() &&
                 extra < player.GetInventory().GetWidth() &&
                 item.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Utility ? extra : -1;
-        return extra == -1 && CharacterSlots.WornSlot(item) is { } slot && slot.x < player.GetInventory().GetWidth() ? slot.x : -1;
+        return extra == -1 && CharacterSlots.WornSlot(item) is { } slot && slot.x < player.GetInventory().GetWidth() ? CharacterSlots.SlotIndex(slot) : -1;
     }
 
-    private static int OccupiedSlot(ItemDrop.ItemData item) => CharacterSlots.IsGearSlot(item.m_gridPos) ? item.m_gridPos.x :
+    private static int OccupiedSlot(ItemDrop.ItemData item) => CharacterSlots.IsGearSlot(item.m_gridPos) ? CharacterSlots.SlotIndex(item.m_gridPos) :
         CharacterSlots.IsProvisionSlot(item.m_gridPos) ? ProvisionOffset + item.m_gridPos.x : -1;
 
     private static Vector2i Position(int slot) => slot >= ProvisionOffset

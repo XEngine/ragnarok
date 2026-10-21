@@ -105,6 +105,14 @@ def setup(args):
         extract(verified[0], unpacked)
         shutil.copytree(unpacked / "BepInExPack_Valheim", game, dirs_exist_ok=True)
         extract(verified[1], game)
+        if not list((game / "BepInEx/plugins").rglob("Jotunn.dll")):
+            archive = download(
+                "https://thunderstore.io/package/download/ValheimModding/Jotunn/2.30.2/",
+                downloads / "Jotunn-2.30.2.zip",
+                "8aae92da2be0eb6820cd4cf57e2f6c1d6ad0d738d4915966e7c3d7a94e9a9b0f")
+            jotunn = unpacked / "Jotunn-2.30.2"
+            extract(archive, jotunn)
+            shutil.copytree(jotunn / "plugins", game / "BepInEx/plugins/Jotunn", dirs_exist_ok=True)
     if previous is not None:
         config.write_bytes(previous)
     else:
@@ -160,6 +168,10 @@ def build(local, configuration, deploy=False):
 
 def doctor(local):
     game = Path(local["gamePath"])
+    jotunn = list((game / "BepInEx/plugins").rglob("Jotunn.dll"))
+    if len(jotunn) != 1:
+        raise RuntimeError("Install exactly one Jotunn 2.30.2 or newer in the development BepInEx/plugins folder.")
+    print(f"OK: Jotunn installed at {jotunn[0]} (runtime requires 2.30.2 or newer)", flush=True)
     for path in (Path(local["dotnetPath"]), game / "valheim.x86_64",
                  game / "valheim_Data/Managed/assembly_valheim.dll",
                  game / "BepInEx/core/BepInEx.dll", game / "BepInEx/plugins/ScriptEngine.dll",
@@ -232,7 +244,7 @@ def smoke(local):
                     and "Starting music menu" in text):
                 if "[Error" in text or any(text.count(marker) < 2 for marker in (
                         "Ragnarok inventory checks PASS", "Ragnarok station checks PASS",
-                        "Ragnarok skill XP checks PASS")):
+                        "Ragnarok skill XP checks PASS", "Ragnarok UI lifecycle checks PASS")):
                     raise RuntimeError(f"Runtime checks failed. Inspect {log}")
                 print("PASS: Steam initialization, initial load, inventory/station/XP checks and ScriptEngine unload/reload.", flush=True)
                 return
@@ -334,7 +346,7 @@ def main():
             package.write(ROOT / "src/Ragnarok/bin/Release/net472/Ragnarok.dll",
                           "BepInEx/plugins/Ragnarok/Ragnarok.dll")
             package.write(ROOT / "docs/INSTALL.md", "INSTALL.md")
-        print(f"Created {archive} (our plugin only; install BepInEx separately).")
+        print(f"Created {archive} (our plugin only; install BepInEx and Jotunn separately).")
 
 
 if __name__ == "__main__":

@@ -53,6 +53,17 @@ internal static class CraftAmount
     {
         Amount = 1;
         if (stored) Apply(stored!);
+        // Apply defers restoration during an active craft. Keep its original snapshot
+        // until that craft ends, even if the panel was rebuilt or its style changed.
+        if (!stored || Timer(stored!) < 0f) stored = null;
+    }
+
+    internal static void Unload()
+    {
+        // No patch remains to restore a deferred override after unload. Cancel only
+        // our overridden batch before restoring; resources are spent at completion.
+        if (stored && forced && Timer(stored!) >= 0f) Timer(stored!) = -1f;
+        Reset();
         stored = null;
     }
 

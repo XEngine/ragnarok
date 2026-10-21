@@ -12,11 +12,13 @@ internal sealed class InterfaceSettings
     internal const string MinimapSection = "HUD.Minimap";
 
     internal readonly ConfigEntry<KeyboardShortcut> WindowKey;
+    internal readonly ConfigEntry<Jotunn.Managers.InputManager.GamepadButton> WindowGamepad;
     internal readonly ConfigEntry<float> Scale;
     internal readonly ConfigEntry<float> ScrollSpeed;
     internal readonly ConfigEntry<FrameEdges> Edges;
     internal readonly ConfigEntry<bool> FollowSystemScroll;
     internal readonly ConfigEntry<HudStyle> Hud;
+    internal readonly ConfigEntry<bool> CrosshairAmmo;
     internal readonly ConfigEntry<float> HudScale;
     internal readonly ConfigEntry<bool> HudNumbers;
     internal readonly ConfigEntry<bool> HudFood;
@@ -43,9 +45,12 @@ internal sealed class InterfaceSettings
     internal readonly ConfigEntry<float> ActionBarScale, ActionBarX, ActionBarBottom;
     internal readonly ConfigEntry<float> ActionBarSpacing, ActionBarPaddingX, ActionBarPaddingY;
     internal readonly ConfigEntry<bool> ProvisionBar;
+    internal readonly ConfigEntry<ProvisionPlacement> VanillaProvisionPlacement;
     internal readonly ConfigEntry<bool> MinimapInfo;
+    internal readonly ConfigEntry<bool> TamedAnimalDots;
     internal readonly ConfigEntry<bool> Clock24h;
     internal readonly ConfigEntry<PanelStyle> MinimapStyle;
+    internal readonly ConfigEntry<bool> ChestSearchMapMarker;
     internal readonly ConfigEntry<PanelStyle> NotificationStyle;
     internal readonly ConfigEntry<PanelStyle> CompendiumStyle;
     internal readonly ConfigEntry<PanelStyle> SkillsStyle;
@@ -81,6 +86,8 @@ internal sealed class InterfaceSettings
         ChestPreviewColumns = config.Bind(preview, "Columns", 6, new ConfigDescription("Item columns in the compact preview. Empty inventory slots are omitted.", new AcceptableValueRange<int>(1, 12)));
         WindowKey = config.Bind("HUD.Window", "ConfigWindowKey", new KeyboardShortcut(KeyCode.F10),
             "Open or close the Ragnarök configuration window.");
+        WindowGamepad = config.Bind("HUD.Window", "GamepadButton", Jotunn.Managers.InputManager.GamepadButton.None,
+            "Optional controller button to toggle settings. None leaves controller input unchanged. Choose a button not used by your other mods.");
         Scale = config.Bind("HUD.Window", "Scale", 1f, new ConfigDescription(
             "Size of Ragnarök windows relative to a 1080p screen.", new AcceptableValueRange<float>(0.75f, 1.5f)));
         Edges = config.Bind("HUD.Window", "FrameEdges", FrameEdges.Solid,
@@ -95,17 +102,19 @@ internal sealed class InterfaceSettings
 
         Hud = config.Bind(HudSection, "Style", HudStyle.Vanilla,
             "Vanilla keeps Valheim's HUD. Ragnarok replaces health, stamina, eitr, food and status effects with the Ragnarök HUD.");
+        CrosshairAmmo = config.Bind(HudSection, "CrosshairAmmo", true,
+            "Show the selected arrow/bolt icon and carried count below the crosshair while a bow or crossbow is equipped. Includes quiver stacks. Works with either HUD style; local display only.");
         HudScale = config.Bind(HudSection, "Scale", 1f, new ConfigDescription(
             "Size of every part of the Ragnarök HUD.", new AcceptableValueRange<float>(0.6f, 1.6f)));
 
         HudNumbers = config.Bind(VitalsSection, "ShowNumbers", true, "Show current and maximum values beside the bars.");
-        HudFood = config.Bind(VitalsSection, "ShowFood", true, "Show active foods and their remaining time above the bars.");
+        HudFood = config.Bind(VitalsSection, "ShowFood", true, "Show active foods and their remaining time beside Forsaken power.");
         HudPower = config.Bind(VitalsSection, "ShowForsakenPower", true,
             "Show your Forsaken power as the emblem beside the bars, replacing Valheim's power box.");
         Vitals = new HudPlacement(config, VitalsSection, "health, stamina and eitr", ScreenAnchor.BottomCenter, 0f, 118f);
 
         NotificationStyle = config.Bind("HUD.Notifications", "Style", PanelStyle.FollowHud,
-            "Ragnarok shows unlocks, pickups and small messages as plain text lines with inline quantities; " +
+            "Ragnarok shows animated pickup text above the vitals, recipe milestones beside the minimap and a separate feed for other messages; " +
             "Vanilla keeps Valheim's. FollowHud uses the Ragnarök notifications whenever the Ragnarök HUD is on. " +
             "Includes compact skill pills, milestone banners and outlined centre messages.");
         Notifications = new HudPlacement(config, "HUD.Notifications", "notifications", ScreenAnchor.BottomLeft, 40f, 140f);
@@ -159,10 +168,16 @@ internal sealed class InterfaceSettings
 
 
         ProvisionBar = config.Bind("HUD.Provisions", "ShowInHud", true,
-            "Show the filled provision slots beside the food in the Ragnarök HUD, with their hotkeys.");
+            "Show the carried provision shortcut row on the vanilla HUD. The Ragnarok HUD shows active food beside Forsaken power.");
+        VanillaProvisionPlacement = config.Bind("HUD.Provisions", "VanillaPlacement", ProvisionPlacement.BesidePower,
+            "Where the provision row sits on the vanilla HUD. BesidePower: next to the Forsaken power icon, at its size. AfterHotbar: in the top row after hotbar slot 8.");
         MinimapInfo = config.Bind(MinimapSection, "Enabled", true,
             "Show the day and clock above the minimap, and the current and next weather below it (with either HUD style).");
         Clock24h = config.Bind(MinimapSection, "TwentyFourHourClock", true, "24-hour clock (14:30). Off: 12-hour (2:30 PM).");
+        TamedAnimalDots = config.Bind(MinimapSection, "TamedAnimalDots", true,
+            "Show small yellow dots for loaded, living tamed animals in explored areas. Tamed animals are shared; Valheim does not assign a permanent player owner. Local display only; dots disappear when animals die or unload.");
+        ChestSearchMapMarker = config.Bind("QualityOfLife.NearbyChests", "ChestSearchMarker", false,
+            "Mark the selected chest-search result on the map for the existing 20-second guide. Respects fog, access and server range limits. Local display only.");
         MinimapStyle = config.Bind(MinimapSection, "Style", PanelStyle.FollowHud,
             "Ragnarok frames the minimap in Ragnarök style (dark plate, gold rim, crimson north mark) and restyles the biome " +
             "name; Vanilla keeps Valheim's frame. FollowHud uses the Ragnarök frame whenever the Ragnarök HUD is on.");

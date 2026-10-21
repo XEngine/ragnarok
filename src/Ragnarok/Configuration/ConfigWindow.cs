@@ -29,13 +29,12 @@ internal sealed class ConfigWindow : IDisposable
         ["HUD.Hotbar"] = ("Hotbar", "An eight-slot Ragnarök action bar. Adjust its scale, position, slot spacing and panel padding; vanilla HUD keeps Valheim's original hotbar."),
         ["QualityOfLife.Plants"] = ("Plants", "Plant health, harvest readiness and estimated growth time in the hover text, with either HUD style."),
         ["HUD.WeaponDial"] = ("Weapon Dial", "Hold a key, aim at a weapon or tool with the mouse, let go to take it in hand."),
-        ["QualityOfLife.ChestSearch"] = ("Chest Search", "Search nearby accessible chests and follow a temporary dashed yellow guide to a result."),
         ["HUD.Vitals"] = ("Vitals", "Health, stamina, eitr and food: what the cluster shows and where it sits."),
         ["HUD.Keys"] = ("Key Hints", "The context key guide for building, combat, inventory and fishing: whether it is shown and where it sits."),
-        ["HUD.Notifications"] = ("Notifications", "Plain text unlocks, pickups and small messages with inline quantities."),
+        ["HUD.Notifications"] = ("Notifications", "Separate pickup text above vitals, recipe milestones beside the minimap, and general messages."),
         ["HUD.Compass"] = ("Compass", "The heading strip at the top centre of the screen."),
         ["HUD.Minimap"] = ("Minimap", "Day and clock above the minimap; current weather and the next one below it."),
-        ["HUD.Status"] = ("Status Effects", "Buffs, debuffs and comfort: whether the strip is shown and where it sits."),
+        ["HUD.Status"] = ("Status Effects", "Original status icons: passive equipment and ongoing buffs near your name, harmful effects below the compass."),
         ["HUD.Inventory"] = ("Inventory", "The Ragnarök inventory grid and item card, or Valheim's own."),
         ["QualityOfLife.Provisions"] = ("Provisions", "The provision slots in the HUD, and the keys that eat or drink from them."),
         ["HUD.Crafting"] = ("Crafting", "The crafting panel: Ragnarök style with search and category filters, or Valheim's."),
@@ -44,15 +43,15 @@ internal sealed class ConfigWindow : IDisposable
         ["HUD.Trophies"] = ("Trophies", "Valheim's trophy wall as a Ragnarök screen: every trophy, the ones you have taken lit."),
         ["HUD.Achievements"] = ("Achievements", "Valheim's achievements as a Ragnarök screen: every badge, the chosen one's conditions."),
         ["QualityOfLife.InventorySort"] = ("Sort", "How the Sort buttons lay out your inventory: by name, by type or by weight."),
-        ["QualityOfLife.QuickStack"] = ("Quick Stack", "What the Quick Stack button leaves in your inventory when it fills nearby chests."),
-        ["QualityOfLife.NearbyChests"] = ("Nearby Chests", "Craft, build and fuel stations from closed chests around you."),
+        ["QualityOfLife.Delete"] = ("Delete", "Destroy the item held on the cursor with the inventory's Delete button."),
+        ["QualityOfLife.Mounts"] = ("Mount companion", "Bind one saddled, tamed mount. Whistle outdoors to summon it when both of you are out of combat. Requires Ragnarok on the server."),
+        ["QualityOfLife.NearbyChests"] = ("Nearby Chests", "Craft, build, supply stations, stack items and search nearby chests with one shared range."),
         ["Gameplay"] = ("Gameplay", "Equipment rules, balance modifiers and server authority."),
         ["QualityOfLife"] = ("Quality Of Life", "Convenience features for storage, inventory, crafting and interaction."),
         ["Gameplay.Equipment"] = ("Equipment", "Character slots and additional utility equipment."),
         ["QualityOfLife.DeathRecovery"] = ("Death Recovery", "Restore worn equipment when reclaiming your tombstone."),
         ["QualityOfLife.Crafting"] = ("Crafting Filters", "Search and filter the vanilla crafting list."),
         ["QualityOfLife.WeaponDial"] = ("Weapon Dial", "Enable the radial selector and choose its activation key."),
-        ["QualityOfLife.Hotbar"] = ("Hotbar Rows", "Access a second inventory row with a modifier key."),
         ["HUD.Provisions"] = ("Provision Bar", "Show provision slots on the HUD."),
         ["HUD.Character"] = ("Character", "Character identity, food and visible companions."),
         ["HUD.Power"] = ("Forsaken Power", "Placement and appearance of the power seal."),
@@ -85,6 +84,7 @@ internal sealed class ConfigWindow : IDisposable
     private readonly string version;
     private readonly Func<string> chestsInRange;
     private readonly Dictionary<string, List<(string Label, string Description, Action Run)>> actions = new();
+    private readonly Dictionary<string, Func<string>> status = new();
 
     private GameObject? canvas;
     private CanvasScaler scaler = null!;
@@ -103,14 +103,20 @@ internal sealed class ConfigWindow : IDisposable
     private float openedAt, nextRefresh;
     private string hoverHelp = "";
     private ConfigEntryBase? capturing;
+    private readonly JotunnIntegration.Binding? toggleInput;
+    private readonly JotunnIntegration.Binding? toggleGamepad;
+    private string shownLanguage = "";
 
-    internal ConfigWindow(ConfigFile config, InterfaceSettings settings, Theme theme, string version, Func<string> chestsInRange)
+    internal ConfigWindow(ConfigFile config, InterfaceSettings settings, Theme theme, string version, Func<string> chestsInRange,
+        JotunnIntegration? jotunn = null)
     {
         this.config = config;
         this.settings = settings;
         this.theme = theme;
         this.version = version;
         this.chestsInRange = chestsInRange;
+        toggleInput = jotunn?.AddButton("RagnarokSettings", settings.WindowKey, settingsToggle: true);
+        toggleGamepad = jotunn?.AddGamepadButton("RagnarokSettingsController", settings.WindowGamepad, settingsToggle: true);
         config.SettingChanged += OnSettingChanged;
         config.ConfigReloaded += OnConfigReloaded;
     }
@@ -127,12 +133,19 @@ internal sealed class ConfigWindow : IDisposable
 
     internal void Update()
     {
+        if (canvas && shownLanguage != UiLocalization.Language)
+        {
+            bool reopen = UiState.WindowOpen;
+            UiState.WindowOpen = false;
+            DestroyCanvas();
+            if (reopen) SetOpen(true);
+        }
         if (capturing != null)
         {
             CaptureKey();
             return;
         }
-        if (settings.WindowKey.Value.IsDown())
+        if (toggleGamepad?.Down == true || ((toggleInput?.Down ?? true) && settings.WindowKey.Value.IsDown()))
             SetOpen(!UiState.WindowOpen);
         else if (UiState.WindowOpen && Input.GetKeyDown(KeyCode.Escape))
         {
@@ -186,10 +199,17 @@ internal sealed class ConfigWindow : IDisposable
 
     public void Dispose()
     {
+        toggleInput?.Dispose();
+        toggleGamepad?.Dispose();
         config.SettingChanged -= OnSettingChanged;
         config.ConfigReloaded -= OnConfigReloaded;
         capturing = null;
         UiState.WindowOpen = false;
+        DestroyCanvas();
+    }
+
+    private void DestroyCanvas()
+    {
         controls?.Clear();
         if (canvas)
         {
@@ -198,6 +218,7 @@ internal sealed class ConfigWindow : IDisposable
             foreach (Slider slider in canvas.GetComponentsInChildren<Slider>(true)) slider.onValueChanged.RemoveAllListeners();
             UnityEngine.Object.Destroy(canvas);
         }
+        canvas = null;
     }
 
     private void OnSettingChanged(object sender, SettingChangedEventArgs e)
@@ -249,6 +270,7 @@ internal sealed class ConfigWindow : IDisposable
 
     private void Build()
     {
+        shownLanguage = UiLocalization.Language;
         canvas = new GameObject("Ragnarok Config Window", typeof(RectTransform)) { layer = 5 };
         UnityEngine.Object.DontDestroyOnLoad(canvas);
         Canvas c = canvas.AddComponent<Canvas>();
@@ -278,7 +300,7 @@ internal sealed class ConfigWindow : IDisposable
         ScrollRect navScroll = Scroller("Navigation", new Rect(1, HeaderHeight, SidebarWidth - 4, Height - HeaderHeight - FooterHeight - 84), 0);
         nav = (RectTransform)navScroll.content;
         Ugui.Image(window, "Note Rule", theme.White, Palette.GoldDim).At(28, Height - FooterHeight - 74, 24, 1);
-        Ugui.Text(window, "Note", "Changes apply instantly and are saved to the config file.", theme.Subtle, 11, Palette.Muted, wrap: true)
+        Ugui.Text(window, "Note", UiLocalization.Text("config.note", "Changes apply instantly and are saved to the config file."), theme.Subtle, 11, Palette.Muted, wrap: true)
             .At(28, Height - FooterHeight - 64, SidebarWidth - 48, 48);
 
         // Compact page heading and description above the controls.
@@ -294,7 +316,7 @@ internal sealed class ConfigWindow : IDisposable
     {
         foreach (string name in new[] { "Sidebar", "Sidebar Rule", "Navigation", "Note", "Note Rule" })
             window.Find(name).gameObject.SetActive(!sidebarCollapsed);
-        sidebarToggleLabel.text = sidebarCollapsed ? "Show sidebar" : "Hide sidebar";
+        sidebarToggleLabel.text = sidebarCollapsed ? UiLocalization.Text("config.show_sidebar", "Show sidebar") : UiLocalization.Text("config.hide_sidebar", "Hide sidebar");
         pageTitle.At(ContentX, HeaderHeight + 10, ContentWidth, 38);
         pageBlurb.At(ContentX, HeaderHeight + 48, ContentWidth, 30);
         window.Find("Page Rule").GetComponent<RectTransform>().At(ContentX, HeaderHeight + 87, ContentWidth, 1);
@@ -303,12 +325,12 @@ internal sealed class ConfigWindow : IDisposable
 
     private void Header()
     {
-        Ugui.Text(window, "Eyebrow", "valheim · mod configuration", theme.Section, 13, Palette.Muted).At(36, 12, 600, 24);
+        Ugui.Text(window, "Eyebrow", UiLocalization.Text("config.eyebrow", "valheim · mod configuration"), theme.Section, 13, Palette.Muted).At(36, 12, 600, 24);
         Ugui.Text(window, "Title", "Ragnarök", theme.Heading, 30, Palette.Gold).At(34, 24, 560, 42);
         Ugui.Text(window, "Byline", "by KernelPanic", theme.Subtle, 11, Palette.Muted).At(36, 66, 400, 18);
 
         Button close = Ugui.Button(window, "Close", theme.Button, theme.ButtonHover, () => SetOpen(false)).At(Width - 36 - 130, 34, 130, 36);
-        closeLabel = Ugui.Text(close.transform, "Label", "Close  ·  Esc", theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center).Stretch();
+        closeLabel = Ugui.Text(close.transform, "Label", UiLocalization.Text("config.close", "Close  ·  Esc"), theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center).Stretch();
         close.OnHover(h => closeLabel.color = h ? Palette.GoldBright : Palette.Bone);
         Image chip = Ugui.Image(window, "Version", theme.Card, Color.white).At(Width - 36 - 130 - 96, 34, 84, 36);
         Ugui.Text(chip.transform, "Label", "v" + version, theme.Strong, 13, Palette.GoldBright, TextAlignmentOptions.Center).Stretch();
@@ -378,16 +400,16 @@ internal sealed class ConfigWindow : IDisposable
         help = Ugui.Text(window, "Help", "", theme.Body, 11, Palette.Muted).At(58, Height - FooterHeight, Width - 480, FooterHeight);
         Button reset = Ugui.Button(window, "Restore Defaults", theme.Button, theme.ButtonHover, () => RestoreDefaults(pages[page]))
             .At(Width - 36 - 190, Height - FooterHeight + 10, 190, 36);
-        TextMeshProUGUI label = Ugui.Text(reset.transform, "Label", "Restore defaults", theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center).Stretch();
+        TextMeshProUGUI label = Ugui.Text(reset.transform, "Label", UiLocalization.Text("config.reset", "Restore defaults"), theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center).Stretch();
         reset.OnHover(h => label.color = h ? Palette.GoldBright : Palette.Bone);
         resetButton = reset.gameObject;
     }
 
     private void UpdateFooter()
     {
-        string text = capturing != null ? "Press the new key combination. Escape cancels."
+        string text = capturing != null ? UiLocalization.Text("config.capture", "Press the new key combination. Escape cancels.")
             : hoverHelp.Length > 0 ? hoverHelp
-            : $"{settings.WindowKey.Value} or Escape closes this window.  Hover a setting for details.";
+            : UiLocalization.Format("config.help", "{0} or Escape closes this window.  Hover a setting for details.", settings.WindowKey.Value);
         if (help.text != text) help.text = text;
         helpMarker.color = capturing != null || hoverHelp.Length > 0 ? Palette.GoldBright : Palette.Faint;
     }
@@ -406,7 +428,7 @@ internal sealed class ConfigWindow : IDisposable
 
         string key = pages[page];
         pageTitle.text = IsChild(key) ? Title(ParentOf(key)) + "  ·  " + Title(key) : Title(key);
-        pageBlurb.text = Sections.TryGetValue(key, out var meta) ? meta.Blurb : "";
+        pageBlurb.text = Blurb(key);
         resetButton.SetActive(key != "Overview");
         float height = key == "Overview" ? Overview() : Section(key);
         content.sizeDelta = new Vector2(0, height);
@@ -417,7 +439,7 @@ internal sealed class ConfigWindow : IDisposable
     private void Navigation()
     {
         Ugui.Clear(nav);
-        Ugui.Text(nav, "Label", "sections", theme.Section, 13, Palette.Muted).At(28, 16, 200, 24);
+        Ugui.Text(nav, "Label", UiLocalization.Text("config.sections", "sections"), theme.Section, 13, Palette.Muted).At(28, 16, 200, 24);
         float y = 48;
         int number = 0;
         string current = pages[page];
@@ -513,6 +535,8 @@ internal sealed class ConfigWindow : IDisposable
         list.Add((label, description, run));
     }
 
+    internal void AddStatus(string section, Func<string> text) => status[section] = text;
+
     private float ActionRows(string section, float y)
     {
         if (!actions.TryGetValue(section, out var list)) return y;
@@ -550,19 +574,26 @@ internal sealed class ConfigWindow : IDisposable
                 var button = Ugui.Button(content, child, theme.Card, theme.CardHover, () => ShowPage(target))
                     .At(0, top, RowWidth, 68);
                 Ugui.Text(button.transform, "Title", Title(child), theme.Strong, 13, Palette.Bone).At(18, 8, RowWidth - 36, 24);
-                Ugui.Text(button.transform, "Description", Sections.TryGetValue(child, out var metadata) ? metadata.Blurb : "",
+                Ugui.Text(button.transform, "Description", Blurb(child),
                     theme.Body, 10, Palette.Muted).At(18, 34, RowWidth - 36, 24);
                 top += 78;
             }
             return top;
         }
         float y = 0;
+        if (status.TryGetValue(section, out Func<string> readStatus))
+        {
+            var label = Ugui.Text(content, "Current status", readStatus(), theme.Body, 13, Palette.Bone)
+                .At(18, 0, RowWidth - 36, 48);
+            controls.Refreshers.Add(() => { if (label) label.text = readStatus(); });
+            y = 56;
+        }
         foreach (ConfigEntryBase entry in Entries(section))
         {
             Image row = Ugui.Image(content, "Row " + entry.Definition.Key, theme.Card, Color.white, raycast: true).At(0, y, RowWidth, RowHeight);
             Image accent = Ugui.Image(row.transform, "Hover Accent", theme.White, Palette.GoldBright).At(0, 14, 2, RowHeight - 28);
             accent.enabled = false;
-            string description = entry.Description?.Description ?? "";
+            string description = SettingDescription(entry);
             row.OnHover(h =>
             {
                 row.sprite = h ? theme.CardHover : theme.Card;
@@ -571,7 +602,8 @@ internal sealed class ConfigWindow : IDisposable
             });
 
             float textWidth = RowWidth - ControlWidth - 64;
-            Ugui.Text(row.transform, "Label", ConfigControls.Pretty(entry.Definition.Key), theme.Strong, 13, Palette.Bone).At(18, 7, textWidth, 22);
+            bool radius = entry.Definition.Key == "Range" && section == "QualityOfLife.NearbyChests";
+            Ugui.Text(row.transform, "Label", radius ? UiLocalization.Text("config.server_range", "Server Maximum Range") : SettingTitle(entry), theme.Strong, 13, Palette.Bone).At(18, 7, textWidth, 22);
             Ugui.Text(row.transform, "Description", description, theme.Body, 11, Palette.Muted, TextAlignmentOptions.TopLeft, wrap: true)
                 .At(18, 31, textWidth, 32);
             Control(entry, row.transform, new Rect(RowWidth - ControlWidth - 22, (RowHeight - 34) / 2, ControlWidth, 34));
@@ -586,7 +618,7 @@ internal sealed class ConfigWindow : IDisposable
         RectTransform holder = Ugui.Node(parent, "Control").Stretch();
         controls.Add(entry, holder, r);
         CanvasGroup group = holder.gameObject.AddComponent<CanvasGroup>();
-        TextMeshProUGUI note = Ugui.Text(parent, "Server Note", "set by server", theme.Subtle, 10, Palette.Gold, TextAlignmentOptions.MidlineRight).At(r.x, r.y - 18, r.width, 16);
+        TextMeshProUGUI note = Ugui.Text(parent, "Server Note", UiLocalization.Text("config.server_note", "set by server"), theme.Subtle, 10, Palette.Gold, TextAlignmentOptions.MidlineRight).At(r.x, r.y - 18, r.width, 16);
 
         void Refresh()
         {
@@ -605,21 +637,24 @@ internal sealed class ConfigWindow : IDisposable
         const float statHeight = 118, gap = 14;
         float width = (RowWidth - gap * 3) / 4;
         ConfigEntry<bool>? chests = Find<bool>("QualityOfLife.NearbyChests", "Enabled");
-        ConfigEntry<float>? range = Find<float>("QualityOfLife.NearbyChests", "Range");
+        ConfigEntry<float>? range = Find<float>("QualityOfLife.NearbyChests", "PersonalRange");
         Stat(0, width, "HUD", Palette.Alert, () =>
         {
             bool ragnarok = settings.Hud.Value == HudStyle.Ragnarok;
-            return (ragnarok ? "Ragnarök" : "Vanilla", ragnarok ? "Custom HUD active" : "Opt in below or on the HUD page");
+            return (ragnarok ? "Ragnarök" : UiLocalization.Text("enum.Vanilla", "Vanilla"), ragnarok ? UiLocalization.Text("config.hud_active", "Custom HUD active") : UiLocalization.Text("config.hud_optin", "Opt in below or on the HUD page"));
         });
-        Stat(width + gap, width, "Nearby Chests", Palette.Gold, () =>
-            (chests?.Value == true ? "On" : "Off", range != null ? $"Range {range.Value:0} m" : ""));
-        Stat((width + gap) * 2, width, "In Range", Palette.Eitr, () => (chestsInRange(), "Chests you can use now"));
-        Stat((width + gap) * 3, width, "Build", Palette.Ember, () => ("v" + version, "F6 reloads code in development"));
+        Stat(width + gap, width, Title("QualityOfLife.NearbyChests"), Palette.Gold, () =>
+            (chests?.Value == true ? UiLocalization.Text("config.on", "On") : UiLocalization.Text("config.off", "Off"), range != null ? UiLocalization.Format("config.range", "Range {0:0} m", RangeLimit.Display(range)) : ""));
+        Stat((width + gap) * 2, width, UiLocalization.Text("config.in_range", "In Range"), Palette.Eitr, () => (chestsInRange(), UiLocalization.Text("config.available_chests", "Chests you can use now")));
+        Stat((width + gap) * 3, width, UiLocalization.Text("config.build", "Build"), Palette.Ember, () => ("v" + version,
+            ServerConfig.Instance?.RemoteVersion is string serverVersion && serverVersion != version
+                ? UiLocalization.Format("config.server_version", "Server v{0}", serverVersion)
+                : UiLocalization.Text("config.reload_help", "F6 reloads code in development")));
         float y = statHeight + gap + 6;
 
         List<ConfigEntryBase> quick = new ConfigEntryBase?[]
         {
-            settings.Hud, chests, Find<bool>("QualityOfLife.NearbyChests", "Crafting"), Find<bool>("QualityOfLife.NearbyChests", "Building"), Find<bool>("QualityOfLife.NearbyChests", "Stations")
+            settings.Hud, chests, range
         }.Where(e => e != null).Cast<ConfigEntryBase>().ToList();
         List<ConfigEntry<KeyboardShortcut>> keys = config.Select(kv => kv.Value).OfType<ConfigEntry<KeyboardShortcut>>().ToList();
 
@@ -627,23 +662,23 @@ internal sealed class ConfigWindow : IDisposable
         float quickHeight = 54 + quick.Count * 56, keysHeight = 54 + (keys.Count + 1) * 40;
 
         Image left = Ugui.Image(content, "Quick Settings", theme.Card, Color.white).At(0, y, leftWidth, quickHeight);
-        CardTitle(left.transform, "quick settings");
+        CardTitle(left.transform, UiLocalization.Text("config.quick", "quick settings"));
         float rowY = 52;
         foreach (ConfigEntryBase entry in quick)
         {
             if (rowY > 52) Ugui.Image(left.transform, "Rule", theme.White, Palette.Rule.WithAlpha(0.6f)).At(20, rowY - 4, leftWidth - 40, 1);
             RectTransform row = Ugui.Image(left.transform, "Row", null, Color.clear, raycast: true).At(20, rowY, leftWidth - 40, 48).rectTransform;
-            string description = entry.Description?.Description ?? "";
+            string description = SettingDescription(entry);
             row.OnHover(h => hoverHelp = h ? description : hoverHelp == description ? "" : hoverHelp);
-            Ugui.Text(row, "Label", $"{Title(entry.Definition.Section)}  ·  {ConfigControls.Pretty(entry.Definition.Key)}", theme.Strong, 13, Palette.Bone)
+            Ugui.Text(row, "Label", $"{Title(entry.Definition.Section)}  ·  {SettingTitle(entry)}", theme.Strong, 13, Palette.Bone)
                 .At(0, 0, leftWidth - 300, 48);
             Control(entry, row, new Rect(leftWidth - 40 - 250, 7, 250, 34));
             rowY += 56;
         }
 
         Image right = Ugui.Image(content, "Controls", theme.Card, Color.white).At(leftWidth + gap, y, rightWidth, keysHeight);
-        CardTitle(right.transform, "controls");
-        KeyLine(right.transform, 52, rightWidth, "Reload code", () => "F6");
+        CardTitle(right.transform, UiLocalization.Text("config.controls", "controls"));
+        KeyLine(right.transform, 52, rightWidth, UiLocalization.Text("config.reload", "Reload code"), () => "F6");
         float keyY = 52;
         foreach (ConfigEntry<KeyboardShortcut> key in keys)
         {
@@ -726,5 +761,9 @@ internal sealed class ConfigWindow : IDisposable
         config.TryGetEntry(section, key, out ConfigEntry<TValue> entry) ? entry : null;
 
     private static string Title(string section) =>
-        Sections.TryGetValue(section, out var meta) ? meta.Title : ConfigControls.Pretty(section.Substring(section.LastIndexOf('.') + 1));
+        UiLocalization.Text("section." + section + ".title", Sections.TryGetValue(section, out var meta) ? meta.Title : ConfigControls.Pretty(section.Substring(section.LastIndexOf('.') + 1)));
+
+    private static string Blurb(string section) => UiLocalization.Text("section." + section + ".blurb", Sections.TryGetValue(section, out var meta) ? meta.Blurb : "");
+    private static string SettingTitle(ConfigEntryBase entry) => UiLocalization.Text("setting." + entry.Definition.Section + "." + entry.Definition.Key + ".title", ConfigControls.Pretty(entry.Definition.Key));
+    private static string SettingDescription(ConfigEntryBase entry) => UiLocalization.Text("setting." + entry.Definition.Section + "." + entry.Definition.Key + ".description", entry.Description?.Description ?? "");
 }

@@ -49,6 +49,11 @@ Check(Ragnarok.Features.Gameplay.DeathPenalty.Scale(0.8f, 100) == 1f, "Increased
 Console.WriteLine("PASS: death penalty scaling and boundaries.");
 
 ConfigSchemaChecks.Run(Check);
+PickupQueueChecks.Run(Check);
+StatusCategoryChecks.Run(Check);
+MountBondChecks.Run(Check);
+MountProgressChecks.Run(Check);
+HoverPromptChecks.Run(Check);
 CraftSearchChecks.Run(Check);
 CraftFrameChecks.Run(Check);
 RecipeDetailsChecks.Run(Check);

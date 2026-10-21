@@ -331,9 +331,9 @@ internal sealed class CharacterPortrait : IDisposable
 
     public void Dispose()
     {
-        image.texture = null;
+        UiLifetime.DetachTexture(image);
         if (texture) { texture!.Release(); UnityEngine.Object.Destroy(texture); }
         texture = null;
-        UnityEngine.Object.Destroy(mask);
+        if (mask) UnityEngine.Object.Destroy(mask);
     }
 }

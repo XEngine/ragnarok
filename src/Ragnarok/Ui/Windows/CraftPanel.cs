@@ -74,6 +74,13 @@ internal sealed class CraftPanel : IDisposable
     private Image? hoveredRow;
     private string shownDescription = "";
     private int signature;
+    private int readListVersion = -1;
+    private Recipe? detailRecipe, requirementsRecipe;
+    private ItemDrop.ItemData? detailUpgrade;
+    private int detailQuality, detailAmount, detailWorld, requirementsQuality, requirementsAmount;
+    private string detailLanguage = "", nativeTooltip = "", nativeCraftType = "";
+    private float nextDetails, nextRequirements;
+    private bool requirementsNearby;
     private InventoryGui? gui;
     private RectTransform? root, listContent, descriptionContent, recipeView, descriptionView;
     private Image? sortButton, listDivider;
@@ -198,6 +205,11 @@ internal sealed class CraftPanel : IDisposable
         levels.Clear();
         repairHovered = false;
         shownDescription = "";
+        readListVersion = -1;
+        detailRecipe = requirementsRecipe = null;
+        detailUpgrade = null;
+        nextDetails = nextRequirements = 0f;
+        nativeTooltip = nativeCraftType = "";
         if (search) UiState.TypingFields.Remove(search!);
         search = null;
         searchPending = false;
@@ -624,7 +636,7 @@ internal sealed class CraftPanel : IDisposable
         craftableChip!.color = CraftFilter.CraftableOnly ? InventoryCategories.Gold.WithAlpha(0.16f) : Color.clear;
         craftableCheck!.color = CraftFilter.CraftableOnly ? InventoryCategories.Gold : Palette.Muted.WithAlpha(0.4f);
         sortLabel!.text = CraftFilter.CraftableFirst ? "Craftable first" : "Name A–Z";
-        bool nearby = NearbyStorage.StorageRuntime.Settings is { } storage && storage.Enabled.Value && storage.Crafting.Value;
+        bool nearby = NearbyStorage.StorageRuntime.Settings is { } storage && storage.Enabled.Value;
         resourcesLabel!.text = nearby ? "Pack + nearby chests" : "Pack materials";
         if (int.TryParse(g.m_craftingStationLevel.text, out int stationTier))
             for (int i = 0; i < levels.Count; i++) levels[i].color = i < stationTier ? InventoryCategories.Gold : Palette.Hex(0x626B64, 0.4f);
@@ -667,6 +679,8 @@ internal sealed class CraftPanel : IDisposable
 
     private void ReadRecipes(InventoryGui g)
     {
+        if (readListVersion == CraftFilter.ListVersion && CraftFilter.LastListOwner == g) return;
+        readListVersion = CraftFilter.ListVersion;
         IList list = (IList)Available.GetValue(g);
         int hash = list.Count;
         bool changedOrder = rows.Count != list.Count;
@@ -817,24 +831,37 @@ internal sealed class CraftPanel : IDisposable
         Color warn = g.m_minStationLevelText.color;
         stationNeed.color = needsStation && warn.r > 0.9f && warn.g < 0.3f ? Palette.Alert : Palette.Muted;
 
-        string text = "";
-        if (selected)
+        int amount = selected ? selected!.m_amount * (upgrading == null ? CraftAmount.Amount : 1) : 0;
+        string language = Localization.instance.GetSelectedLanguage();
+        if (selected != detailRecipe || upgrading != detailUpgrade || quality != detailQuality || amount != detailAmount ||
+            Game.m_worldLevel != detailWorld || language != detailLanguage || Time.unscaledTime >= nextDetails)
         {
-            ItemDrop.ItemData data = selected!.m_item.m_itemData;
-            int amount = selected.m_amount * (upgrading == null ? CraftAmount.Amount : 1);
-            string native = ItemDrop.ItemData.GetTooltip(data, quality, true, Game.m_worldLevel, amount);
-            text = Restyle(Localization.instance.Localize(RecipeDetails.Format(native, data.m_shared.m_description)));
+            detailRecipe = selected; detailUpgrade = upgrading; detailQuality = quality; detailAmount = amount;
+            detailWorld = Game.m_worldLevel; detailLanguage = language; nextDetails = Time.unscaledTime + 0.2f;
+            string text = "";
+            if (selected)
+            {
+                ItemDrop.ItemData data = selected!.m_item.m_itemData;
+                string native = ItemDrop.ItemData.GetTooltip(data, quality, true, Game.m_worldLevel, amount);
+                text = Restyle(Localization.instance.Localize(RecipeDetails.Format(native, data.m_shared.m_description)));
+            }
+            if (text != shownDescription)
+            {
+                shownDescription = text;
+                description!.text = text;
+                description.ForceMeshUpdate();
+                descriptionContent!.sizeDelta = new Vector2(0, description.preferredHeight + 10);
+                descriptionContent.anchoredPosition = Vector2.zero;
+            }
         }
-        string fullTooltip = has ? Restyle(g.m_recipeDecription.text) : "";
-        if (has && g.m_itemCraftType.gameObject.activeSelf) fullTooltip += "\n\n" + Restyle(g.m_itemCraftType.text);
-        recipeTooltip!.Set(has ? g.m_recipeName.text : "", "RECIPE · ITEM DETAILS", fullTooltip);
-        if (text != shownDescription)
+        string nativeDescription = has ? g.m_recipeDecription.text : "";
+        string craftType = has && g.m_itemCraftType.gameObject.activeSelf ? g.m_itemCraftType.text : "";
+        if (nativeDescription != nativeTooltip || craftType != nativeCraftType)
         {
-            shownDescription = text;
-            description!.text = text;
-            description.ForceMeshUpdate();
-            descriptionContent!.sizeDelta = new Vector2(0, description.preferredHeight + 10);
-            descriptionContent.anchoredPosition = Vector2.zero;
+            nativeTooltip = nativeDescription; nativeCraftType = craftType;
+            string fullTooltip = Restyle(nativeDescription);
+            if (craftType.Length > 0) fullTooltip += "\n\n" + Restyle(craftType);
+            recipeTooltip!.Set(has ? g.m_recipeName.text : "", "RECIPE · ITEM DETAILS", fullTooltip);
         }
 
         ShowRequirements(g, player, has);
@@ -891,14 +918,20 @@ internal sealed class CraftPanel : IDisposable
 
     private void ShowRequirements(InventoryGui g, Player player, bool has)
     {
-        needed.Clear();
-        missingMaterials = false;
         object selected = SelectedField.GetValue(g);
         Recipe? recipe = has ? PairRecipe.GetValue(selected) as Recipe : null;
-        materialsLabel!.text = recipe && recipe!.m_requireOnlyOneIngredient ? "ANY ONE INGREDIENT" : "REQUIRED MATERIALS";
         ItemDrop.ItemData? upgrade = PairItem.GetValue(selected) as ItemDrop.ItemData;
         int quality = upgrade == null ? 1 : upgrade.m_quality + 1;
         int multiplier = upgrade == null && (CraftAmount.Amount > 1 || ZInput.GetButton("AltPlace")) ? g.m_multiCraftAmount : 1;
+        NearbyStorage.StorageSettings? storage = NearbyStorage.StorageRuntime.Settings;
+        bool nearby = storage != null && storage.Enabled.Value && NearbyStorage.StorageRuntime.Registry != null;
+        if (recipe == requirementsRecipe && quality == requirementsQuality && multiplier == requirementsAmount &&
+            nearby == requirementsNearby && Time.unscaledTime < nextRequirements) return;
+        requirementsRecipe = recipe; requirementsQuality = quality; requirementsAmount = multiplier;
+        requirementsNearby = nearby; nextRequirements = Time.unscaledTime + 0.2f;
+        needed.Clear();
+        missingMaterials = false;
+        materialsLabel!.text = recipe && recipe!.m_requireOnlyOneIngredient ? "ANY ONE INGREDIENT" : "REQUIRED MATERIALS";
         CraftingStation station = player.GetCurrentCraftingStation();
         if (recipe)
             foreach (Piece.Requirement req in recipe!.m_resources)
@@ -914,9 +947,8 @@ internal sealed class CraftPanel : IDisposable
         NearbyStorage.ResourceScope? scope = null;
         try
         {
-            NearbyStorage.StorageSettings? storage = NearbyStorage.StorageRuntime.Settings;
-            if (storage != null && storage.Enabled.Value && storage.Crafting.Value && NearbyStorage.StorageRuntime.Registry != null)
-                scope = new NearbyStorage.ResourceScope(player, NearbyStorage.StorageRuntime.Registry, false);
+            if (nearby)
+                scope = new NearbyStorage.ResourceScope(player, NearbyStorage.StorageRuntime.Registry!, false);
             foreach (Piece.Requirement resource in needed)
                 if (player.GetInventory().CountItems(resource.m_resItem.m_itemData.m_shared.m_name) < resource.GetAmount(quality) * multiplier)
                     missingMaterials = true;

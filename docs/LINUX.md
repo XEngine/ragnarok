@@ -14,6 +14,11 @@ Requirements: Python 3.9+, Bash, curl, rsync, file, and the system libraries nee
 by .NET and Valheim. No PowerShell, Wine, global SDK installation or root access is
 required. Setup installs the exact SDK from `global.json` locally and uses the same
 SHA-256-verified BepInExPack 5.4.2351 and ScriptEngine r11.2 archives as Windows.
+Setup also installs checksum-verified Jotunn 2.30.2 if no copy exists in the isolated
+game. Jotunn 2.30.2+ is required to build and run Ragnarok; existing installations
+are preserved. Keep exactly one Jotunn.dll under the development BepInEx/plugins.
+Builds discover it recursively; an explicit `JotunnPath` MSBuild property can point
+to another installed copy. Dependencies are not bundled in Ragnarok release archives.
 The SDK resolves .NET Framework reference assemblies during restore; the game runs
 the resulting net472 plugin with its own Unity/Mono runtime.
 

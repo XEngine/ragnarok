@@ -53,6 +53,16 @@ $previousConfig = if (Test-Path -LiteralPath $bepConfig) { [IO.File]::ReadAllTex
 Copy-Item -Path (Join-Path $bepExtract 'BepInExPack_Valheim/*') -Destination $game -Recurse -Force
 if ($null -ne $previousConfig) { [IO.File]::WriteAllText($bepConfig, $previousConfig) }
 Copy-Item -LiteralPath (Join-Path $engineExtract 'BepInEx/plugins') -Destination (Join-Path $game 'BepInEx') -Recurse -Force
+# Preserve existing mod-manager/manual Jotunn installations; doctor checks their version.
+$jotunnCopies = @(Get-ChildItem -LiteralPath (Join-Path $game 'BepInEx/plugins') -Recurse -File -Filter 'Jotunn.dll')
+if ($jotunnCopies.Count -eq 0) {
+    $jotunn = Get-VerifiedArchive 'https://thunderstore.io/package/download/ValheimModding/Jotunn/2.30.2/' 'Jotunn-2.30.2.zip' '8AAE92DA2BE0EB6820CD4CF57E2F6C1D6AD0D738D4915966E7C3D7A94E9A9B0F'
+    $jotunnExtract = Join-Path $downloads 'Jotunn-2.30.2'
+    Expand-Archive -LiteralPath $jotunn -DestinationPath $jotunnExtract -Force
+    $jotunnDestination = Join-Path $game 'BepInEx/plugins/Jotunn'
+    New-Item -ItemType Directory -Path $jotunnDestination -Force | Out-Null
+    Copy-Item -Path (Join-Path $jotunnExtract 'plugins/*') -Destination $jotunnDestination -Recurse -Force
+}
 $savePath = Join-Path $DevRoot 'saves'
 New-Item -ItemType Directory -Path $savePath,(Join-Path $game 'BepInEx/scripts') -Force | Out-Null
 $engineConfig = Join-Path $game 'BepInEx/config/com.bepis.bepinex.scriptengine.cfg'

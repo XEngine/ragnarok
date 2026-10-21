@@ -89,7 +89,7 @@ internal sealed class BuildMenuData
         foreach (Category category in Categories) if (category.Selected) Heading = category.Name;
         Repair = Special.GetValue(owner) is BuildUiPieceButton special && special ? special.Piece : null;
         Pieces.Clear(); Visible.Clear(); Materials.Clear();
-        NearbyAllowed = StorageRuntime.Settings is { } storage && storage.Enabled.Value && storage.Building.Value && StorageRuntime.Registry != null;
+        NearbyAllowed = StorageRuntime.Settings is { } storage && storage.Enabled.Value && StorageRuntime.Registry != null;
         using ResourceScope? scope = NearbyAllowed && settings.BuildCountNearby.Value
             ? new ResourceScope(player, StorageRuntime.Registry!, false) : null;
         string[] terms = query.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);

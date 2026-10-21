@@ -12,7 +12,6 @@ namespace Ragnarok.Features.QualityOfLife;
 
 internal sealed class ChestSearch : IDisposable
 {
-    private static readonly MethodInfo Access = AccessTools.Method(typeof(Container), "CheckAccess");
     private static readonly MethodInfo SetCrouch = AccessTools.Method(typeof(Player), "SetCrouch");
     private static readonly AccessTools.FieldRef<InventoryGui, Container> OpenContainer = AccessTools.FieldRefAccess<InventoryGui, Container>("m_currentContainer");
     private readonly InterfaceSettings settings;
@@ -28,6 +27,8 @@ internal sealed class ChestSearch : IDisposable
     private float expires, nextScan;
     private int selected, totalResults;
     private bool vanilla;
+    private readonly ChestSearchMapOverlay mapOverlay = new();
+    private string shownLanguage = "";
     private const int MaxRows = 8;
     private const float GuideDuration = 20f;
 
@@ -50,19 +51,21 @@ internal sealed class ChestSearch : IDisposable
     // The search shortcut's keys are held (either Control counts for the default Ctrl+F).
     private bool ShortcutHeld()
     {
-        KeyboardShortcut key = settings.Features.ChestSearchKey.Value;
+        if (!NearbyStorage.StorageRuntime.Settings.Enabled.Value) return false;
+        KeyboardShortcut key = NearbyStorage.StorageRuntime.Settings.ChestSearchKey.Value;
         if (key.MainKey == KeyCode.None || !Input.GetKey(key.MainKey)) return false;
         return key.Modifiers.All(m => Input.GetKey(m) || (m == KeyCode.LeftControl && Input.GetKey(KeyCode.RightControl)));
     }
 
     internal void Update()
     {
+        if (canvas && shownLanguage != UiLocalization.Language) { Close(); ClearGuide(); DestroyUi(); }
         var player = Player.m_localPlayer;
-        if (!settings.Features.ChestSearch.Value || !player || player.IsDead()) { Close(); ClearGuide(); return; }
+        if (!NearbyStorage.StorageRuntime.Settings.Enabled.Value || !player || player.IsDead()) { Close(); ClearGuide(); return; }
         if (UiState.WindowOpen || InventoryGui.IsVisible() || Menu.IsVisible()) Close();
-        bool shortcut = settings.Features.ChestSearchKey.Value.IsDown();
+        bool shortcut = NearbyStorage.StorageRuntime.Settings.ChestSearchKey.Value.IsDown();
         // Support either Control key for the default shortcut.
-        if (settings.Features.ChestSearchKey.Value.MainKey == KeyCode.F && settings.Features.ChestSearchKey.Value.Modifiers.SequenceEqual(new[] { KeyCode.LeftControl }))
+        if (NearbyStorage.StorageRuntime.Settings.ChestSearchKey.Value.MainKey == KeyCode.F && NearbyStorage.StorageRuntime.Settings.ChestSearchKey.Value.Modifiers.SequenceEqual(new[] { KeyCode.LeftControl }))
             shortcut |= Input.GetKeyDown(KeyCode.F) && Input.GetKey(KeyCode.RightControl);
         if (shortcut && !UiState.WindowOpen && !InventoryGui.IsVisible() && !Menu.IsVisible() &&
             !Console.IsVisible() && !Minimap.IsOpen() && !StoreGui.IsVisible() && (!Chat.instance || !Chat.instance.HasFocus()))
@@ -82,13 +85,7 @@ internal sealed class ChestSearch : IDisposable
 
     private bool Accessible(Container chest, Player player)
     {
-        if (!chest || !chest.isActiveAndEnabled || chest.GetInventory() == null || chest.GetComponent<TombStone>()) return false;
-        var piece = chest.GetComponent<Piece>();
-        if (!piece || piece.GetCreator() == 0 || chest.m_wagon || chest.m_rootObjectOverride || chest.m_autoDestroyEmpty) return false;
-        var view = chest.GetComponent<ZNetView>();
-        return view && view.IsValid() && Vector3.Distance(player.transform.position, chest.transform.position) <= settings.Features.ChestSearchRange.Value &&
-            (!chest.m_checkGuardStone || PrivateArea.CheckAccess(chest.transform.position, 0f, flash: false)) &&
-            (bool)Access.Invoke(chest, new object[] { player.GetPlayerID() });
+        return NearbyStorage.StorageRuntime.Registry?.CanAccess(chest, player) == true;
     }
 
     private void Open()
@@ -120,9 +117,10 @@ internal sealed class ChestSearch : IDisposable
         string query = input!.text.Trim();
         if (query.Length > 0)
         {
-            foreach (var chest in UnityEngine.Object.FindObjectsByType<Container>(FindObjectsSortMode.None))
+            foreach (var chest in NearbyStorage.StorageRuntime.Registry.Nearby(Player.m_localPlayer, fresh: true))
             {
                 if (!Accessible(chest, Player.m_localPlayer)) continue;
+                NearbyStorage.StorageRuntime.Registry.Refresh(chest);
                 foreach (var group in chest.GetInventory().GetAllItems().GroupBy(item => item.m_shared.m_name))
                 {
                     string name = Localization.instance.Localize(group.Key);
@@ -144,8 +142,8 @@ internal sealed class ChestSearch : IDisposable
             rows[i].Icon.sprite = result.Icon;
             rows[i].Label.text = $"{result.Name} ×{result.Count}\n{Localization.instance.Localize(result.Chest.GetHoverName())} · {result.Distance:0} m";
         }
-        footer!.text = query.Length == 0 ? "Type an item name to search nearby chests" : totalResults == 0 ? "No matching items in accessible chests" :
-            totalResults > MaxRows ? $"Nearest {MaxRows} of {totalResults} matches · refine your search" : "↑ ↓ Select   Enter Locate   Esc Close · guide lasts 20 seconds";
+        footer!.text = query.Length == 0 ? UiLocalization.Text("search.start", "Type an item name to search nearby chests") : totalResults == 0 ? UiLocalization.Text("search.empty", "No matching items in accessible chests") :
+            totalResults > MaxRows ? UiLocalization.Format("search.many", "Nearest {0} of {1} matches · refine your search", MaxRows, totalResults) : UiLocalization.Text("search.help", "↑ ↓ Select   Enter Locate   Esc Close · guide lasts 20 seconds");
     }
 
     private void Choose(int index)
@@ -165,9 +163,11 @@ internal sealed class ChestSearch : IDisposable
             SetCrouch.Invoke(Player.m_localPlayer, new object[] { false });
         if (!target) { ClearGuide(); return; }
         var player = Player.m_localPlayer;
-        if (!player || player.IsDead() || Time.unscaledTime >= expires || !Accessible(target!, player) ||
+        if (!NearbyStorage.StorageRuntime.Settings.Enabled.Value || !player || player.IsDead() || Time.unscaledTime >= expires || !Accessible(target!, player) ||
             (InventoryGui.instance && InventoryGui.IsVisible() && OpenContainer(InventoryGui.instance) == target))
         { ClearGuide(); return; }
+        if (settings.ChestSearchMapMarker.Value && NearbyStorage.StorageRuntime.Settings.Enabled.Value) mapOverlay.Show(target!.transform.position);
+        else mapOverlay.Hide();
         var camera = Utils.GetMainCamera();
         if (!camera || !guide) return;
         bool visible = global::Hud.instance && global::Hud.instance.m_rootObject.activeInHierarchy && !UiState.ModalOpen;
@@ -226,6 +226,7 @@ internal sealed class ChestSearch : IDisposable
 
     private void Build()
     {
+        shownLanguage = UiLocalization.Language;
         vanilla = settings.Hud.Value == HudStyle.Vanilla;
         var gui = InventoryGui.instance;
         var font = vanilla ? gui.m_recipeDecription.font : theme.Body;
@@ -245,13 +246,13 @@ internal sealed class ChestSearch : IDisposable
         var window = Ugui.Image(panel, "Window", frame, Color.white, true).rectTransform;
         window.anchorMin = window.anchorMax = window.pivot = new Vector2(0.5f, 0.5f);
         window.sizeDelta = new Vector2(600, 610);
-        Ugui.Text(window, "Title", "FIND IN NEARBY CHESTS", vanilla ? gui.m_containerName.font : theme.Heading, 22, vanilla ? gui.m_containerName.color : Palette.Gold).At(28, 22, 540, 30);
+        Ugui.Text(window, "Title", UiLocalization.Text("search.title", "FIND IN NEARBY CHESTS"), vanilla ? gui.m_containerName.font : theme.Heading, 22, vanilla ? gui.m_containerName.color : Palette.Gold).At(28, 22, 540, 30);
         var field = Ugui.Image(window, "Search", vanilla ? button : theme.Field, Color.white, true).At(28, 64, 544, 42);
         field.gameObject.SetActive(false);
         var area = Ugui.Node(field.transform, "Text Area").Stretch(12, 4, 12, 4);
         area.gameObject.AddComponent<RectMask2D>();
         var text = Ugui.Text(area, "Query", "", font, 19, Color.white).Stretch();
-        var placeholder = Ugui.Text(area, "Placeholder", "Search items…", font, 19, new Color(1, 1, 1, 0.5f)).Stretch();
+        var placeholder = Ugui.Text(area, "Placeholder", UiLocalization.Text("search.placeholder", "Search items…"), font, 19, new Color(1, 1, 1, 0.5f)).Stretch();
         input = field.gameObject.AddComponent<TMP_InputField>();
         input.textViewport = area; input.textComponent = text; input.placeholder = placeholder; input.targetGraphic = field;
         input.characterLimit = 64;
@@ -270,7 +271,7 @@ internal sealed class ChestSearch : IDisposable
         footer = Ugui.Text(window, "Help", "", font, 14, vanilla ? Color.white : Palette.Muted).At(28, 554, 544, 30);
     }
 
-    private void ClearGuide() { target = null; if (guide) guide!.gameObject.SetActive(false); }
+    private void ClearGuide() { target = null; mapOverlay.Hide(); if (guide) guide!.gameObject.SetActive(false); }
     private void DestroyUi()
     {
         if (input) UiState.TypingFields.Remove(input!);
@@ -280,6 +281,7 @@ internal sealed class ChestSearch : IDisposable
     }
     public void Dispose()
     {
+        mapOverlay.Dispose();
         ForsakenPowerPatch.Blocked = () => false;
         Close();
         ClearGuide();

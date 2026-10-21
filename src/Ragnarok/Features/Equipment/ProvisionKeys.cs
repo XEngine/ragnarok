@@ -23,7 +23,7 @@ internal static class ProvisionKeys
         Inventory inventory = player.GetInventory();
         for (int i = 0; i < Keys.Length && i < CharacterSlots.Provisions; i++)
         {
-            if (!Keys[i].Value.IsDown() || HotbarRows.Claims(Keys[i].Value)) continue;
+            if (!Keys[i].Value.IsDown()) continue;
             Vector2i slot = CharacterSlots.ProvisionSlot(i);
             ItemDrop.ItemData item = inventory.GetItemAt(slot.x, slot.y);
             if (item != null) player.UseItem(null, item, false);
@@ -31,7 +31,7 @@ internal static class ProvisionKeys
     }
 
     // A provision key with modifiers (Alt+1) also presses Valheim's hotbar key (1).
-    internal static bool AnyDown() => CharacterSlots.Enabled() && Keys.Any(k => k.Value.MainKey != KeyCode.None && k.Value.IsDown() && !HotbarRows.Claims(k.Value));
+    internal static bool AnyDown() => CharacterSlots.Enabled() && Keys.Any(k => k.Value.MainKey != KeyCode.None && k.Value.IsDown());
 
     // Short label for the HUD: "ALT+1", "CTRL+F", "NUM 3".
     internal static string Label(KeyboardShortcut shortcut)

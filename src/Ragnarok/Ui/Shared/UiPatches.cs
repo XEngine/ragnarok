@@ -21,6 +21,23 @@ internal static class UiState
             return false;
         }
     }
+
+    // Typing into any text field: ours, or the focused field the UI has selected (a field not in the
+    // list above, or another mod's). Only movement and character actions use this; game buttons stay
+    // with Typing so Valheim's own chat and console keep their keys.
+    internal static bool TextFocused
+    {
+        get
+        {
+            if (Typing) return true;
+            GameObject? selected = UnityEngine.EventSystems.EventSystem.current
+                ? UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject : null;
+            if (!selected || !selected!.activeInHierarchy) return false;
+            if (selected.TryGetComponent(out TMPro.TMP_InputField tmp)) return tmp.isFocused;
+            return selected.TryGetComponent(out UnityEngine.UI.InputField legacy) && legacy.isFocused;
+        }
+    }
+
     // Escape closes our window; keep the pause menu from opening on the same key press.
     internal static int SuppressMenuUntilFrame;
 
@@ -35,12 +52,25 @@ internal static class UiState
     }
 }
 
+// Movement and camera: with this false, PlayerController zeroes the character's controls, however
+// the keys are read (keyboard buttons, the input system's stick, other mods).
 [HarmonyPatch(typeof(PlayerController), "TakeInput")]
 internal static class BlockPlayerInputPatch
 {
     private static void Postfix(ref bool __result)
     {
-        if (UiState.BlocksGame) __result = false;
+        if (__result && (UiState.BlocksGame || UiState.TextFocused)) __result = false;
+    }
+}
+
+// Character actions (use, hotbar, sit, powers, provision keys): Valheim already stops them while its
+// own windows are open, but not for our search windows and fields.
+[HarmonyPatch(typeof(Player), "TakeInput")]
+internal static class BlockPlayerActionsPatch
+{
+    private static void Postfix(Player __instance, ref bool __result)
+    {
+        if (__result && __instance == Player.m_localPlayer && (UiState.BlocksGame || UiState.TextFocused)) __result = false;
     }
 }
 
@@ -55,12 +85,20 @@ internal static class BlockGameButtonsPatch
             yield return AccessTools.Method(typeof(ZInput), name, new[] { typeof(string) });
     }
 
-    private static bool Prefix(ref bool __result)
+    private static bool Prefix(string name, ref bool __result)
     {
         // Include the closing frame: Enter must not become Chat after search consumes it.
-        if (!UiState.BlocksGame && !UiState.Typing) return true;
+        if ((!UiState.BlocksGame && !UiState.Typing) || JotunnIntegration.AllowsButton(name)) return true;
         __result = false;
         return false;
+    }
+
+    // Jotunn reads buttons again in its postfix using a reverse patch, bypassing our prefix.
+    // Apply the focus guard after that result too, for both native and mod-defined buttons.
+    [HarmonyPriority(Priority.Last)]
+    private static void Postfix(string name, ref bool __result)
+    {
+        if ((UiState.BlocksGame || UiState.Typing) && !JotunnIntegration.AllowsButton(name)) __result = false;
     }
 }
 

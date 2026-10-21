@@ -20,6 +20,7 @@ internal static class CraftFilter
     internal static int ContextVersion;
     internal static InventoryGui? LastListOwner;
     internal static bool LastListSorted;
+    internal static int ListVersion;
     internal static readonly HashSet<CraftArmorSlot> PresentSlots = new();
     private static string[] terms = Array.Empty<string>();
     private static readonly List<string> ingredients = new();
@@ -218,6 +219,7 @@ internal static class SlotRecipeListPatch
 
     private static void Postfix(InventoryGui __instance)
     {
+        unchecked { CraftFilter.ListVersion++; }
         CraftFilter.LastListOwner = __instance;
         CraftFilter.LastListSorted = CraftFilter.Enabled() && CraftFilter.SortEnabled();
         IList list = (IList)Available.GetValue(__instance);

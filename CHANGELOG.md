@@ -1,5 +1,71 @@
 # Change record
 
+## Unreleased - Riding progression 0.5.4, 2026-10-21
+
+- Summons cost 10% maximum stamina at Riding 0, falling to zero at 100, charged
+  only on confirmed arrival. Whistle windup falls from 1.2 to 0.6 seconds.
+- Add modest native Riding XP for a first bond with each animal and successful
+  summons, with persistent rebind protection and a five-minute summon XP cooldown.
+- Persist ordered completion receipts and deduplicate owner-side stamina/XP
+  application across duplicate delivery and F6 reloads. Server controls all rules;
+  mount protocol 3 requires updated clients/owners.
+- Show companion condition, Riding, summon cost and whistle time in F10; show
+  estimates on bound-mount hover and add subtle arrival sparkles at milestones.
+- Build/metadata/regression checks passed. Live multiplayer progression checks
+  remain pending.
+
+## Unreleased - Stable mount bonds 0.5.3, 2026-10-21
+
+- Add a local magical burst and short materialization animation after a confirmed
+  mount arrival, using native game effects and preserving the original animal.
+- Add a compact frameless Ragnarok riding panel with health/stamina values and
+  slim bars, above vitals or at right-center when that space is occupied.
+- Avoid indefinite summon rejection from a mount's saved alert/fear flag; retain
+  the combat cooldown and verify loaded hostile targeting before movement.
+- Persist an owner-stamped animal marker rather than treating network IDs as
+  stable across saves. Refuse missing/duplicate markers and preserve old bonds
+  for guarded exact-name recovery or rebinding. The user's Moose was recovered
+  and its marker, health, saddle and position verified through a server restart.
+- Wait for a missing distant owner record before moving it, and reject clients
+  without the required mount protocol with an explicit F6/update message.
+- Use native health defaults for missing health fields and native saddle support,
+  with specific validation reasons and transaction diagnostics. Never heal, clone
+  or resurrect an animal to make validation pass.
+- Builds, automated checks and native marker persistence passed. Full multiplayer
+  Ashlands arrival is pending an in-game retry.
+
+## Unreleased - Dedicated mount handshake fix 0.5.1, 2026-10-21
+
+- Detect the mount service without requiring a loaded server-side Player object.
+  Authenticate gameplay requests from the connection's persistent character ZDO.
+- Recheck outdoor physics on the requesting client before and after windup, using
+  fresh server tokens. Server bounds, ward/combat/bond checks and current-owner
+  animal movement remain in place. Explain pending player records explicitly.
+- Debug/Release builds, metadata and regression checks passed. Full multiplayer
+  binding/summoning still requires an in-game test.
+
+## Unreleased - Mount companion prototype 0.5.0, 2026-10-21
+
+- Add one exclusive saddle-mount bond per player, world-specific atomic server
+  storage, hold Shift+H to bind/release and H to whistle outdoors. F10 includes
+  rebindable controls, bound name and remote release.
+- Validate combat, riders, health/saddle, wards and safe outdoor arrival before
+  and after a short windup. The current owner moves the original animal/ZDO;
+  unloaded offline-owned animals can be moved by the server without cloning.
+- Reuse the wave gesture and add original synthesized whistle audio. Server rules
+  stay locked; RPC/input/audio/patch ownership is cleaned up on unload.
+- Debug/Release builds, regression and metadata checks passed. Earlier isolated
+  transport checks passed. The full new service/control flow and multiplayer
+  still need an in-game test; user requested leaving the current client running.
+
+## Unreleased ? Nearby Chests 0.4.0, 2026-10-21
+
+- Combine crafting, building, station supply, Quick Stack and item search under one
+  Nearby Chests enable switch, shared range and registry/access policy.
+- Consolidate settings and migrate existing preferences; retire separate switches
+  and search ranges. Update clients and servers together.
+- Builds and automated checks passed; in-game and multiplayer testing pending.
+
 ## Unreleased — Rune & Iron and Linux development, 2026-10-19–20
 
 Accumulated work after `9472bf2`. The plugin remains version 0.3.0; this is not a

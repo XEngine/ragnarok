@@ -14,7 +14,7 @@ internal sealed class TextOutline
     private static readonly Regex ColorTags = new(@"</?color(?:=[^>]*)?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private string sourceText, outlineText;
 
-    internal TextOutline(TMP_Text source, bool world = false)
+    internal TextOutline(TMP_Text source, bool world = false, float opacity = 1f, float radiusScale = 1f)
     {
         this.source = source;
         edges = new TextMeshProUGUI[world ? 17 : 8];
@@ -27,6 +27,7 @@ internal sealed class TextOutline
             bool shadow = world && i < 9;
             float angle = (world ? i - 9 : i) * Mathf.PI / 4;
             Color ink = world ? Palette.Hex(0x0A0D0E, shadow ? 0.097f : 1) : Palette.Hex(0x29302F, 0.32f);
+            ink.a *= Mathf.Clamp01(opacity);
             TextMeshProUGUI edge = Ugui.Text(source.transform.parent, source.name + " outline " + i,
                 source.richText ? outlineText : sourceText, source.font, source.fontSize, ink, source.alignment);
             RectTransform rect = edge.rectTransform;
@@ -36,6 +37,7 @@ internal sealed class TextOutline
             rect.sizeDelta = layout.sizeDelta;
             offsets[i] = shadow ? new Vector2(0, -2) + (i == 8 ? Vector2.zero : new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * 3)
                 : new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * (world ? 1 : 0.65f);
+            offsets[i] *= radiusScale;
             rect.anchoredPosition = layout.anchoredPosition + offsets[i];
             edge.overflowMode = source.overflowMode;
             edge.textWrappingMode = source.textWrappingMode;

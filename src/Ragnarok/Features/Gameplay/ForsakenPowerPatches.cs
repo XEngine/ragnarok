@@ -35,3 +35,18 @@ internal static class PowerDurationPatch
         if (effect) effect.m_ttl = GameplaySettings.Current.PowerDuration.Value * 60f;
     }
 }
+
+// Templates retain vanilla lifetimes; only the preview text reflects the next
+// activation's configured duration. Existing active effects keep their own TTL.
+[HarmonyPatch(typeof(SE_Stats), nameof(SE_Stats.GetTooltipString))]
+internal static class PowerTooltipPatch
+{
+    private static void Postfix(SE_Stats __instance, ref string __result)
+    {
+        if (GameplaySettings.Current == null || !GameplaySettings.Powers.Contains(__instance.NameHash()) ||
+            __instance.m_character) return;
+        string original = "$se_ttl: <color=orange>" + __instance.m_ttl + "</color>";
+        string duration = StatusEffect.GetTimeString(GameplaySettings.Current.PowerDuration.Value * 60f);
+        __result = __result.Replace(original, "$se_ttl: <color=orange>" + duration + "</color>");
+    }
+}

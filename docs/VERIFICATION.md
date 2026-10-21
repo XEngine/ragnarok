@@ -1,5 +1,507 @@
 # Development setup verification
 
+## Native verification of scene-cleanup fixes, 2026-10-21
+
+- After the user closed the client, ran the real Unity startup/F6 smoke test.
+  Inventory, station, XP, policy and new UI lifecycle checks passed on both loads;
+  the destroyed notification/portrait accesses and duplicate localization errors
+  did not recur. The full run failed only because BepInEx logged the earlier
+  ReadDebugHeader/negative-count assembly error during startup.
+- Scanned installed plugin DLLs with the installed Mono.Cecil: MyDirtyHoe.dll was
+  the failing file. Preserved the all-mods smoke log outside the checkout at
+  D:/RagnarokDev/diagnostics/hud-smoke-with-installed-mods.log.
+- With the client closed, temporarily moved only that DLL out of plugin discovery,
+  repeated scripts/smoke.ps1 and obtained a complete PASS for startup and F6 reload.
+  A finally block restored MyDirtyHoe.dll and verified its original SHA-256 hash.
+  ScriptEngine/BepInEx configuration was restored by the smoke script. No world or
+  character was loaded/modified, and the dedicated server was not restarted.
+- Cleanup fixes are deployed. Server rejoin and camera-spinning behavior remain
+  unverified in gameplay; the native checks verify scene-owned UI destruction and
+  plugin reload rather than mouse/controller movement in a connected world.
+
+## Scene-change cleanup failure and interrupted reload, 2026-10-21
+
+- Real client log identifies two destroyed-native-object accesses after returning
+  through the menu/server scene transition: CharacterPortrait.Dispose writes
+  RawImage.texture after its scene was destroyed; ItemNotifications.Clear writes
+  destroyed CanvasGroup.alpha. The latter repeats every frame and interrupts
+  OnDestroy. The next reload then fails with "Ragnarok localization is already
+  registered", leaving custom rendering/native masks incompletely restored.
+- Added Unity lifetime guards for fade reset, portrait texture detach and owned
+  root destruction. Notification disposal is idempotent and dead child roots force
+  reconstruction. Plugin unload now releases input/patch hooks first, attempts
+  every component release despite failures, and still reaches native HUD restoration
+  and localization cleanup. Jotunn releases its own block even if a binding fails.
+- Nine production-linked fake-null/cleanup checks passed, including a simulated
+  broken renderer followed by actual localization release. Input regressions now
+  include a failing action disposal and preservation of another mod's input block
+  (109 checks total). Full automated suites and Debug/Release builds passed.
+- Added opt-in real-Unity startup checks that construct notification/portrait UI,
+  destroy their synthetic parent, then clear/dispose their managed owners repeatedly.
+  Windows/Linux smoke validation requires these checks on both initial load and F6.
+  Native smoke was attempted but its existing guard rejected execution while the
+  user's Valheim process remained running; no client/server was stopped.
+- Deployed fix to development scripts. The current client needs one full restart:
+  failed old-version unloads already left a localization registration and UI objects
+  behind, and new code cannot repair those destroyed old plugin instances via F6.
+  Rejoin/return to menu/rejoin and reload after restarting; check that errors above
+  disappear and the UI restores consistently. Camera spinning is user-reported;
+  logs establish the cleanup failures, not a separate camera-input cause. It still
+  requires verification in a clean session; no camera-sensitivity/config reset made.
+
+## Categorized original status icons, 2026-10-21
+
+- Debuff refinement: enlarged only the compass-row icons to 48 pixels, with a
+  larger outlined countdown inside the lower part of each icon and names below.
+  Expanded row spacing; untimed debuffs omit the timer. Passive/ongoing sizing is
+  retained. Debug build/deploy passed; in-game visual verification is pending.
+- Visual follow-up: enlarged original icons from 24 to 32 pixels, slightly enlarged
+  names/timers and expanded spacing. Removed visible plates/rims from every group;
+  transparent hover targets preserve tooltips. Debug build/deploy passed without
+  warnings/errors; in-game appearance remains unverified.
+- Status tiles now use each StatusEffect.m_icon directly in full color; removed
+  custom rested/fire/shelter/wet replacements and monochrome conversions from this
+  display. Tiles grew from 34 to 42 pixels, icons from 16 to 24, with matching
+  sizes in all groups. Existing Forsaken power artwork is outside this change.
+- Passive effects are identified from Humanoid.m_equipmentStatusEffects (including
+  extra utility effects). Other beneficial/unknown effects stay in Ongoing. Both
+  groups use the existing HUD.Status placement near the character name, with
+  localized headings and separate rows; portrait provisions/roster reserve their
+  actual combined height. Existing tooltips, timers and comfort count are retained.
+- Harmful effects use a separate centered strip below the compass at identical
+  HUD scale. Known native poison/burning/smoked/wet/cold/freezing/frost/lightning/
+  spirit/tared/encumbered names and poison/burning/smoke implementation types route
+  here. Inspected installed SEMan native IDs and equipment-effect field. No generic
+  debuff flag exists; unknown mod effects without these identities/types remain
+  Ongoing. CampFire/Resting/Rested/Shelter are explicitly not harmful.
+- Compass-off/preview fallback uses top center. Owned roots, labels and tooltips
+  are destroyed on HUD rebuild/unload. Settings toggle restores the native list.
+  Presentation only: no status application, gameplay policy, RPC or new dependency.
+- Added routing regressions for equipment, ongoing buffs, native harmful names,
+  mod damage types, clone names and precedence. Debug/Release builds and all
+  automated suites passed; development build deployed. No in-game test performed.
+- After F6 verify Megingjord/Wishbone/Wisplight, rested/shelter/fire, actual poison/
+  burning/smoke, timer expiry, mixed categories, long/localized names, tooltip
+  hovers, moved/scaled compass, status toggle and repeated reload cleanup.
+
+## Active food beside Forsaken power, 2026-10-21
+
+- Moved the three active-food cells from the portrait to an independently owned
+  HUD root beside the Forsaken power display, retaining original food sprites,
+  rings and countdowns. Follows HUD.Power placement and HUD scale; switches to the
+  left when space on the right is insufficient and clamps to the screen.
+- Food remains available when the power display is disabled. Existing food toggle
+  and inventory visibility behavior are retained. Provision shortcuts remain below
+  the portrait; their layout and the party roster no longer reserve the old food gap.
+  New root is destroyed during HUD rebuild/unload. Presentation only.
+- Debug build/deploy passed without warnings/errors. No in-game test performed;
+  after F6 check food placement, moved/scaled power, power toggle, inventory and
+  repeated reload cleanup.
+
+## Original food item icons, 2026-10-21
+
+- Food cells below the portrait now display HudFood.Icon (the eaten item's original
+  GetIcon sprite) in full color using the existing item-icon renderer. Removed
+  the generic health/stamina/eitr food symbols and tints; duration rings/countdowns
+  remain. Cells without a sprite display no substitute icon.
+- Debug build/deploy passed without warnings/errors. No in-game visual test
+  performed; after F6 check three different foods, refresh and expiration.
+
+## Crosshair ranged ammunition, 2026-10-21
+
+- Icon/count refinement: removed the ammo-name label, increased the icon to
+  20 pixels at 90% opacity, and retained the muted count/soft outline. Empty ammo
+  now displays a red ×0. Debug build/deploy passed; in-game appearance unverified.
+- Further muted the ammo line (60% text, 50% icon opacity) and replaced its heavy
+  world silhouette with a narrow, low-opacity outline. TextOutline defaults remain
+  unchanged for existing callers. Debug build/deploy passed; visual test pending.
+- Visual follow-up: reduced ammo text from 14 to 12 pixels and icon from 20 to
+  16 pixels, tightened spacing, and muted text/icon opacity. Debug build passed
+  without warnings/errors and was deployed. In-game appearance remains unverified.
+- Position follow-up: shifted the readout 32 HUD pixels right while retaining
+  its gap below the crosshair, scaled with the HUD. Debug build/deploy passed;
+  in-game positioning remains unverified.
+- Added HUD.CrosshairAmmo (default true): a frameless outlined selected-ammo name
+  and count plus icon below the native crosshair for Bows/Crossbows weapons with
+  an ammo type. Shows localized No arrows/No bolts with a red zero when empty.
+- Inspected installed Attack.FindAmmo: it reads the equipped ammo, validates its
+  inventory membership/type and falls back to Inventory.GetAmmoItem. Called via
+  a cached delegate without equipping or consuming ammo. Counts same-name/type
+  carried stacks only, including Better Archery inventory quiver rows. Other ammo
+  varieties and nearby chest resources do not inflate the number. Reads at 10 Hz.
+- Local presentation on either HUD style; hides for unequipped/non-ranged weapons,
+  death, hidden crosshair/HUD, inventory, menus, chat, console, large map and modal
+  UI. Owned objects/outlines are destroyed on HUD replacement and plugin unload.
+  No new gameplay patches, server settings, RPCs or dependencies.
+- Eight production-linked tests cover ranged detection, mixed ammo names/types,
+  multi-stack counting, empty inventories and overflow. Full automated suites and
+  Debug/Release builds passed; deployed to development scripts.
+- No in-game test performed. After F6, equip bows/crossbows, switch ammo, fire,
+  split/move stacks, empty/replenish ammo, use Better Archery quiver keys, holster,
+  open menus and repeat F6. Verify real modded ammo selection and crosshair spacing;
+  count denotes carried ammunition, not a separate crossbow chamber counter.
+
+## Tamed animal minimap dots, 2026-10-21
+
+- Added HUD.Minimap.TamedAnimalDots, enabled by default, for loaded living tamed
+  creatures with Tameable components in explored terrain. Vanilla Tame() does not
+  persist a taming player's ownership; marks represent shared tames, not a claim
+  about which player owns an animal. Reads Character.GetAllCharacters at 4 Hz.
+- Native unsaved pins use an original runtime-generated yellow dot sprite with a
+  dark rim. Native map zoom/clipping supports both minimap styles and the large
+  map. Jotunn's existing map overlays remain intact; moving dots use native pins
+  because its map manager exposes texture layers rather than a moving pin API.
+- Inspected installed Minimap.Start/UpdatePins/GetClosestPin: None is a visible pin
+  type, and unsaved pins are excluded from normal pin editing. IsExplored is read
+  via a cached private delegate. Splatform is referenced from the installed game
+  for AddPin's optional signature, Private=false; no game binaries redistributed.
+- No RPCs, ownership changes or persistent animal/map writes. Removes owned pins
+  on death/unload, fog exclusion, disable, minimap/player change and plugin unload;
+  destroys owned sprite/texture. Dedicated server never creates this HUD component.
+- Added 18 production-linked marker lifecycle checks with doubles for filtering,
+  movement, death, unload, foreign pin preservation and repeated cleanup. Full
+  suites and Debug/Release builds passed; deployed to development scripts.
+- No in-game test performed. After F6, verify tamed versus wild animals, yellow-dot
+  size/visibility, moving livestock, explored terrain, death/unload, both map styles,
+  zoom/large map and setting toggles. Another player's network ownership must not
+  hide a shared tame. No tracking of distant unloaded animals is provided.
+
+## Split pickup and unlock notifications, 2026-10-21
+
+- Native Character.ShowPickupMessage was inspected in the installed game assembly:
+  pickups use TopLeft, `$msg_added ` plus item name, and the supplied amount/icon.
+  Route this identifiable message into a dedicated pickup queue; unrelated warnings
+  and general messages retain their existing feed. Native logging remains in place.
+- Pickups use a single outlined text line without images/frames above ShownVitals
+  and the equipped-name area, with a gold name, bold +quantity, quick rise, damped
+  pop and fade. Same-item active/pending arrivals merge counts; distinct items are
+  FIFO. Skill toasts dock above active pickups. A centered fallback supports absent
+  custom vitals.
+- Unlock events use a separate FIFO milestone channel beside the minimap. Actual
+  minimap/compass bounds determine placement; narrow layouts move below the compass
+  and both channels clamp to the canvas. No new gameplay settings, RPCs or assets.
+  Owned objects and queues are cleared on style changes, preview clear and unload.
+- Added pickup queue regressions for active/pending merges, FIFO, invalid amounts,
+  overflow, cleanup and a 1,000-event randomized burst. All suites and Debug/Release
+  builds passed. Development build deployed; no in-game visual test performed.
+- After F6, use `ragnarok_popup pickup` and `ragnarok_popup unlock` (close F5), then
+  real pickups/unlocks. Check +5 merged quantity, independent simultaneous channels,
+  moved/scaled HUD, narrow resolutions, skill toast spacing, native log, Vanilla
+  fallback and repeated F6 cleanup. Preview commands change no gameplay state.
+
+## Removed second hotbar, 2026-10-21
+
+- Deleted HotbarRows and its UseHotbarItem patch, plugin lifecycle hooks, enable
+  setting and switch binding. Removed the action-bar switch indicator, dynamic row
+  selection, second-row inventory key labels and associated localization entries.
+- The action bar displays row zero; KeepHotbar sorting protects only the top row.
+  Provision hotkeys no longer defer to a row-switch modifier; their existing patch
+  still suppresses the matching native hotbar activation. No new network policy.
+- Migration discards SecondRow/SwitchRowKey from HUD.Hotbar and QualityOfLife.Hotbar
+  while preserving normal hotbar presentation settings and inventory contents.
+- Debug/Release builds and automated regression checks passed, including saved
+  config cleanup using the installed BepInEx. Development build deployed for F6.
+  No in-game test performed. Check normal 1-8 keys/action-bar clicks, provision
+  shortcuts, sorting below the first row, absent switch UI and repeated F6 reload.
+
+## Removed legacy Quick Stack keep options, 2026-10-21
+
+- Removed KeepWeapons, KeepConsumables and KeepTools and their unused fallback
+  path. Both inventory styles supply the selected category to Quick Stack;
+  equipped/quest items, held items and assigned gear/provision/quiver slots retain
+  their protections. No new authority or synchronization settings were added.
+- Migration removes all three saved keys from current and legacy chest sections.
+  Migration regressions and installed BepInEx configuration checks passed, as did
+  the build and existing automated suites. Deployed to development scripts.
+  No in-game test performed; press F6 to load the changed settings page.
+
+## Unified Nearby Chests, 2026-10-21
+
+- Combined crafting/upgrading, building, station supply, Quick Stack and search
+  under one Enabled entry and one effective radius (PersonalRange capped by the
+  server Range). Removed separate capability switches and search radii. Server
+  Enabled/Range remain mandatory even with the general gameplay lock off.
+- Search now uses ContainerRegistry discovery, access checks and read-only refresh;
+  no separate object scan or ownership request. Private/ward-protected, out-of-range,
+  in-use, world-loot, tombstone, cart and ship inventories are excluded consistently.
+  Quick Stack into the currently open owned chest retains the shared range/access
+  checks. Disabling the feature closes search and clears its guide/marker.
+- Moved shortcut, stacking preferences and marker display onto the Nearby Chests
+  page. Preserved existing Nearby Chests enable/range values and moved personal
+  preferences during migration; retired switches/ranges cannot override the policy.
+  Version is 0.4.0 because older independent permissions cannot represent this model.
+  Update clients and dedicated servers together.
+- Debug/Release builds passed without warnings/errors. All automated suites passed,
+  including new migration assertions. Installed BepInEx checks verified migration,
+  backup preservation, actual StorageSettings binding and shared cap calculations.
+  Eager loader/metadata checks passed for both configurations. Client Debug build
+  deployed; no active client or dedicated-server process was restarted.
+- No in-game test performed. Verify the shared range boundary across all actions,
+  disabling/re-enabling with an active guide, private/ward/in-use exclusions, open
+  chest Quick Stack, F6 cleanup and two-peer authority using NEARBY-CHESTS.md.
+
+## ScriptEngine Jotunn metadata resolution fix, 2026-10-21
+
+- Reproduced the reported Jotunn assembly-resolution failure with the installed
+  Mono.Cecil eager metadata reader and core/game search paths, without adding the
+  nested Jotunn plugin directory. The compatibility attribute's enum arguments
+  triggered the same ReadCustomAttributeEnum failure.
+- Omitted that attribute from Debug builds; release VersionCheckOnly/Minor metadata
+  and the required Jotunn dependency/runtime check remain intact.
+- Added `scripts/check-plugin-metadata.ps1`. After building each configuration, run
+  it with `-Configuration Debug` and `-Configuration Release`. Both checks passed;
+  Debug reads successfully without a Jotunn resolver search path, and Release checks
+  the actual enum values with the installed dependency available.
+- Debug/Release builds passed with zero warnings/errors, and all regression suites
+  passed. The Debug fix was deployed to the isolated development scripts directory.
+  Actual in-game F6 reload remains to be verified; no active client/server was stopped.
+
+## Jotunn phases 1-4 for existing features, 2026-10-21
+
+- Implemented the [phased roadmap](JOTUNN-ROADMAP.md). New content is explicitly
+  deferred until requested; no items, pieces, effects, skills or new save data were added.
+- Localization: 181 English/Turkish tokens for settings navigation/page summaries,
+  common controls/overview captions, controller options and chest search. Game
+  language selects the catalog. Unconverted individual descriptions and unsupported
+  languages use English. Registration/native words are cleaned on unload, previous
+  words restored and foreign replacements preserved. Settings rebuild on language
+  changes; Turkish glyphs already exist in the shipped font character set.
+- Controllers: optional personal settings-window and weapon-dial bindings, both None
+  by default. Keyboard/mouse behavior is retained. The opening device controls dial
+  release; right-stick aim uses the existing dial. Rebinding/unload remove native Joy
+  actions, Jotunn registrations, layout presentations and config listeners. Large enum
+  controls cycle readable choices. No gamepad button is consumed by default.
+- Versions: release metadata declares VersionCheckOnly/Minor. Jotunn's BepInEx startup
+  registry cannot guarantee the same handshake for ScriptEngine development instances.
+  Existing authenticated server-settings packets already contain the version; exact
+  differences remain logged and now display in the F10 Build card. Display state is
+  assigned after complete validation and cleared on disconnect. Wire format/authority
+  remain unchanged; extra native runtime assertions were added but not run in-game.
+- Maps: HUD.Minimap.ChestSearchMarker is off by default. The selected authorized
+  chest result receives a temporary fog-respecting marker during its existing guide.
+  Range/access/life-state/open-chest checks are reused each frame. No background chest
+  scan, persistent pin or new RPC. Texture uploads occur on position changes, not per
+  frame. Owned layer, texture, toggle and listeners are removed on unload, and the
+  shared composite redraw removes stale pixels. Another mod's layer/toggle remains.
+- Validation: existing regression suites passed, plus 577 localization assertions,
+  34 map drawing/clipping/cleanup assertions, 12 controller lifecycle assertions and
+  106 input/UI assertions using linked production code, installed Harmony and doubles.
+  Debug/Release builds passed with zero warnings/errors. Installed BepInEx migration
+  checks passed. Release metadata was checked for VersionCheckOnly/Minor and both
+  embedded catalogs. Diff whitespace checks passed; client deployment hash matched.
+- No new in-game test performed and no active game/server was interrupted. Press F6
+  to load the client build. Test English/Turkish navigation, crafting search typing,
+  Mouse3 dial, an assigned controller button's hold/release and settings toggle,
+  marker selection/expiry/access loss and another F6 reload. Test the release version
+  handshake with real peers separately; do not treat simulated lifecycle tests as
+  proof of native rendering, controller hardware or multiplayer behavior.
+
+## Required Jotunn dependency and typed APIs, 2026-10-21
+
+- User approved depending on Jotunn after confirming the mouse-dial fix. Ragnarok
+  now declares a hard BepInEx dependency on Jotunn 2.30.2+, with an explicit runtime
+  check for ScriptEngine on clients and servers. This supersedes the earlier
+  optional-integration notes below. InputManager/ButtonConfig/GUIManager calls are
+  typed; private access remains only for unload cleanup. Mouse bindings retain
+  direct input polling, and shared settings/server authority are unchanged.
+- Builds discover one installed Jotunn DLL recursively or use JotunnPath. Copy-local
+  is disabled. Windows/Linux setup download a SHA-256-pinned 2.30.2 archive only
+  when no Jotunn installation exists. Existing copies are preserved. Sources and
+  license are recorded in DEPENDENCIES.md; releases require separate installation.
+- Debug/Release builds passed with zero warnings/errors; all existing regression
+  suites and 106 input/UI assertions passed. Missing/older dependency checks,
+  three simulated unload/reload rounds, shared blocks, rebinding and mouse keys
+  are covered. Verified release metadata includes the required minimum version
+  and typed assembly reference, and Jotunn is absent from plugin output. Invalid
+  JotunnPath was rejected with a clear build error. Windows doctor found 2.30.2.0.
+- PowerShell scripts and Linux helper syntax passed; downloaded archive version,
+  checksum and plugin layout were checked. Full setup was not run against the
+  active game, and Linux setup/runtime received no execution test. The Debug DLL
+  was deployed to the isolated client and verified by matching SHA-256 hashes.
+- No new in-game test performed. F6 reload and verify F10, Mouse3 weapon-dial
+  hold/release, crafting-search typing and another reload with no stuck input.
+
+## Weapon-dial mouse binding after Jotunn integration, 2026-10-21
+
+- User reported the dial no longer opening after reload. The saved key is Mouse3.
+  The integration had changed mouse shortcuts from legacy Unity Input polling to
+  Jotunn/ZInput actions. Inspection of the installed ZInput.KeyCodeToPath shows
+  Mouse3 and Mouse4 converted to the Input System Forward and Back enum entries;
+  those are a different input path from the key picker's direct legacy input.
+- Mouse0 through Mouse6 now retain the original direct polling for down/held,
+  without creating a converted Jotunn action. Keyboard bindings continue through
+  Jotunn. Switching between mouse/keyboard removes old registrations, and dial
+  modifiers, context gates and release-to-select behavior remain in the caller.
+- All regression suites passed, including 105 input/UI checks covering all seven
+  mouse bindings, held/released states and keyboard-to-mouse-to-keyboard rebinding.
+  Windows Debug build/deploy passed with zero warnings/errors. No in-game test
+  performed; F6 and hold the existing side mouse button to verify the fix.
+
+## Optional Jotunn input/UI integration, 2026-10-21
+
+- Settings toggle and weapon-dial keys register through the installed Jotunn
+  InputManager when available. Configured keys, modifiers and dial hold/release
+  behavior are preserved; no new gameplay setting or RPC was introduced.
+- Modal windows and registered focused fields share one Jotunn GUI input-block
+  request. The settings toggle remains available to close its own window. GUI
+  recreation closes settings; unload releases owned input actions, button entries,
+  config listeners and the GUI event listener. The adapter is client-only and
+  optional, with native fallback and diagnostics for unavailable APIs.
+- Checked the installed Jotunn 2.30.2 metadata and native ButtonAction getter.
+  The new `tests/Ragnarok.Jotunn.Tests` links the actual adapter and UI guards,
+  uses the installed Harmony with Unity/Jotunn doubles, and passes 82 assertions:
+  three unload/reload rounds, key rebinding/None, partial registration failure,
+  absent Jotunn, name collisions, input initialization, scene replacement, E key
+  suppression, settings toggle access and preserving another mod's input block.
+  Windows `dev.ps1 test` runs this suite along with the existing regression suites.
+- Windows Debug and Release builds passed with zero warnings/errors; existing
+  regression suites and the input/UI suite passed. Debug deployment to the isolated
+  development client's BepInEx/scripts was verified by matching SHA-256 hashes.
+- No in-game test performed: the development client is running, and the startup
+  smoke script requires it closed. The automated reload rounds use test doubles,
+  not an actual F6 reload. After F6, check F10 open/close (including while editing),
+  key rebinding, `leather` in crafting search, weapon-dial hold/release with modifiers,
+  movement during the dial, another Jotunn window, and returning to the main menu.
+  Then reload again and confirm no duplicate-button warning or stuck input.
+
+## Craft search input with Jotunn, 2026-10-21
+
+- Typing E in the crafting search could close the inventory. Inspected the installed
+  game and Jotunn assemblies: InventoryGui closes on the Use button; Jotunn's
+  GetButton/GetButtonDown/GetButtonUp postfixes replace the result using reverse
+  patches, bypassing Ragnarok's prefix suppression.
+- Added a last-priority postfix to reapply the existing typing/modal input guard.
+  It covers both crafting styles and other registered Ragnarok text fields, without
+  adding a dependency. The patch uses the plugin's existing Harmony unload cleanup.
+- Windows Debug build passed with zero warnings/errors. A temporary .NET Framework
+  harness compiled the actual BlockGameButtonsPatch against the installed Harmony:
+  the old prefix-only version failed on Use with a simulated Jotunn postfix; the
+  fixed version passed 60 checks across button down/up/held, normal input, typing,
+  modal/closing-frame suppression, focus release and patch unload.
+- No in-game test performed. After deployment, press F6 and type `leather` into
+  crafting search in each style; E must stay in the field. Click outside it and
+  verify E/Tab close normally. Check chat, console and crafting amount entry too.
+
+## Delete by drop and confirmation window, 2026-10-21
+
+- User reported Delete not working and asked for drag-to-delete with a confirmation
+  window. Root cause, found with temporary in-game click logging: the vanilla-style
+  panel's `Dispose` runs every frame while the Ragnarök inventory is shown, and it
+  called `ItemTrash.Reset()`, which cleared the two-press arm (and later closed the
+  popup) on the next frame. Teardown no longer resets; only the Delete button's own
+  `OnDisable` (inventory closed, panel rebuilt) and plugin unload do. Separately,
+  Valheim moves items by click with the mouse (drag-release is touch only), so a
+  release over Delete never clicked the button.
+- The Delete button (both inventory styles) now also catches a release over it
+  while an item is held. With `Confirm` on, Valheim's `UnifiedPopup` Yes/No window
+  asks (cover background on); the two-press arm remains only where no popup
+  instance exists. The answer re-checks that the item is still in its inventory
+  and deletes at most the asked amount; closing the inventory or rebuilding the
+  panel pops the window.
+- Tested in game (development install, Ragnarök inventory, joined to the local
+  dedicated server): click Delete with an item held → popup above the inventory
+  (raycasts hit `UnifiedPopup/.../FullscreenBlocker`); Yes deleted stone and iron
+  and cleared the cursor; No kept the item held; press on an item and release
+  over Delete opened the popup and Yes deleted it. Not tested: Esc while the popup
+  is open, split amounts, chest items, the vanilla-style panel. Diagnostics removed
+  afterwards; build passed.
+- Follow-up: the user found the full-screen `UnifiedPopup` too heavy. Replaced by a
+  small card built from the Delete button itself (sprite, outline, label font) so
+  it matches either inventory style, opening above the button in the lower half of
+  the panel and below it in the upper half. A click outside it, Escape, closing the
+  inventory or a rebuild cancels it. Build passed; deployed. Not yet seen in game.
+
+## Movement while typing in searches, 2026-10-20
+
+- User reported the character moving while typing in the crafting or chest search.
+  Static review did not find why the existing `ZInput.GetButton*` block missed it
+  (installed Steam and development assemblies are identical; the methods are not
+  inlining candidates; no other installed mod patches the input path).
+- Defense in depth: `PlayerController.TakeInput` and `Player.TakeInput` now return
+  false while a Ragnarök field, or any focused field selected in the EventSystem,
+  has focus. Movement/camera controls are zeroed and character actions stop
+  regardless of how keys are read. Game buttons keep the narrower rule so Valheim's
+  chat/console are unaffected.
+- Build and `dev.ps1 test` passed; deployed to the Gale profile's `BepInEx/scripts`.
+  Not yet tested in game.
+
+## Inventory-first choices, Delete, vanilla provisions and Better Archery, 2026-10-20
+
+- Where Valheim picks one of several items (Smelter/CookingStation/Fermenter
+  `FindCookableItem`, `Player.GetFirstRequiredItem` for "any one ingredient"
+  recipes), the choice now runs over the carried inventory first with vanilla's
+  order and falls back to nearby chests only when nothing carried qualifies.
+  Payments already spent carried stock first (`WithdrawalPlan`); unchanged.
+- Delete button in both inventory styles destroys the item held on the cursor
+  (split amount), with optional two-press confirmation. Local only; no network
+  authority is involved beyond Valheim's own container ownership.
+- Vanilla HUD provision row moved beside the Forsaken power icon (sized to it,
+  clamped to 60-100% of the hotbar) with key labels at 60% size; the old
+  placement remains as `HUD.Provisions.VanillaPlacement = AfterHotbar`.
+- Better Archery's own vanilla-grid arrow slots are skipped while a Ragnarök
+  character panel shows them, removing the duplicate.
+- Windows Debug/Release builds, `dev.ps1 test`, `check-config.ps1` and the config
+  harness passed. A static Mono.Cecil check confirmed every new patch target and
+  Harmony parameter name in the installed Valheim and Better Archery 2.0.5. Sharing
+  archive rebuilt. No in-game test: the new layout, deletion and station choices
+  have not been seen or exercised in a world.
+
+## Server-locked QoL policies and audit fixes, 2026-10-20
+
+- Chest search, nearby chests (enabled, crafting, building, stations, range) and
+  death-reclaim auto equip are always defined and locked by a modded server,
+  independent of `LockSettings`. Both radii are server maximums with a separate
+  personal range that can only lower them; the personal preference stays on disk.
+  The second hotbar is now off by default.
+- Audit fixes: saved slot items load regardless of admission rules; the Better
+  Archery quiver moved from the invalid (8, 64) to (0, 66) with live/saved migration;
+  slotted upgrades with a full bag recreate into the freed slot; reload while
+  server-locked keeps the personal value; craft-amount reset/unload during a batch
+  keeps the original defaults; server hot reload resyncs peers and disconnects
+  release their RPC registrations; recipe details, requirements and chest counts
+  are throttled/cached for the UI while resource spending still checks live stock.
+- Windows Debug/Release builds, `dev.ps1 test` and `check-config.ps1` passed. Local
+  harnesses against the installed BepInEx/Valheim assemblies passed: config
+  policy/reload/disconnect, craft-amount reset/unload, a static (Mono.Cecil) check
+  that the installed `Inventory.AddItem(string, ...)` IL matches the upgrade
+  transpiler, and native position-gate acceptance of the relocated quiver slot.
+- Not run: `smoke.ps1` (development Valheim was in use), so the new
+  `PolicyRuntimeChecks` and the transpiler have not run inside the engine. No
+  character/world, multiplayer, Better Archery relog or full-bag upgrade test was
+  performed.
+
+## Craft progress before shared-chest authority, 2026-10-20
+
+- User clarified that the progress bar finished without putting an item in their
+  inventory; whether ingredients were spent was not confirmed. The earlier change
+  addressed a notification only. Inspection of installed vanilla code showed that
+  OnCraftPressed starts progress without checking chest authority; DoCrafting then
+  returns without output when the final owned-resource check fails.
+- Added a progress-phase authority gate: check owned stock without sending requests,
+  request remote ingredients only on a shortfall, and hold progress until the
+  checks pass. The native craft still checks and consumes materials normally.
+  After eight seconds without a handoff, cancel with an explicit timeout message.
+  Cancel/unload clears wait state. No resources are spent by the gate.
+- The running game was located in Gale's Cem profile; prior development deployments
+  did not update that profile. Its log has no matching Ragnarok withdrawal exception.
+  Other mod errors are present and are not established causes of this report.
+- Windows Debug/Release builds and existing regression suites passed.
+  Sharing archive rebuilt. No real-peer/in-game validation of
+  this fix performed; acceptance steps are in NEARBY-CHESTS.md.
+
+## Shared-chest message after successful crafting, 2026-10-20
+
+- User reported successful crafts displaying the pending ownership message while
+  the other player was idle. Resource enumeration requested remote ingredient
+  chests even when owned stock was sufficient, and scope disposal treated those
+  requests as blocked crafting.
+- Record the recipe requirement result on the enclosing crafting scope, including
+  nested checks. A passed check suppresses the pending notification for that craft;
+  post-payment UI checks cannot reset it. Failed checks retain the handoff warning.
+  Chest authority, permission checks and withdrawal behavior are unchanged.
+- Windows Debug/Release builds and regression suite passed; sharing archive rebuilt.
+  No in-game test performed. Real-peer regression steps are in NEARBY-CHESTS.md.
+
 ## Consolidated documentation and commit checks, 2026-10-20
 
 - Updated README, architecture notes and the HUD guide's current-state summary; added a consolidated `CHANGELOG.md` for the accumulated Linux, HUD, inventory, tooltip, notification and crafting work. Historical entries remain dated and may describe superseded trials.
@@ -651,6 +1153,291 @@ manual check in the visible game. Multiplayer is not tested.
   and compact cell spacing are unchanged.
 - Windows Debug build/deploy passed with zero warnings/errors; diff check passed.
   No in-game test performed; verify label centering after F6 reload.
+
+## Remove portrait provision row, 2026-10-21
+
+- Removed the carried provision shortcut row under the Ragnarok portrait and its
+  unused renderer/root. Active food remains beside Forsaken power. Party layout
+  no longer reserves space for the removed row. Inventory slots and provision
+  shortcuts retain their existing behavior; the optional vanilla HUD row remains.
+- Updated the affected setting descriptions. Windows Debug build/deploy passed
+  with zero warnings/errors; no in-game visual test. Client F6 reload required.
+
+## Combat status indicator, 2026-10-21
+
+- Add a presentation-only ongoing status tile: a borrowed native sword icon,
+  localized In combat label, Active while engaged and seconds remaining during
+  the mount quiet period. Reuse the same player combat predicate as summoning.
+  The tile indicates player combat only; mount combat and other restrictions still
+  apply independently.
+- Ragnarok HUD places it with ongoing effects near the character name. Vanilla
+  HUD gets the same frameless tile near the top center/below the compass. No actual
+  status effect, stat modifier, item, save data or network rule is added. All owned
+  UI and static status state are cleared on unload/scene replacement.
+- Windows Debug build/deploy and regression/localization checks passed. No in-game
+  visual test was run; F6 client reload is required. Server restart is unnecessary.
+
+## Persistent mount identity correction (0.5.3), 2026-10-21
+
+- The user's screenshot showed the generic alive/tamed/saddle rejection. New
+  diagnostics established that the old ledger's `1:8777` resolved to `wood_roof_45`
+  after restart. A raw ZDO ID is not a durable mount identity in this game version.
+- Version-2 bonds use an owner-stamped unique string on the original animal's ZDO;
+  cached IDs never resolve an unmarked bond. Server world-load indexing handles
+  ID remapping and refuses duplicate markers. Legacy rows require rebinding or
+  explicit guarded exact-name recovery. Marker saves use the native server-world
+  save method; the public profile-save helper was found to require a local player.
+- With the user's confirmation of the name Moose, guarded recovery found exactly
+  one tamed, saddled `Moose` prefab (its species display name; no custom pet name).
+  It remained at (-57.68, 29.35, 7.66), with 1000/1000 health. No movement, healing,
+  replacement or character action was performed during recovery.
+- A normal server save/restart preserved marker
+  `1b75d39904aa4117a5a883c996fe9023`. Restarted 0.5.3 resolved the same Moose from
+  the marker at ID `1:5144`, with unchanged position, health and saddle. This proves
+  native marker persistence; synthetic regression checks separately cover ID
+  reassignment and rejection of a different object at the former ID.
+- The owner now requests a missing distant ZDO before executing a command, with
+  a bounded wait and no replayed movement. A protocol handshake explicitly rejects
+  older clients instead of leaving them to time out on unsupported RPCs.
+- Debug/Release builds, metadata and all regression suites passed. Client Debug
+  deployed for F6; Release installed on the live isolated RagnarokTest server.
+  Full Ashlands summon/arrival still needs the user's in-game retry. No additional
+  test client was launched because the user requested keeping their client running.
+
+## Dedicated mount handshake correction (0.5.1), 2026-10-21
+
+- The live 0.5.0 server loaded Ragnarok successfully, but the mount handshake
+  required resolving the peer's Player prefab via ZNetScene.FindInstance. Native
+  ZNetScene only streams around its own reference position; a connected player
+  can have an authenticated ZDO without a loaded Player on a dedicated server.
+- Advertise the mount service independently of the streamed Player. Bind and
+  summon authority uses the connection's character ZDO, owner and profile ID.
+  The requesting client supplies fresh, nonce-matched physics/action checks
+  before and after windup; server constraints, wards, combat, bond identity and
+  animal-owner execution remain authoritative. Missing player records now return
+  a loading explanation instead of silently dropping requests.
+- Windows Debug/Release builds, both eager metadata checks and all regression
+  suites passed, including rejection of non-finite, diagonal-out-of-range and
+  excessive-height arrival proposals. Client Debug DLL deployed for F6 reload.
+  Multiplayer summon/placement still needs a player test; no test character or
+  movement was injected into the user's session.
+- Sent normal Ctrl+C to the dev server's console, verified its orderly shutdown
+  and new `_main.20.ok` save at 19:29:31, then installed the verified Release DLL.
+  Restarted RagnarokTest from that save; native logs confirm Ragnarok 0.5.1,
+  `Mount server ready; world-scoped bond store loaded`, `Game server connected`
+  and UDP 2456/2457. Client F6/reconnect and an actual bind/summon remain to verify.
+
+## Riding HUD placement, 2026-10-21
+
+- Move the native mount name/health/stamina panel above Ragnarok vitals, leaving
+  clearance for the equipped-weapon title. Use measured HUD bounds and scale.
+- Fall back to right-center when the build task/equipped card overlaps that slot,
+  pickups or skill messages use it, or the slot would crowd the reticle/screen edge.
+  Layout runs after the vitals, build card and notification updates.
+- Preserve native values and saddle support. Restore the original panel position
+  and scale on dismount, HUD-style change, scene replacement and plugin unload.
+- Windows Debug build/deploy passed with zero warnings/errors. No in-game test:
+  the user previously requested leaving the running client alone. F6 reload is
+  needed; check riding, equipping the hammer, dismounting and HUD scale changes.
+
+## Mount companion service and controls, 2026-10-21
+
+- Implemented server-owned bonds, authenticated requests, repeated safety checks,
+  cooperative owner movement/acknowledgment, combat stamps/cancellation, cooldowns,
+  Jotunn keys, hover hints, settings status/release, wave and original whistle audio.
+  Persistent source-ward checks use nearby ZDO sectors even when the ward is unloaded.
+  Arrival updates the patrol point so animals do not walk back to an old location.
+- Final Windows Debug/Release builds passed with zero warnings/errors. All
+  regression suites and both eager plugin-metadata checks passed. Debug DLL/PDB
+  deployed to the isolated client's BepInEx/scripts; F6 is required to load them.
+- The extended runtime runner now covers service binding, unloaded summon,
+  cooldown, combat cancellation/rejection and release. It was NOT run: the client
+  had reopened, and the user explicitly requested leaving it running and skipping
+  the isolated test. The full new service/input/audio/ward/multiplayer flow is
+  untested in-game. Earlier transport-only results below do not cover these changes.
+- The live server DLL was Windows-mapped and refused replacement. Its original
+  hash was verified against the backup; no server process was stopped. Release
+  files and a guarded apply.ps1 are staged externally under
+  `D:\RagnarokDev\server-updates\Ragnarok-0.5.0`. Save/stop the dev server, apply the
+  update, then start it before trying these controls on the dedicated server.
+
+## Mount transport prototype, 2026-10-21
+
+- Windows Debug build/deploy passed with zero warnings or errors. Regression
+  checks passed, including exclusive bonds, replacement/release, atomic disk
+  persistence and rejection of invalid or cross-world records.
+- Isolated native runtime check passed at
+  `D:\RagnarokDev\mount-checks\20261021-182501`. A tamed saddled lox moved while
+  loaded, streamed out in a distant sector and returned with its original ZDO ID,
+  saddle, name and health. Exactly one matching animal existed after return.
+- The test used its own temporary character/world and closed its client on
+  completion. The running dedicated server was left alone.
+- This proves local authoritative loaded/unloaded transport only. Remote owner
+  transfer, multiplayer authority and normal bind/whistle controls remain
+  outstanding; the full summon feature has not received an in-game test.
+
+## Hover keys match Forsaken Power, 2026-10-21
+
+- Changed hover keycaps from the general button sprite to the same HudKeySurface
+  glass face and HudKeyEdge at 45% bone opacity used by PowerEmblem. Key text uses
+  the same 90% bone color; compact size and normal action labels are retained.
+- Debug build/deploy passed with zero warnings/errors. No in-game visual retest
+  was performed. Load with F6; no server restart is needed.
+
+## Forsaken tooltip duration and hover wrapping, 2026-10-21
+
+- Confirmed the installed ItemStand.GetHoverText reads its power template's
+  SE_Stats.GetTooltipString. This supplies the flavor and stamina modifier lines,
+  plus the raw template TTL (300), while the configured active duration is 600
+  seconds. Server/client DurationMinutes are both 10.
+- Power template tooltip previews now replace only the native TTL line with the
+  configured next-activation duration formatted by StatusEffect.GetTimeString.
+  Active effects retain their instance TTL text; shared templates are not mutated.
+- Hover prose/info lines wrap within 420 UI units and expand vertically; object
+  names and key/action rows stay compact. Chest peek follows the resulting bounds.
+- Debug build/deploy passed with zero warnings/errors; eager metadata validation
+  passed. No in-game tooltip/wrapping retest was performed. F6 loads the client
+  presentation change; no server restart is needed.
+
+## Themed hover action labels, 2026-10-21
+
+- Split native hover text into an object heading, normal 12-point body/action
+  labels and themed dark keycaps. Hold is a separate muted hint; modifier names
+  are shortened and placed before their main key. Pet, Rename and mount actions
+  no longer inherit the heading's larger bold font or incoming bold/size tags.
+- Preserve native bindings, sprite glyphs, warning colors, condition lines and
+  mod descriptions. Reuse row/key objects when only label/timer text changes;
+  source atlas changes update copied glyph assets. Prompt bounds continue to
+  position the chest preview. All owned UI is destroyed and native alpha restored
+  on style/scene changes and unload. Interaction/input behavior is unchanged.
+- Debug build/deployment and eager metadata validation passed with zero build
+  warnings/errors. All regression suites passed, including new parser checks for
+  native pet/rename text, hold chords, modifiers, gamepad glyphs containing plus,
+  alternative keys, CRLF/blank lines, mod colors/text and reusable timer rows.
+- No in-game visual/gamepad/rebind retest was performed. F6 loads this client-only
+  change; no server restart required.
+
+## Riding progression 0.5.4, 2026-10-21
+
+- Added server-controlled linear 10%-to-zero maximum-stamina cost and
+  1.2-to-0.6-second whistle windup across Riding 0–100. The owner reports bounded
+  finite native skill/stamina snapshots during both arrival checks; the server
+  recomputes cost, requires sufficient stamina and authorizes completion only
+  after confirmed movement. Failed/cancelled/unconfirmed summons have no receipt.
+- Default XP factors are 0.5 for the first bond per player/animal and 0.25 for a
+  successful summon at most every 300 real seconds. Atomic world-scoped server
+  history preserves eligibility across release, F6, reconnect and restart.
+- Ordered persisted completion receipts retry until an authenticated matching
+  acknowledgment. Owner-side application records a per-world sequence in character
+  custom data before native stamina/XP calls. This handles duplicate packets/F6,
+  but is not an atomic transaction across abrupt character/server save crashes.
+- Companion settings/hover/calling text expose Riding, condition, cost and windup;
+  tiers 25/50/75/100 add bounded native particle layers with extra audio muted.
+  Unity's installed ParticleSystemModule is referenced, never copied into releases.
+- Debug/Release builds passed with zero warnings/errors. Both eager metadata
+  checks and all regression suites passed. New pure checks cover formula endpoints
+  and monotonicity, malformed snapshots, first-bond history, restart/clock/cooldown
+  boundaries, ordered receipts, duplicate/out-of-order acknowledgments, bounded
+  queues, malformed/cross-world files and failed-write rollback.
+- Deployed Debug client scripts and installed Release on the dev server through
+  the existing graceful save/backup/restart helper. Protocol 3 rejects outdated
+  requesters and connected mount owners; clients must F6/reconnect.
+- No live progression test was performed. Still check exact cost, insufficient
+  stamina, cancellation, XP/cooldown/rebinding, packet retries, reconnect/F6,
+  remote owners, skill 0/25/50/75/100, tooltip layout and visual/audio feel in-game.
+  The user requested leaving Valheim open and skipping the isolated test.
+
+## Fixed mount panel position, 2026-10-21
+
+- Keep the compact mount panel above the player vitals whenever those vitals are
+  available. Hammer/build cards and notifications no longer move it to the right.
+  Screen-edge clamping remains; right-center is used only if vitals are absent.
+- Debug build/deploy passed with zero warnings/errors. No in-game hammer retest
+  was performed; reload the client with F6. No server restart required.
+
+## Compact Ragnarok mount panel, 2026-10-21
+
+- Replaced the relocated vanilla readout with an owned 280-by-52 frameless HUD:
+  compact native name/status line, red health and yellow stamina tracks, current
+  and maximum values, matching fonts and outlined text. Follows HUD scale.
+- Reads the ridden Sadle/Character directly; no health/stamina/network writes or
+  new synchronization settings. Native update/control hooks keep running while
+  a reversible CanvasGroup masks the vanilla presentation. Dismount, HUD switch,
+  scene change and unload destroy owned UI and restore original native alpha.
+- Retains above-vitals positioning, weapon-title clearance and occupied-space
+  right-center fallback. Render-time placement avoids native layout interference.
+- Debug build/deploy, eager metadata checks and all regression suites passed.
+  No in-game visual, HUD-switch, hammer or modded-saddle retest was performed.
+  Load with F6; this client-only presentation needs no server restart.
+
+## Mount readout visible-bounds placement, 2026-10-21
+
+- User screenshot showed the riding readout below vitals. Placement now measures
+  active visible native graphics instead of assuming the container rect encloses
+  the name and bars. Screen fitting/clamping uses those same visible bounds.
+- Reapply placement through Canvas.willRenderCanvases after animation/layout;
+  keep the existing above-vitals and occupied-space right-center fallback.
+  Dispose unsubscribes the render callback and restores native position/scale;
+  dismount/owner changes restore state without removing the callback.
+- Debug build/deploy passed with zero warnings/errors; eager metadata validation
+  passed. No live mounted, hammer-equipped or HUD-scale retest was performed.
+  Client-only change; no server restart required.
+
+## First-entry unarmed key guide, 2026-10-21
+
+- Native fist hints can activate from targeting during entry. The custom guide
+  now requires an equipped inventory weapon for combat rows, sharing the hotbar
+  docking predicate and clearing unarmed rows without the normal scan delay.
+- Native guide suppression now runs after KeyHints.Awake/UpdateHints as well as
+  Hud.LateUpdate. It tracks the KeyHints owner, restoring the previous CanvasGroup
+  before attaching to a replacement UI instance. Existing groups retain their
+  original alpha, and owned groups are removed on restore/unload.
+- Debug build/deploy and eager metadata validation passed with zero build
+  warnings/errors. No in-game first-entry, reconnect or F6 retest was performed.
+  This client HUD change requires no server update.
+
+## Distant mount stale alert fix, 2026-10-21
+
+- Removed the persistent alert-bit rejection from mount readiness. The bit can
+  represent fear or a stale unloaded state; it does not identify an active fight.
+  Loaded AI must be alerted with a living hostile target to block movement.
+  Recent combat timestamps, rider, health, tame, saddle and owner checks remain.
+- Debug deployment, Release build, both metadata checks and all regression
+  suites passed. No live calm/hostile/unloaded summon retest was performed.
+- Installed the Release DLL on the dev server using the existing graceful
+  shutdown/save and backup helper, then restarted RagnarokTest.
+
+## Combat false-positive checks, 2026-10-21
+
+- Removed passive Player.IsTargeted and unrelated nearby alerted hostiles from
+  continuous engagement. Hostiles must be alerted and actually target this player.
+- Removed the native time-since-attack fallback: it starts at zero on spawn;
+  confirmed attack hooks already stamp the shared combat timestamp.
+- Debug build/deploy passed with zero warnings/errors; all automated regression
+  suites passed. Native method inspection confirms passive targeting and timer
+  initialization behavior. No live creature/indicator test was performed.
+- Client scripts updated; running dedicated-server binary was not replaced.
+
+## Picked plant hover name, 2026-10-21
+
+- Fixed the regrowth hover replacement displaying a raw item localization token:
+  resolve Pickable.GetHoverName through native Localization before adding the
+  timer. Respawn timing and world state are unchanged.
+- Windows Debug build/deployment passed with zero warnings/errors. The user's
+  screenshot identifies the affected branch; no in-game retest was performed.
+
+## Mount arrival animation, 2026-10-21
+
+- Windows Debug build and deployment passed with zero warnings/errors.
+- Arrival presentation uses native spawn/skill-up assets and animates only the
+  original animal's visual child after confirmed movement. Pending reveals and
+  owned effect objects are disposed on unload/scene change; renderer state and
+  scale are restored on completion or mounting.
+- Deployed to the isolated client's ScriptEngine scripts directory; F6 loads it.
+  The existing server protocol is unchanged and no server restart was needed.
+- No in-game visual test was performed; the user requested keeping Valheim open
+  and skipping the isolated test. Burst appearance, timing and compatibility with
+  modded mount visuals require a live check.
 
 ## Session wrap-up checks, 2026-10-20
 

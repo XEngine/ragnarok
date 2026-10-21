@@ -14,6 +14,46 @@ The Windows instructions below remain available for the original development PC.
 
 ## Settings window and HUD (0.3.0)
 
+Ragnarok requires **Jotunn 2.30.2 or newer** on clients and dedicated servers.
+Development setup installs the pinned 2.30.2 build when no copy is present.
+Its input manager handles the settings toggle and weapon dial's keyboard bindings;
+windows and focused search fields share its GUI input blocking. Existing key
+bindings and styling stay in place. Mouse bindings retain direct Unity input
+polling to match the key picker. Registrations are removed on F6 unload/reload.
+See [dependency sources](docs/DEPENDENCIES.md) and [installation](docs/INSTALL.md).
+
+**Mount companion prototype (0.5.0):** hold **Shift+H** near a saddled, tamed mount
+to bind or release it; press **H** outdoors to call it when both of you are out of
+combat. One exclusive mount per player, with server-owned rules and persistent
+bonds. Requires the updated server as well as the client. See the
+[controls, test steps and verification limits](docs/MOUNTS.md).
+
+The [Jotunn roadmap](docs/JOTUNN-ROADMAP.md) records the phased integration. Settings
+navigation and chest search have English/Turkish catalogs following the game's
+language; untranslated setting descriptions retain English. Optional controller
+buttons are under HUD > Window and Quality Of Life > Weapon Dial (unassigned by
+default). Quality Of Life > Nearby Chests > Chest Search Marker enables a temporary map marker for
+the selected search result. Release installs check major/minor Ragnarok versions
+when both peers have the mod. New content is deferred until a feature is requested.
+
+**Tamed Animal Dots** (HUD > Minimap, on by default) show loaded, living tame
+animals as yellow dots in explored areas. Animals are shared livestock; no permanent
+player owner is recorded by vanilla taming. Dots move with animals and disappear
+on death/unload. These temporary local pins work with either minimap style.
+
+**Status effects** use original full-color icons in larger tiles. Passive equipment
+and ongoing buffs (rested, shelter and campfire) have separate groups near the
+character name. Poison, burning, smoke and other recognized harmful effects appear
+below the compass at the same size. The status toggle restores vanilla's list.
+
+**Crosshair Ammo** (HUD, on by default) shows the selected arrow/bolt icon
+and carried count immediately below the crosshair while a bow or crossbow is
+equipped. It follows the native attack ammo resolver, includes quiver stacks and
+shows a red zero-ammo warning. Both HUD styles are supported.
+
+The hotbar uses the top inventory row only. The second hotbar, switching shortcut
+and row indicator have been removed. Provision shortcuts remain independent.
+
 The F10 configuration window uses compact text and rows. Use **Hide sidebar / Show
 sidebar** to give the settings more room, and **+ / -** beside a section to fold
 its subpages. Each slider has an editable value box: type an exact number and press Enter or
@@ -42,7 +82,8 @@ reach game UI behind it.
 
 **HUD → Style** chooses `Vanilla` (default) or `Ragnarok`. The Ragnarök HUD replaces
 the native vitals with health/stamina bars above the bottom-center hotbar, an eitr
-strip when applicable, and character/food information at top left; switch back at any time.
+strip when applicable, character information at top left and active food beside
+the Forsaken power display; switch back at any time.
 It is parented to Valheim's HUD, so it follows the game's UI scale
 and hides with Ctrl+F3. Separate settings control the other HUD replacements.
 
@@ -169,12 +210,15 @@ round gold-rimmed frame drawn around translucent terrain, with smoked-glass meda
 Biome, cardinal, key, day/clock and weather labels have outlines and shadows.
 Everything is restored on Vanilla or unload.
 
-**Notifications** (`[HUD.Notifications]`, FollowHud by default): unlocks, pickups and status messages
-use rounded dark cards with semantic gold/blue/red accents. Up to four stack, newest at the bottom,
-for four seconds; repeated pickups merge with a gold count. Placement remains
-configurable; optional HUD backdrop plating has been removed. Centre system lines use outlined bone/amber/red text; death, discovery, new-day and
-newly selected power banners use the larger Rune & Iron treatment. Discovery audio stays native,
-and intercepted messages still enter the native log. The settings page has a **Test notifications** button.
+**Notifications** (`[HUD.Notifications]`, FollowHud by default) have separate channels:
+item pickups appear as one outlined, frameless line above the vitals/weapon name,
+with a gold item name, bold +quantity and a quick rise/pop animation. Matching
+pickups merge their quantities and pulse again; other items wait their turn.
+Recipe/content unlocks queue as milestone panels to the left of the minimap,
+between it and the compass; narrow layouts place them below the compass.
+General messages retain the configurable four-card feed. Skill toasts move above
+an active pickup line. Centre messages, larger banners and native logs remain.
+The settings page has a **Test notifications** button.
 
 In a world, use the F5 console for UI-only popup previews:
 `ragnarok_popup all` plays every sample in sequence; close F5 to start playback.
@@ -232,7 +276,8 @@ upgrades remain one item. Native requirement amounts show total available/requir
 bag/chest breakdown in the hover tooltip using the native inventory tooltip backdrop.
 Nearby stock follows the existing server-controlled
 crafting storage settings. With the vanilla HUD, filled provision slots show
-as Valheim hotbar slots just past the hotbar, with their keys (`Features/QualityOfLife/VanillaProvisionBar.cs`).
+as Valheim hotbar slots beside the Forsaken power icon, at its size, with smaller key labels;
+`[HUD.Provisions] VanillaPlacement = AfterHotbar` puts them back just past the hotbar (`Features/QualityOfLife/VanillaProvisionBar.cs`).
 
 **Info panel** (follows the inventory style): the wooden board above the inventory, with the character
 name and the Compendium, Skills, Trophies, Achievements and PvP buttons, redrawn with
@@ -269,6 +314,12 @@ and an unmet condition shows as ???. Valheim's "cheated" note shows bottom left 
 stacks of the same item are merged first, then the grid is laid out in reading order. The hotbar row
 stays as it is by default (`KeepHotbar`); character, provision and quiver slots never move.
 
+**Delete** (in the inventory, both styles; `[QualityOfLife.Delete]`): pick up an item (Shift-click to split
+off part of a stack), then click Delete, or press on an item and let go of it over Delete, to destroy what
+you hold, from your inventory or the open chest. With `Confirm` on (default) a small card beside the button
+asks first (Delete / Cancel); a click elsewhere, Escape or closing the inventory cancels it. Worn items are taken off first; quest items cannot be deleted
+(`Features/QualityOfLife/ItemTrash.cs`).
+
 **Provision bar** (`[QualityOfLife.Provisions]`): filled provision slots show beside the food circles
 in the Ragnarök HUD with their hotkeys (default Left Alt+1…6, rebindable in the settings window).
 A key eats or drinks from its slot like a hotbar key; Valheim's hotbar does not also fire on it.
@@ -276,7 +327,8 @@ A key eats or drinks from its slot like a hotbar key; Valheim's hotbar does not 
 **Better Archery** (optional, soft dependency): when its quiver is enabled, the character panel shows
 the worn leather quiver and its three **Arrows** slots (a row in the Ragnarök dashboard,
 a column in the vanilla panel) (Better Archery's own rows; its ammo-only rule and Alt+1-3 keys apply). The grid is its base
-rows only. Character slots live at fixed rows 64/65, and are shielded from Valheim's
+rows only. While a Ragnarök character panel shows the arrow slots, Better Archery's own copy of them on
+Valheim's grid is skipped, so they appear once. Character slots live at fixed rows 64/65 (the quiver at 0,66), and are shielded from Valheim's
 `DropInvalidItems` (which runs on every spawn) and from Better Archery's hidden-row repairs, which
 would otherwise drop them.
 
@@ -303,11 +355,12 @@ Saved provision positions are recorded for deaths after this update.
 ## Server settings
 
 The server (a dedicated server, or the player hosting) decides the gameplay settings for everyone
-who joins: `[QualityOfLife.NearbyChests]` Enabled, Range, Crafting, Building and Stations; `[QualityOfLife.QuickStack]
-Enabled`; `[Inventory]` CharacterSlots and ExtraUtilitySlots. It sends its values after each
+who joins: `[QualityOfLife.NearbyChests]` Enabled and Range control all chest actions;
+`[Gameplay.Equipment]` controls CharacterSlots and ExtraUtilitySlots. It sends its values after each
 player's handshake and again whenever one changes. While its `[Gameplay.Server] LockSettings` is on (the
 default), players use the server's values. Their F10 window shows those rows dimmed with "SET BY
-SERVER" and they cannot change them. Off: everyone uses their own.
+SERVER" and they cannot change them. Nearby Chests Enabled and Range remain
+server-controlled even with the general lock off; other gameplay settings become personal.
 
 Players' own values stay in their config file: the file is always written with them, never with the
 server's, and they come back on leaving. A dedicated server re-reads its config file whenever it is
@@ -317,7 +370,10 @@ other setting (HUD, styles, keys, scale) stays with each player. Admins are not 
 Server side: `ServerConfig.cs`. It uses Valheim's own peer RPCs (`Ragnarok_ServerConfig`, plus
 `Ragnarok_ServerConfigRequest` so an F6 reload mid-session asks again), with no extra library.
 
-## Nearby chest resources (0.2.0)
+## Nearby Chests (0.4.0)
+
+One feature provides crafting, upgrading, building, station supplies, Quick Stack and
+Ctrl+F item search. All actions use one enable switch and the same effective range.
 
 Craft, upgrade, build and supply stations using resources in player-built chests
 within **100 metres of your character** by default. Your carried stock of each resource is
@@ -343,10 +399,16 @@ Edit the `[QualityOfLife.NearbyChests]` section in the config and press **F7**:
 [QualityOfLife.NearbyChests]
 Enabled = true
 Range = 100
-Crafting = true
-Building = true
-Stations = true
+PersonalRange = 100
+Shortcut = F + LeftControl
 ```
+
+Existing Nearby Chests enable/range values are retained. Separate crafting, building,
+station, Quick Stack and search switches are retired, along with the old search
+range. Search shortcuts and map-marker preferences move to this section.
+KeepWeapons, KeepConsumables and KeepTools have been removed; Quick Stack uses
+the inventory category selection and always protects equipped and assigned items.
+Update every client and the server together to 0.4.0.
 
 See [the gameplay test checklist](docs/NEARBY-CHESTS.md).
 
@@ -437,7 +499,7 @@ Use a unique Harmony owner per instance if reload lifetimes overlap.
 New assets, registered items, startup hooks or network state may require a restart.
 Always test a normal fresh launch before sharing a release.
 
-Add Jötunn or Unity asset tools when the chosen features require them.
+Add Unity asset tools when the chosen features require them.
 
 Ideas go in [docs/INSPIRATION.md](docs/INSPIRATION.md).
 

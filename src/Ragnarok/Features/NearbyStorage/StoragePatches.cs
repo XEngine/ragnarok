@@ -46,11 +46,11 @@ internal static class ResourceContextPatch
     private static void Prefix(object? __instance, MethodBase __originalMethod, object[] __args, out ResourceScope? __state)
     {
         __state = null;
+        if (InventoryFirst.Suspended) return;
         StorageSettings settings = StorageRuntime.Settings;
         Player? player = __instance as Player ?? __args.OfType<Player>().FirstOrDefault();
         if (!settings.Enabled.Value || !player || player != Player.m_localPlayer) return;
         string name = __originalMethod.Name;
-        bool enabled;
         bool execute = false;
         if (__originalMethod.DeclaringType == typeof(Player))
         {
@@ -61,26 +61,33 @@ internal static class ResourceContextPatch
             // whose plain remove quietly takes what little you carry. Leave building fully to Valheim then;
             // a chest withdrawal would either spend chest stock for free building or refuse with an error.
             if (player.NoCostCheat() && (execute || name == "HaveRequirements")) return;
-            enabled = name == "HaveRequirements" || execute ? settings.Building.Value : settings.Crafting.Value;
-            if (name == "ConsumeResources" && ResourceScope.Current != null) enabled = true;
         }
         else if (__originalMethod.DeclaringType == typeof(InventoryGui))
         {
-            enabled = name == "SetupRequirement" && !(bool)__args[3] ? settings.Building.Value : settings.Crafting.Value;
             execute = name == "DoCrafting";
         }
         else
         {
-            enabled = settings.Stations.Value;
             execute = true;
         }
-        if (enabled) __state = new ResourceScope(player, StorageRuntime.Registry, execute);
+        __state = new ResourceScope(player, StorageRuntime.Registry, execute,
+            __originalMethod.DeclaringType == typeof(InventoryGui) && name == "DoCrafting");
     }
 
     private static Exception? Finalizer(Exception? __exception, ResourceScope? __state)
     {
         __state?.Dispose();
         return __exception;
+    }
+}
+
+[HarmonyPatch(typeof(Player), nameof(Player.HaveRequirements), new[] { typeof(Recipe), typeof(bool), typeof(int), typeof(int) })]
+internal static class CraftingRequirementsResultPatch
+{
+    [HarmonyPriority(Priority.Last)]
+    private static void Postfix(Player __instance, bool discover, bool __result)
+    {
+        if (!discover) ResourceScope.Current?.ReportCraftingRequirements(__instance, __result);
     }
 }
 

@@ -25,6 +25,7 @@ internal sealed class VanillaQuickStack : IDisposable
     private RectTransform? root, footer, gridRect, sunken;
     private InventoryGuide.Summary? summary;
     private TMP_Text? stackLabel, status, close;
+    private Button? deleteButton;
     private Vector2 gridMin, gridMax, sunkenHome;
     private float originalHeight, builtWidth;
     private bool layoutChanged, failed;
@@ -60,6 +61,7 @@ internal sealed class VanillaQuickStack : IDisposable
         spotlight.Dispose();
         if (root) { root!.gameObject.SetActive(false); UnityEngine.Object.Destroy(root.gameObject); }
         root = footer = null;
+        deleteButton = null;
         summary = null;
         tabs.Clear();
         foreach (var entry in hidden)
@@ -113,6 +115,9 @@ internal sealed class VanillaQuickStack : IDisposable
             tabs.Add((value, button));
             x += width + 4;
         }
+        // Delete sits at the far end of the tab row; it acts on the item held on the cursor.
+        deleteButton = VanillaInventoryStyle.Button(inventoryGui, root, "Delete", new Rect(Mathf.Max(x + 8, builtWidth - 92), 50, 80, 30), PressDelete);
+        ItemTrash.Attach(deleteButton, PressDelete);
         footer = Ugui.Node(root, "Actions and keys");
         footer.anchorMin = footer.anchorMax = new Vector2(0, 0);
         footer.pivot = new Vector2(0, 1);
@@ -144,9 +149,11 @@ internal sealed class VanillaQuickStack : IDisposable
 
     private void Press()
     {
-        if (QuickStackCommand.Run(settings, gui!, item => category == PackCategory.All || InventoryCategories.Of(item.m_shared) == category) is { } result)
+        if (QuickStackCommand.Run(gui!, item => category == PackCategory.All || InventoryCategories.Of(item.m_shared) == category) is { } result)
             Show(result);
     }
+
+    private void PressDelete() => ItemTrash.Press(gui!, deleteButton!, settings.Features.ItemDeleteConfirm.Value, Show);
 
     private void Refresh(Player player)
     {
@@ -159,6 +166,8 @@ internal sealed class VanillaQuickStack : IDisposable
         }
         spotlight.Refresh(gui!.m_playerGrid, inventory, category, QuickStackCommand.DragItem(gui) != null);
         stackLabel!.text = "Quick Stack: " + category;
+        bool delete = settings.Features.ItemDelete.Value;
+        if (deleteButton!.gameObject.activeSelf != delete) deleteButton.gameObject.SetActive(delete);
         int nearby = NearbyStorage.StorageRuntime.Registry?.Nearby(player).Count ?? 0;
         status!.text = Time.unscaledTime - messageTime < 3 ? message : nearby + (nearby == 1 ? " chest in range" : " chests in range");
         string bound = ZInput.instance != null ? ZInput.instance.GetBoundKeyString("Inventory", true) : "TAB";

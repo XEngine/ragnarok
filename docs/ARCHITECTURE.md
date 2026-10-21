@@ -1,5 +1,12 @@
 # Module organization
 
+Mount companion (0.5.0) lives in `Features/Mounts`: `MountService` owns authenticated
+RPCs and server transactions, `MountBondLedger`/`MountBondStore` persist exclusive
+world-scoped bonds, `MountSafety` validates combat/wards/outdoor placement, and
+`MountTransport` moves the owner-controlled original transform/ZDO without cloning.
+`MountClient` owns Jotunn inputs, gesture/audio and their cleanup. The server always
+locks mount rules; keys remain local. See [authority and verification limits](MOUNTS.md).
+
 `Plugin.cs` is the composition root: it constructs settings and services, wires server-controlled options, ticks active components and disposes them before releasing the shared theme. It does not implement gameplay rules. `GlobalUsings.cs` lists shared module namespaces and explicit compatibility aliases; no dependency packages were added.
 
 ## Code ownership
@@ -25,6 +32,47 @@
 A category does not determine authority: the explicit synchronized-entry list in Plugin remains authoritative. Server-owned convenience features stay synchronized even though their pages now live under Quality Of Life. Local visual choices and shortcuts stay local.
 
 ## Migration and compatibility
+
+The additional localization, controller, network-version and map phases are documented
+in [JOTUNN-ROADMAP.md](JOTUNN-ROADMAP.md), including authority and unload behavior.
+
+`UI/JotunnIntegration` uses the required Jotunn 2.30.2+ library. The plugin declares
+a hard BepInEx dependency and explicitly validates it for ScriptEngine, which does
+not enforce normal loader dependencies. GUI integration runs only on graphical
+clients. It registers settings/weapon-dial main keys
+through InputManager for keyboard bindings; callers retain their existing modifier and context rules.
+Mouse bindings use the original Unity Input API, matching the key picker and avoiding
+side-button identity changes through Valheim's KeyCodeToPath conversion.
+Config changes replace only the relevant binding, including disabling with None.
+Only the settings toggle bypasses Ragnarok's modal/text game-button guard, allowing
+F10 to close the window. The dial remains a native-style radial menu that permits
+walking; it does not acquire a GUI block.
+
+The adapter balances one GUIManager.BlockInput request across all Ragnarok modal
+windows and registered focused fields. Repeated ticks do not increment the counter;
+closing/unload releases just this request. OnCustomGUIAvailable resets local request
+ownership after Jotunn resets its counter, and closes settings across GUI recreation.
+Existing canvas/scaling and fallback input patches remain owned by Ragnarok.
+
+Jotunn 2.30.2 has no public RemoveButton. The adapter validates the private Buttons
+registry and native ZInput ButtonAction cleanup contract before enabling itself.
+Bindings use main-key snapshots rather than handing config entries to Jotunn, so
+no entries remain in its config registry. Unload removes owned registrations and
+disposes their native input actions; config/GUI listeners are detached. Public APIs
+are called directly through typed InputManager, ButtonConfig and GUIManager
+references; reflection is limited to cleanup. Missing/older Jotunn prevents plugin
+initialization. The build references one installed `BepInEx/plugins/**/Jotunn.dll`,
+or an explicit `JotunnPath` override in ignored Environment.props/MSBuild arguments.
+Copy-local is disabled. Windows/Linux setup install a checksum-pinned 2.30.2 package
+only if none exists; existing copies are preserved. See [dependency sources](DEPENDENCIES.md).
+Dedicated servers require the library but do not initialize this UI adapter;
+config authority and RPCs are unchanged.
+
+API/source references (Jotunn, MIT; no source copied):
+[inputs](https://valheim-modding.github.io/Jotunn/tutorials/inputs.html),
+[GUI lifecycle](https://valheim-modding.github.io/Jotunn/tutorials/gui.html),
+[InputManager source](https://github.com/Valheim-Modding/Jotunn/blob/master/JotunnLib/Managers/InputManager.cs),
+[GUIManager source](https://github.com/Valheim-Modding/Jotunn/blob/master/JotunnLib/Managers/GUIManager.cs).
 
 Before binding settings, migrate BepInEx's unbound entries. Legacy `QoL.*` balance pages become `Gameplay.*`; `Inventory.*` appearance pages become `HUD.*`, with behavior keys routed individually. `Interface` becomes `HUD.Window`, `Server` becomes `Gameplay.Server`, and `NearbyChests` becomes `QualityOfLife.NearbyChests`.
 
@@ -86,7 +134,7 @@ Vanilla crafting enhancements use the same CraftFilter state and the existing
 CraftAmount/native multi-craft path as the custom panel. They introduce no new
 RPC, resource withdrawal path, server settings or crafting permissions. Material
 source counts are read-only snapshots refreshed at 5 Hz through the existing
-ResourceScope, whose access/range/world-level and server-controlled crafting
+ResourceScope, whose access/range/world-level and server-controlled Nearby Chests
 storage checks remain in force. Quantity affordability uses native
 HaveRequirements and native crafting still validates/pays the final job.
 VanillaCraftExtras owns its input controls and uses the native inventory tooltip

@@ -12,11 +12,9 @@ internal sealed class CharacterHud : IDisposable
 {
     internal const float PortraitSize = 92, FoodSize = 46;
     private const float StatsLeft = 12;
-    internal const float FoodLeft = StatsLeft, FoodLabelLeft = StatsLeft;
     private readonly List<TextOutline> outlines = new();
     private readonly InterfaceSettings settings;
     private readonly RectTransform root, roster;
-    internal readonly RectTransform FoodRoot;
     private readonly TextMeshProUGUI name, partyTitle, armor, weight;
     private readonly Image weightIcon;
     private readonly TextMeshProUGUI[] names = new TextMeshProUGUI[3], distances = new TextMeshProUGUI[3];
@@ -50,7 +48,6 @@ internal sealed class CharacterHud : IDisposable
         weightIcon = Ugui.Image(root, "Carry weight icon", theme.GlyphWeight, Palette.Gold).At(StatsLeft, 121, 14, 14);
         weight = Ugui.Text(root, "Carry weight", "", theme.Numbers, 13, Palette.Bone).At(34, 117, 112, 22);
         weight.overflowMode = TextOverflowModes.Overflow;
-        FoodRoot = Ugui.Node(root, "Food").At(0, 156, 310, 110);
         roster = Ugui.Node(root, "Visible players").At(0, 240, 270, 145);
         partyTitle = Ugui.Text(roster, "Heading", "PARTY", theme.Strong, 11, Palette.Bone, spacing: 3).At(0, 0, 270, 18);
         for (int i = 0; i < rows.Length; i++)
@@ -78,15 +75,14 @@ internal sealed class CharacterHud : IDisposable
 
     internal void SetVisible(bool visible) => root.gameObject.SetActive(visible);
 
-    internal void Tick(bool preview, int statusCount)
+    internal void Tick(bool preview, float statusHeight)
     {
         settings.Character.Apply(root);
         root.localScale = Vector3.one * settings.HudScale.Value;
         portrait.Tick(preview ? null : Player.m_localPlayer, settings.CharacterPortrait.Value, settings.PortraitHelmet.Value);
         // Leave room for additional buff rows when using the reference placement.
-        float foodY = Mathf.Max(156, 40 + StatusStrip.HeightFor(statusCount));
-        FoodRoot.anchoredPosition = new Vector2(0, -foodY);
-        roster.anchoredPosition = new Vector2(0, -foodY - 104 - (settings.ProvisionBar.Value ? 44 : 0));
+        float rosterY = Mathf.Max(156, 56 + statusHeight);
+        roster.anchoredPosition = new Vector2(0, -rosterY);
         if (Time.unscaledTime >= refresh)
         {
             refresh = Time.unscaledTime + 0.5f;

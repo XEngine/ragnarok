@@ -18,7 +18,7 @@ internal static class ConfigSliderValue
     {
         if (key.EndsWith("Percent", StringComparison.Ordinal)) return 5;
         if (key.EndsWith("Capacity", StringComparison.Ordinal)) return 10;
-        if (key == "Range") return 5;
+        if (key.EndsWith("Range", StringComparison.Ordinal)) return 5;
         if (key.StartsWith("Margin", StringComparison.Ordinal)) return 10;
         if (key.EndsWith("Minutes", StringComparison.Ordinal)) return 1;
         if (key.EndsWith("Opacity", StringComparison.Ordinal) || key.EndsWith("Scale", StringComparison.Ordinal)) return 0.05f;

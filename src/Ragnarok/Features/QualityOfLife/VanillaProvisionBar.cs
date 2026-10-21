@@ -7,16 +7,20 @@ using UnityEngine.UI;
 
 namespace Ragnarok.Features.QualityOfLife;
 
-// The provision slots on the vanilla HUD: Valheim's own hotbar slots, in a row just past the hotbar's
-// eight, holding the filled provision slots with their key on each. Click or press the key to use one.
-// Shown while the Ragnarök HUD (which has its own provision bar) is off.
+// The provision slots on the vanilla HUD: Valheim's own hotbar slots holding the filled provision slots
+// with their key on each, beside the Forsaken power icon (or just past the hotbar's eight). Click or
+// press the key to use one. Shown while the Ragnarök HUD (which has its own provision bar) is off.
 internal sealed class VanillaProvisionBar : IDisposable
 {
     private readonly InterfaceSettings settings;
     private readonly Func<bool> ragnarokHud;
+    // Key labels such as "ALT+4" are several characters wide; keep them below the slot numbers' size.
+    private const float BindingScale = 0.6f, PowerGap = 8f;
+    private static readonly Vector3[] Corners = new Vector3[4];
     private readonly List<Cell> cells = new();
     private HotkeyBar? hotbar;
     private RectTransform? root;
+    private ProvisionPlacement builtPlacement;
 
     private sealed class Cell
     {
@@ -47,13 +51,12 @@ internal sealed class VanillaProvisionBar : IDisposable
             Dispose();
             return;
         }
-        if (!root) Build(hotbar!);
+        ProvisionPlacement placement = settings.VanillaProvisionPlacement.Value;
+        global::Hud hud = global::Hud.instance!; // The hotbar above was found through it.
+        if (placement == ProvisionPlacement.BesidePower && (!hud.m_gpRoot || !hud.m_gpIcon)) placement = ProvisionPlacement.AfterHotbar;
+        if (root && builtPlacement != placement) Dispose();
+        if (!root) Build(hotbar!, placement, hud);
         root!.gameObject.SetActive(hotbar!.gameObject.activeInHierarchy);
-
-        // Just past the hotbar's eight slots, in its own parent's space, so it never shifts.
-        Transform bar = hotbar.transform;
-        root.localPosition = bar.localPosition + new Vector3(8.5f * hotbar.m_elementSpace, 0, 0);
-        root.localScale = bar.localScale;
 
         Inventory inventory = player.GetInventory();
         int shown = 0;
@@ -78,6 +81,36 @@ internal sealed class VanillaProvisionBar : IDisposable
             cells[i].Item = null;
             if (cells[i].Go.activeSelf) cells[i].Go.SetActive(false);
         }
+
+        Transform bar = hotbar.transform;
+        if (placement == ProvisionPlacement.AfterHotbar)
+        {
+            // Just past the hotbar's eight slots, in its own parent's space, so it never shifts.
+            root.localPosition = bar.localPosition + new Vector3(8.5f * hotbar.m_elementSpace, 0, 0);
+            root.localScale = bar.localScale;
+        }
+        else PlaceBesidePower(hud, bar);
+    }
+
+    // Right of the power icon, centred on it, with slots the icon's height (between 60% and 100% of
+    // the hotbar's). World-space corners keep this independent of the HUD's anchors and canvas scale.
+    private void PlaceBesidePower(global::Hud hud, Transform bar)
+    {
+        RectTransform icon = hud.m_gpIcon.rectTransform;
+        RectTransform first = (RectTransform)cells[0].Go.transform;
+        Transform parent = root!.parent;
+        float parentScale = Mathf.Max(1e-4f, parent.lossyScale.y);
+        icon.GetWorldCorners(Corners);
+        float iconHeight = (Corners[1].y - Corners[0].y) / parentScale;
+        Vector3 iconRight = (Corners[2] + Corners[3]) * 0.5f;
+        float hotbarScale = bar.lossyScale.y / parentScale;
+        float scale = Mathf.Clamp(iconHeight / Mathf.Max(1f, first.rect.height), hotbarScale * 0.6f, hotbarScale);
+        root.localScale = new Vector3(scale, scale, 1f);
+
+        first.GetWorldCorners(Corners);
+        Vector3 firstLeft = (Corners[0] + Corners[1]) * 0.5f;
+        Vector3 target = iconRight + new Vector3(PowerGap * parent.lossyScale.x, 0, 0);
+        root.position += new Vector3(target.x - firstLeft.x, target.y - firstLeft.y, 0);
     }
 
     public void Dispose()
@@ -87,10 +120,13 @@ internal sealed class VanillaProvisionBar : IDisposable
         cells.Clear();
     }
 
-    private void Build(HotkeyBar bar)
+    private void Build(HotkeyBar bar, ProvisionPlacement placement, global::Hud hud)
     {
-        root = Ugui.Node(bar.transform.parent, "Ragnarok Provisions");
-        RectTransform source = (RectTransform)bar.transform;
+        builtPlacement = placement;
+        // The power's own root hides while no power is chosen; its parent keeps the row on screen.
+        Transform parent = placement == ProvisionPlacement.BesidePower ? hud.m_gpRoot.parent : bar.transform.parent;
+        root = Ugui.Node(parent, "Ragnarok Provisions");
+        RectTransform source = placement == ProvisionPlacement.BesidePower ? hud.m_gpRoot : (RectTransform)bar.transform;
         root.anchorMin = source.anchorMin;
         root.anchorMax = source.anchorMax;
         root.pivot = source.pivot;
@@ -111,6 +147,8 @@ internal sealed class VanillaProvisionBar : IDisposable
             go.transform.Find("equiped").gameObject.SetActive(false);
             go.transform.Find("queued").gameObject.SetActive(false);
             go.transform.Find("selected").gameObject.SetActive(false);
+            cell.Binding.enableAutoSizing = false;
+            cell.Binding.fontSize *= BindingScale;
             cell.Binding.textWrappingMode = TextWrappingModes.NoWrap;
             cell.Binding.overflowMode = TextOverflowModes.Overflow;
             go.GetComponent<Button>().onClick.AddListener(() =>

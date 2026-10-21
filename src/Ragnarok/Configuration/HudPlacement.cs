@@ -41,6 +41,13 @@ internal enum ScreenAnchor
 
 // Shade: a feathered Animus-style field. Plate: a chamfered obsidian plate with a gold rim.
 // Ragnarök look or Valheim's, for parts that are restyled rather than replaced.
+// Where the vanilla HUD's provision row sits.
+internal enum ProvisionPlacement
+{
+    BesidePower,
+    AfterHotbar
+}
+
 internal enum PanelStyle
 {
     FollowHud,

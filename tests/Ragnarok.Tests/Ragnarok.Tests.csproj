@@ -7,6 +7,15 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../src/Ragnarok/HUD/PickupQueue.cs" Link="PickupQueue.cs" />
+    <Compile Include="../../src/Ragnarok/HUD/HoverPromptLines.cs" Link="HoverPromptLines.cs" />
+    <Compile Include="../../src/Ragnarok/HUD/StatusCategories.cs" Link="StatusCategories.cs" />
+    <Compile Include="../../src/Ragnarok/Features/Mounts/MountBondLedger.cs" Link="MountBondLedger.cs" />
+    <Compile Include="../../src/Ragnarok/Features/Mounts/MountBondStore.cs" Link="MountBondStore.cs" />
+    <Compile Include="../../src/Ragnarok/Features/Mounts/MountArrivalPolicy.cs" Link="MountArrivalPolicy.cs" />
+    <Compile Include="../../src/Ragnarok/Features/Mounts/MountRecordPolicy.cs" Link="MountRecordPolicy.cs" />
+    <Compile Include="../../src/Ragnarok/Features/Mounts/MountProgression.cs" Link="MountProgression.cs" />
+    <Compile Include="../../src/Ragnarok/Features/Mounts/MountProgressStore.cs" Link="MountProgressStore.cs" />
     <Compile Include="../../src/Ragnarok/Configuration/ConfigSliderValue.cs" Link="ConfigSliderValue.cs" />
     <Compile Include="../../src/Ragnarok/Ui/Shared/BuildMenuRules.cs" Link="BuildMenuRules.cs" />
     <Compile Include="../../src/Ragnarok/Features/Equipment/GraveRecoveryPlan.cs" Link="GraveRecoveryPlan.cs" />

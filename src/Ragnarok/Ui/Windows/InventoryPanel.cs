@@ -33,14 +33,13 @@ internal sealed class InventoryPanel : IDisposable
     private InventoryGuide.Summary? summary;
     private CharacterDashboard? dashboard;
     private TextMeshProUGUI? closeHint, quickStackLabel;
+    private Button? deleteButton;
     private readonly List<InventoryGuide.Tab> categoryChips = new();
     private PackCategory category;
     private Vector2 builtSize;
     private float panelHeight;
     private int builtWidth, builtHeight;
     private int builtCharacter;
-    // Whether the second row is a hotbar too (HotbarRows), so its slots carry the keys 1-8 as well.
-    private bool builtSecond;
     private SlotView? hovered;
     private TextMeshProUGUI? chests, result;
     private float resultTime = -10;
@@ -71,15 +70,6 @@ internal sealed class InventoryPanel : IDisposable
         }
         if (!gui) return;
 
-        // Character slots are kept in order every frame, inventory open or not: gear put on from the
-        // hotbar moves into its slot, gear taken off goes back to the grid.
-        if (Player.m_localPlayer)
-        {
-            if (CharacterSlots.Enabled()) CharacterSlots.Settle(Player.m_localPlayer, DragItem(gui!));
-            else CharacterSlots.Empty(Player.m_localPlayer.GetInventory());
-            CharacterSlots.SyncEffects(Player.m_localPlayer);
-        }
-
         if (!Wanted)
         {
             Restore();
@@ -90,7 +80,7 @@ internal sealed class InventoryPanel : IDisposable
         Inventory inventory = Player.m_localPlayer.GetInventory();
         RectTransform panel = gui!.m_player;
         if (!root || panel.rect.size != builtSize || inventory.GetWidth() != builtWidth || CharacterSlots.GridRows(inventory) != builtHeight ||
-            builtCharacter != CharacterLayout || builtSecond != HotbarRows.Enabled)
+            builtCharacter != CharacterLayout)
             Build(panel, inventory);
         Refresh(Player.m_localPlayer, inventory);
     }
@@ -117,6 +107,7 @@ internal sealed class InventoryPanel : IDisposable
         root = null;
         card = null;
         dashboard = null;
+        deleteButton = null;
         slots.Clear();
         backgrounds.Clear();
         categoryChips.Clear();
@@ -135,7 +126,6 @@ internal sealed class InventoryPanel : IDisposable
         builtSize = panel.rect.size;
         builtWidth = inventory.GetWidth();
         builtHeight = CharacterSlots.GridRows(inventory);
-        builtSecond = HotbarRows.Enabled;
         float width = builtSize.x, height = builtSize.y;
 
         int cols = builtWidth, rows = builtHeight;
@@ -167,7 +157,7 @@ internal sealed class InventoryPanel : IDisposable
             for (int x = 0; x < cols; x++)
             {
                 SlotView slot = new(theme, root, new Rect(Pad + x * (size + Gap), HeaderHeight + Pad + y * (size + Gap), size, size),
-                    new Vector2i(x, y), y == 0 || (y == 1 && builtSecond) ? (x + 1).ToString() : null, guide: true);
+                    new Vector2i(x, y), y == 0 ? (x + 1).ToString() : null, guide: true);
                 slot.Input.Down = button => Click(grid, slot, button);
                 slot.Input.Hover = on => hovered = on ? slot : hovered == slot ? null : hovered;
                 slots.Add(slot);
@@ -187,7 +177,15 @@ internal sealed class InventoryPanel : IDisposable
         float row = x + 162;
 
         float sortGap = 3, sortWidth = 44, sortX = x + w - sortWidth * 3 - sortGap * 2;
-        float textX = row, textW = sortX - textX - 8;
+        // Delete acts on the item held on the cursor; it sits apart from the sort chips.
+        float deleteWidth = 52, deleteX = sortX - deleteWidth - 10;
+        deleteButton = PackButton("Delete", deleteX, y, deleteWidth, FooterHeight, DeleteHeld, 12);
+        Features.QualityOfLife.ItemTrash.Attach(deleteButton, DeleteHeld);
+        deleteButton.OnHover(on =>
+        {
+            if (on && DragItem(gui!) == null) ShowHint("Pick up an item, then press or drop it on Delete");
+        });
+        float textX = row, textW = deleteX - textX - 8;
         chests = Ugui.Text(root!, "Chests", "", theme.Body, 12, Palette.Muted).At(textX, y, textW, FooterHeight);
         result = Ugui.Text(root!, "Result", "", theme.Subtle, 12, Palette.Bone).At(textX, y, textW, FooterHeight);
 
@@ -292,10 +290,17 @@ internal sealed class InventoryPanel : IDisposable
         resultTime = Time.unscaledTime - 1.5f;
     }
 
+    private void DeleteHeld() => Features.QualityOfLife.ItemTrash.Press(gui!, deleteButton!, settings.Features.ItemDeleteConfirm.Value, text =>
+    {
+        if (!result) return; // The answer came after the panel closed.
+        result!.text = text;
+        resultTime = Time.unscaledTime;
+    });
+
     private void QuickStackNow()
     {
         PackCategory selected = category;
-        if (QuickStackCommand.Run(settings, gui!, item => selected == PackCategory.All ||
+        if (QuickStackCommand.Run(gui!, item => selected == PackCategory.All ||
             InventoryCategories.Of(item.m_shared) == selected) is not { } text) return;
         result!.text = text;
         resultTime = Time.unscaledTime;
@@ -389,6 +394,8 @@ internal sealed class InventoryPanel : IDisposable
         chests.alpha = 1f - result.alpha;
         foreach (var chip in categoryChips) chip.Refresh(category);
         quickStackLabel!.text = "Quick Stack: " + category;
+        bool delete = settings.Features.ItemDelete.Value;
+        if (deleteButton!.gameObject.activeSelf != delete) deleteButton.gameObject.SetActive(delete);
 
         card!.Show(focus?.Item, player, focus?.Area ?? default);
     }

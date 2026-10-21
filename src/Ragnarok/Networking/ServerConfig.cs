@@ -26,7 +26,9 @@ internal sealed class ServerConfig : IDisposable
     private readonly ConfigFile config;
     private readonly ManualLogSource log;
     private readonly string version;
+    internal string? RemoteVersion { get; private set; }
     private readonly List<ConfigEntryBase> synced;
+    private readonly HashSet<ConfigEntryBase> mandatory;
     // While a server holds a setting: its value, and the player's own (what the config file keeps).
     private readonly Dictionary<ConfigEntryBase, string> held = new(), own = new();
     private readonly FileSystemWatcher? watcher;
@@ -35,16 +37,19 @@ internal sealed class ServerConfig : IDisposable
     private int reloadPending;
     private readonly HashSet<ZRpc> registered = new();
 
-    internal ServerConfig(ConfigFile config, ManualLogSource log, string version, IEnumerable<ConfigEntryBase> synced)
+    internal ServerConfig(ConfigFile config, ManualLogSource log, string version, IEnumerable<ConfigEntryBase> synced,
+        IEnumerable<ConfigEntryBase>? mandatory = null)
     {
         this.config = config;
         this.log = log;
         this.version = version;
         this.synced = synced.ToList();
+        this.mandatory = new HashSet<ConfigEntryBase>(mandatory ?? Enumerable.Empty<ConfigEntryBase>());
         Lock = config.Bind("Gameplay.Server", "LockSettings", true,
             "When you host or run a dedicated server: players who join use this file's values for the gameplay settings " +
             "(nearby chests, inventory and QoL gameplay settings including skills, resource costs, stations, sailing and ballistas) " +
-            "and cannot change them. Off: everyone uses their own.");
+            "and cannot change them. Off: other gameplay settings are personal. Nearby Chests enable state and shared range, " +
+            "and death-reclaim auto equip are always defined and locked by a modded server.");
         config.SettingChanged += OnSettingChanged;
         config.ConfigReloaded += OnReloaded;
 
@@ -74,7 +79,7 @@ internal sealed class ServerConfig : IDisposable
             net = current;
             if (net) Hook(net!);
         }
-        if ((!net || (!net!.IsServer() && net.GetServerPeer() == null)) && (held.Count > 0 || serverLocked)) Release();
+        if ((!net || (!net!.IsServer() && net.GetServerPeer() == null)) && (held.Count > 0 || serverLocked || RemoteVersion != null)) Release();
 
         if (Interlocked.Exchange(ref reloadPending, 0) != 0)
         {
@@ -110,7 +115,8 @@ internal sealed class ServerConfig : IDisposable
     {
         foreach (ZNetPeer peer in zNet.GetPeers())
             if (peer.m_rpc != null) Register(peer.m_rpc);
-        if (!zNet.IsServer()) zNet.GetServerPeer()?.m_rpc?.Invoke(RequestRpc);
+        if (zNet.IsServer()) dirty = true;
+        else zNet.GetServerPeer()?.m_rpc?.Invoke(RequestRpc);
     }
 
     private static void Register(ZRpc rpc)
@@ -129,6 +135,13 @@ internal sealed class ServerConfig : IDisposable
             rpc.Unregister(RequestRpc);
         }
         registered.Clear();
+    }
+
+    private void Unregister(ZRpc rpc)
+    {
+        if (!registered.Remove(rpc)) return;
+        rpc.Unregister(ConfigRpc);
+        rpc.Unregister(RequestRpc);
     }
 
     private void Answer(ZRpc rpc)
@@ -159,7 +172,7 @@ internal sealed class ServerConfig : IDisposable
         catch (Exception exception) { log.LogWarning("Rejected invalid server configuration: " + exception.Message); }
     }
 
-    private void ApplyPackage(ZPackage package)
+    internal void ApplyPackage(ZPackage package)
     {
         string serverVersion = package.ReadString();
         bool locked = package.ReadBool();
@@ -173,16 +186,19 @@ internal sealed class ServerConfig : IDisposable
         }
         if (serverVersion != version)
             log.LogWarning($"The server runs Ragnarök {serverVersion}; this is {version}.");
-        if (!locked)
-        {
-            Release();
-            log.LogInfo("The server leaves Ragnarök's settings to each player.");
-            return;
-        }
-        serverLocked = true;
+        // Validate the complete message before replacing any active policy.
         foreach (ConfigEntryBase entry in synced)
         {
-            if (values.TryGetValue(entry.Definition, out string value)) Hold(entry, value);
+            if (!values.TryGetValue(entry.Definition, out string value)) continue;
+            object parsed = TomlTypeConverter.ConvertToValue(value, entry.SettingType);
+            if (parsed is float number && (float.IsNaN(number) || float.IsInfinity(number)))
+                throw new InvalidDataException("Non-finite setting value.");
+        }
+        serverLocked = locked;
+        RemoteVersion = serverVersion;
+        foreach (ConfigEntryBase entry in synced)
+        {
+            if ((locked || mandatory.Contains(entry)) && values.TryGetValue(entry.Definition, out string value)) Hold(entry, value);
             else Release(entry);
         }
         log.LogInfo($"The server sets {held.Count} of Ragnarök's settings: " +
@@ -191,6 +207,9 @@ internal sealed class ServerConfig : IDisposable
 
     private void Hold(ConfigEntryBase entry, string value)
     {
+        object parsed = TomlTypeConverter.ConvertToValue(value, entry.SettingType);
+        parsed = entry.Description.AcceptableValues?.Clamp(parsed) ?? parsed;
+        value = TomlTypeConverter.ConvertToString(parsed, entry.SettingType);
         if (!own.ContainsKey(entry)) own[entry] = entry.GetSerializedValue();
         held[entry] = value;
         Set(entry, value);
@@ -198,6 +217,7 @@ internal sealed class ServerConfig : IDisposable
 
     private void Release()
     {
+        RemoteVersion = null;
         serverLocked = false;
         foreach (ConfigEntryBase entry in held.Keys.ToList()) Release(entry);
     }
@@ -262,6 +282,15 @@ internal sealed class ServerConfig : IDisposable
         }
     }
 
+    [HarmonyPatch(typeof(ZNet), nameof(ZNet.Disconnect))]
+    private static class DisconnectPatch
+    {
+        private static void Prefix(ZNetPeer peer)
+        {
+            if (peer.m_rpc != null) Instance?.Unregister(peer.m_rpc);
+        }
+    }
+
     // The server sends its settings once a player's handshake is accepted.
     [HarmonyPatch(typeof(ZNet), "RPC_PeerInfo")]
     private static class HandshakePatch
@@ -274,24 +303,55 @@ internal sealed class ServerConfig : IDisposable
         }
     }
 
-    // Puts the player's own values (or back the server's) in place quietly, without change events.
-    private void Swap(ConfigFile file, bool toOwn)
+    // BepInEx saves before its SettingChanged event. Restore the values present at save entry,
+    // including a proposed local edit, so that event can still observe the actual edit.
+    private Dictionary<ConfigEntryBase, object>? BeforeSave(ConfigFile file)
     {
-        if (file != config) return;
+        if (file != config || held.Count == 0) return null;
+        Dictionary<ConfigEntryBase, object> snapshot = new();
         foreach (KeyValuePair<ConfigEntryBase, string> kv in held)
         {
-            string value = toOwn && own.TryGetValue(kv.Key, out string mine) ? mine : kv.Value;
-            AccessTools.Field(kv.Key.GetType(), "_typedValue")?.SetValue(kv.Key, TomlTypeConverter.ConvertToValue(value, kv.Key.SettingType));
+            snapshot[kv.Key] = kv.Key.BoxedValue;
+            string current = Current(kv.Key);
+            if (!applying && current != kv.Value) own[kv.Key] = current;
+            if (own.TryGetValue(kv.Key, out string mine))
+                QuietSet(kv.Key, TomlTypeConverter.ConvertToValue(mine, kv.Key.SettingType));
+        }
+        return snapshot;
+    }
+
+    private static void QuietSet(ConfigEntryBase entry, object value) =>
+        AccessTools.Field(entry.GetType(), "_typedValue").SetValue(entry, value);
+
+    [HarmonyPatch(typeof(ConfigEntryBase), nameof(ConfigEntryBase.SetSerializedValue))]
+    private static class SerializedEditPatch
+    {
+        private static void Prefix(ConfigEntryBase __instance, string value)
+        {
+            ServerConfig? instance = Instance;
+            if (instance == null || instance.applying || !instance.held.ContainsKey(__instance)) return;
+            // Reloading a personal value equal to the effective server value raises no
+            // SettingChanged event. Remember the disk input before the equality check.
+            try
+            {
+                object parsed = TomlTypeConverter.ConvertToValue(value, __instance.SettingType);
+                parsed = __instance.Description.AcceptableValues?.Clamp(parsed) ?? parsed;
+                instance.own[__instance] = TomlTypeConverter.ConvertToString(parsed, __instance.SettingType);
+            }
+            catch (Exception) { /* Let BepInEx report malformed config values normally. */ }
         }
     }
 
-    // The config file keeps the player's own values while the server's are in force: they stand in for
-    // the server's just while the file is written.
     [HarmonyPatch(typeof(ConfigFile), nameof(ConfigFile.Save))]
     private static class SavePatch
     {
-        private static void Prefix(ConfigFile __instance) => Instance?.Swap(__instance, true);
+        private static void Prefix(ConfigFile __instance, out Dictionary<ConfigEntryBase, object>? __state) =>
+            __state = Instance?.BeforeSave(__instance);
 
-        private static void Finalizer(ConfigFile __instance) => Instance?.Swap(__instance, false);
+        private static void Finalizer(Dictionary<ConfigEntryBase, object>? __state)
+        {
+            if (__state == null) return;
+            foreach (var entry in __state) QuietSet(entry.Key, entry.Value);
+        }
     }
 }

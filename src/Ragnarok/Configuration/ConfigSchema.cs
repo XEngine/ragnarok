@@ -35,12 +35,15 @@ internal static class ConfigSchema
         ("Inventory.Provisions", "ShowInHud", "HUD.Provisions"),
         ("HUD.WeaponDial", "Enabled", "QualityOfLife.WeaponDial"),
         ("HUD.WeaponDial", "Key", "QualityOfLife.WeaponDial"),
-        ("HUD.Hotbar", "SecondRow", "QualityOfLife.Hotbar"),
-        ("HUD.Hotbar", "SwitchRowKey", "QualityOfLife.Hotbar")
+        ("HUD.Minimap", "ChestSearchMarker", "QualityOfLife.NearbyChests")
     };
 
     internal static string CanonicalSection(string section, string key)
     {
+        if ((section == "QualityOfLife.ChestSearch" || section == "HUD.ChestSearch") && key == "Shortcut")
+            return "QualityOfLife.NearbyChests";
+        if ((section == "QualityOfLife.QuickStack" || section == "Inventory.QuickStack") && key != "Enabled")
+            return "QualityOfLife.NearbyChests";
         foreach (var item in Overrides)
             if (item.OldSection == section && item.Key == key) return item.NewSection;
         if (section.StartsWith("QoL.", StringComparison.Ordinal)) return "Gameplay." + section.Substring(4);
@@ -57,11 +60,30 @@ internal static class ConfigSchema
         return section;
     }
 
+    // Nearby Chests owns the combined policy. Old subfeature switches/ranges cannot
+    // override it; retain the established Nearby Chests enable/radius preferences.
+    private static bool RetiredChestSetting(string section, string key) =>
+        ((section == "QualityOfLife.NearbyChests" || section == "NearbyChests" ||
+          section == "QualityOfLife.QuickStack" || section == "Inventory.QuickStack") &&
+            (key == "KeepWeapons" || key == "KeepConsumables" || key == "KeepTools")) ||
+        ((section == "QualityOfLife.ChestSearch" || section == "HUD.ChestSearch") &&
+            (key == "Enabled" || key == "Range" || key == "PersonalRange")) ||
+        ((section == "QualityOfLife.QuickStack" || section == "Inventory.QuickStack") && key == "Enabled") ||
+        ((section == "QualityOfLife.NearbyChests" || section == "NearbyChests") &&
+            (key == "Crafting" || key == "Building" || key == "Stations"));
+
     // New-format values win when both forms exist. Unknown settings are left untouched.
     internal static void Migrate(IDictionary<(string Section, string Key), string> values)
     {
         foreach (var item in new List<KeyValuePair<(string Section, string Key), string>>(values))
         {
+            if (RetiredChestSetting(item.Key.Section, item.Key.Key) ||
+                ((item.Key.Section == "HUD.Hotbar" || item.Key.Section == "QualityOfLife.Hotbar") &&
+                    (item.Key.Key == "SecondRow" || item.Key.Key == "SwitchRowKey")))
+            {
+                values.Remove(item.Key);
+                continue;
+            }
             var target = (CanonicalSection(item.Key.Section, item.Key.Key), item.Key.Key);
             if (target == item.Key) continue;
             if (!values.ContainsKey(target)) values[target] = item.Value;

@@ -58,7 +58,9 @@ internal static class HarvestGrowthHoverPatch
         if (picked <= 1) return; // Vanilla has not initialized a respawn timestamp yet.
         double age = (ZNet.instance.GetTime().Ticks - picked) / (double)TimeSpan.TicksPerSecond;
         double remaining = __instance.m_respawnTimeMinutes * 60d - Math.Max(0, age);
-        __result = __instance.GetHoverName() + (remaining > 0
+        // Picked plants have no vanilla hover text. GetHoverName returns an item
+        // token, so resolve it before constructing our replacement hover text.
+        __result = Localization.instance.Localize(__instance.GetHoverName()) + (remaining > 0
             ? "\nRegrowing — ready in ~" + PlantHoverStatus.Remaining(remaining)
             : "\nRegrowth due — awaiting world update");
     }

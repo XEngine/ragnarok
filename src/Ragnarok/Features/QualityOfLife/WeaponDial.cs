@@ -104,11 +104,16 @@ internal sealed class WeaponDial : IDisposable
     private float nextDetails;
     private Vector2 aim;
     private int chosen = -1;
+    private readonly JotunnIntegration.Binding? dialInput;
+    private readonly JotunnIntegration.Binding? dialGamepad;
+    private bool openedWithGamepad;
 
-    internal WeaponDial(InterfaceSettings settings, Theme theme)
+    internal WeaponDial(InterfaceSettings settings, Theme theme, JotunnIntegration? jotunn = null)
     {
         this.settings = settings;
         this.theme = theme;
+        dialInput = jotunn?.AddButton("RagnarokWeaponDial", settings.Features.WeaponDialKey);
+        dialGamepad = jotunn?.AddGamepadButton("RagnarokWeaponDialController", settings.Features.WeaponDialGamepad);
     }
 
     internal void Update()
@@ -140,15 +145,24 @@ internal sealed class WeaponDial : IDisposable
 
     public void Dispose()
     {
+        dialInput?.Dispose();
+        dialGamepad?.Dispose();
         Equipping = null;
         Hide();
         ClearCanvas();
     }
 
     // The key went down this frame, with its modifiers held (either Control, Shift or Alt counts).
-    private bool Pressed() => Input.GetKeyDown(settings.Features.WeaponDialKey.Value.MainKey) && Modifiers();
+    private bool Pressed()
+    {
+        if (dialGamepad?.Down == true) { openedWithGamepad = true; return true; }
+        if (!(dialInput?.Down ?? Input.GetKeyDown(settings.Features.WeaponDialKey.Value.MainKey)) || !Modifiers()) return false;
+        openedWithGamepad = false;
+        return true;
+    }
 
-    private bool Held() => settings.Features.WeaponDialKey.Value.MainKey != KeyCode.None && Input.GetKey(settings.Features.WeaponDialKey.Value.MainKey);
+    private bool Held() => openedWithGamepad ? dialGamepad?.Held == true :
+        dialInput?.Held ?? (settings.Features.WeaponDialKey.Value.MainKey != KeyCode.None && Input.GetKey(settings.Features.WeaponDialKey.Value.MainKey));
 
     private bool Modifiers() => settings.Features.WeaponDialKey.Value.Modifiers.All(m => Input.GetKey(m) || Input.GetKey(Twin(m)));
 

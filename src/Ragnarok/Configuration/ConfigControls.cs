@@ -92,7 +92,7 @@ internal sealed class ConfigControls
         void Refresh()
         {
             bool on = (bool)entry.BoxedValue;
-            state.text = on ? "ON" : "OFF";
+            state.text = on ? UiLocalization.Text("config.on_caps", "ON") : UiLocalization.Text("config.off_caps", "OFF");
             state.color = on ? Palette.GoldBright : Palette.Faint;
             track.color = on ? Palette.SwitchOn : Palette.Ink;
             Color edge = on ? (hover ? Palette.GoldBright : Palette.Gold) : (hover ? Palette.Muted : Palette.Faint);
@@ -131,7 +131,7 @@ internal sealed class ConfigControls
         Refreshers.Add(() =>
         {
             int selected = (int)(ScreenAnchor)entry.BoxedValue;
-            name.text = Pretty(((ScreenAnchor)selected).ToString());
+            name.text = UiLocalization.Text("enum." + (ScreenAnchor)selected, Pretty(((ScreenAnchor)selected).ToString()));
             for (int i = 0; i < cells.Count; i++)
             {
                 bool on = i == selected;
@@ -145,6 +145,7 @@ internal sealed class ConfigControls
     {
         Type type = entry.SettingType;
         string[] names = Enum.GetNames(type);
+        if (names.Length > 6) { Cycle(entry, parent, r, names); return; }
         float width = r.width / names.Length;
         List<(string Name, Button Button, TextMeshProUGUI Label)> segments = new();
         for (int i = 0; i < names.Length; i++)
@@ -153,7 +154,7 @@ internal sealed class ConfigControls
             float gap = i > 0 ? 3 : 0;
             Button button = Ugui.Button(parent, "Segment " + name, theme.Button, theme.ButtonHover,
                 () => Set(entry, Enum.Parse(type, name))).At(r.x + i * width + gap, r.y, width - gap, r.height);
-            string text = EnumNames.TryGetValue(name, out string pretty) ? pretty : Pretty(name);
+            string text = UiLocalization.Text("enum." + name, EnumNames.TryGetValue(name, out string pretty) ? pretty : Pretty(name));
             TextMeshProUGUI label = Ugui.Text(button.transform, "Label", text, theme.Strong, 11, Palette.Muted,
                 TextAlignmentOptions.Center).Stretch();
             segments.Add((name, button, label));
@@ -171,10 +172,28 @@ internal sealed class ConfigControls
         });
     }
 
+    // Large enums (controller buttons) remain readable instead of becoming tiny segments.
+    private void Cycle(ConfigEntryBase entry, Transform parent, Rect r, string[] names)
+    {
+        void Step(int direction)
+        {
+            int index = Array.IndexOf(names, entry.BoxedValue.ToString());
+            Set(entry, Enum.Parse(entry.SettingType, names[(index + direction + names.Length) % names.Length]));
+        }
+        Button previous = Ugui.Button(parent, "Previous", theme.Button, theme.ButtonHover, () => Step(-1)).At(r.x, r.y, 32, r.height);
+        Ugui.Text(previous.transform, "Label", "‹", theme.Strong, 18, Palette.Bone, TextAlignmentOptions.Center).Stretch();
+        TextMeshProUGUI label = Ugui.Text(parent, "Selection", "", theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center)
+            .At(r.x + 36, r.y, r.width - 72, r.height);
+        Button next = Ugui.Button(parent, "Next", theme.Button, theme.ButtonHover, () => Step(1)).At(r.xMax - 32, r.y, 32, r.height);
+        Ugui.Text(next.transform, "Label", "›", theme.Strong, 18, Palette.Bone, TextAlignmentOptions.Center).Stretch();
+        Refreshers.Add(() => label.text = UiLocalization.Text("enum." + entry.BoxedValue, Pretty(entry.BoxedValue.ToString())));
+    }
+
     private void Slider(ConfigEntryBase entry, AcceptableValueBase range, Transform parent, Rect r)
     {
         float min = Convert.ToSingle(range.GetType().GetProperty("MinValue")!.GetValue(range, null));
         float max = Convert.ToSingle(range.GetType().GetProperty("MaxValue")!.GetValue(range, null));
+        float Maximum() => Math.Min(max, RangeLimit.For(entry)?.Maximum ?? max);
         bool isInt = entry.SettingType == typeof(int);
         bool whole = isInt;
         bool percent = entry.Definition.Key.EndsWith("Opacity", StringComparison.Ordinal);
@@ -182,7 +201,7 @@ internal sealed class ConfigControls
         string unit = Units.TryGetValue(entry.Definition.Section + "." + key, out string u) ? u
             : key.EndsWith("Percent", StringComparison.Ordinal) ? "%"
             : key.EndsWith("Minutes", StringComparison.Ordinal) ? " min"
-            : key == "Range" ? " m"
+            : key.EndsWith("Range", StringComparison.Ordinal) ? " m"
             : key.StartsWith("Margin", StringComparison.Ordinal) ? " px"
             : key.EndsWith("Multiplier", StringComparison.Ordinal) || key.EndsWith("Scale", StringComparison.Ordinal) ? "\u00D7" : "";
 
@@ -215,7 +234,7 @@ internal sealed class ConfigControls
         };
         slider.direction = UnityEngine.UI.Slider.Direction.LeftToRight;
         slider.minValue = min;
-        slider.maxValue = max;
+        slider.maxValue = Maximum();
         slider.wholeNumbers = whole;
 
         Image box = Ugui.Image(parent, "Value Box", theme.PackSurface, Palette.Hex(0x080B0C), raycast: true)
@@ -238,13 +257,13 @@ internal sealed class ConfigControls
 
         string DisplayValue()
         {
-            float current = Convert.ToSingle(entry.BoxedValue);
+            float current = RangeLimit.Display(entry);
             return (percent ? current * 100f : current).ToString(whole ? "0" : "0.##", CultureInfo.InvariantCulture);
         }
         field.onEndEdit.AddListener(text =>
         {
             if (!field.wasCanceled && window.CanEdit(entry) &&
-                ConfigSliderValue.TryRead(text, isInt, percent, min, max, out object parsed))
+                ConfigSliderValue.TryRead(text, isInt, percent, min, Maximum(), out object parsed))
                 Set(entry, parsed);
             field.SetTextWithoutNotify(DisplayValue());
         });
@@ -253,15 +272,16 @@ internal sealed class ConfigControls
         slider.onValueChanged.AddListener(v =>
         {
             if (updating || !window.CanEdit(entry)) return;
-            object snapped = ConfigSliderValue.Snap(v, isInt, min, max, step);
+            object snapped = ConfigSliderValue.Snap(v, isInt, min, Maximum(), step);
             Set(entry, snapped);
             // Snap the handle even when the setting did not change this frame.
-            slider.SetValueWithoutNotify(Convert.ToSingle(entry.BoxedValue));
+            slider.SetValueWithoutNotify(RangeLimit.Display(entry));
         });
         Refreshers.Add(() =>
         {
-            float current = Convert.ToSingle(entry.BoxedValue);
+            float current = RangeLimit.Display(entry);
             updating = true;
+            slider.maxValue = Maximum();
             slider.SetValueWithoutNotify(current);
             updating = false;
             if (!field.isFocused) field.SetTextWithoutNotify(DisplayValue());
@@ -277,7 +297,7 @@ internal sealed class ConfigControls
         {
             bool waiting = window.Capturing == entry;
             Ugui.SpriteSwap(button, waiting ? theme.SegmentOn : theme.Button, waiting ? theme.SegmentOnHover : theme.ButtonHover);
-            label.text = waiting ? "PRESS A KEY…" : ((KeyboardShortcut)entry.BoxedValue).ToString();
+            label.text = waiting ? UiLocalization.Text("control.key_wait", "PRESS A KEY…") : ((KeyboardShortcut)entry.BoxedValue).ToString();
             label.color = waiting ? Color.white : Palette.Bone;
         });
     }

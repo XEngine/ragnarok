@@ -22,7 +22,7 @@ namespace Ragnarok.Features.Equipment;
 // "out of bounds" items (Valheim's DropInvalidItems, Better Archery's repairs) is kept off them.
 internal static class CharacterSlots
 {
-    internal const int GearRow = 64, ProvisionRow = 65;
+    internal const int GearRow = 64, ProvisionRow = 65, QuiverRow = 66;
 
     internal static readonly ItemDrop.ItemData.ItemType[] Gear =
     {
@@ -51,11 +51,16 @@ internal static class CharacterSlots
     internal static bool IsPlayer(Inventory inventory) =>
         Player.m_localPlayer && Player.m_localPlayer.GetInventory() == inventory;
 
-    internal static Vector2i GearSlot(int index) => new(index, GearRow);
+    internal static Vector2i GearSlot(int index) => index == QuiverIndex ? new(0, QuiverRow) : new(index, GearRow);
+
+    internal static bool IsQuiverSlot(Vector2i pos) =>
+        (pos.y == QuiverRow && pos.x == 0) || (pos.y == GearRow && pos.x == QuiverIndex);
+
+    internal static int SlotIndex(Vector2i pos) => IsQuiverSlot(pos) ? QuiverIndex : pos.x;
 
     internal static Vector2i ProvisionSlot(int index) => new(index, ProvisionRow);
 
-    internal static bool IsGearSlot(Vector2i pos) => pos.y == GearRow && pos.x >= 0 && pos.x <= QuiverIndex;
+    internal static bool IsGearSlot(Vector2i pos) => (pos.y == GearRow && pos.x >= 0 && pos.x < Gear.Length) || IsQuiverSlot(pos);
 
     internal static bool IsProvisionSlot(Vector2i pos) => pos.y == ProvisionRow && pos.x >= 0 && pos.x < Provisions;
 
@@ -80,7 +85,7 @@ internal static class CharacterSlots
     {
         if (IsExtraUtility(pos) && !ExtraUtilityEnabled()) return false;
         if (IsGearSlot(pos))
-            return pos.x == QuiverIndex
+            return IsQuiverSlot(pos)
                 ? BetterArcheryCompat.Active && BetterArcheryCompat.IsQuiver(item)
                 : item.m_shared.m_itemType == Gear[pos.x];
         if (IsProvisionSlot(pos)) return item.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Consumable;
@@ -153,6 +158,13 @@ internal static class CharacterSlots
     {
         if (migrated == inventory) return;
         migrated = inventory;
+        // Also migrate live inventories during F6, before the old invalid coordinate is saved.
+        ItemDrop.ItemData quiver = inventory.GetItemAt(QuiverIndex, GearRow);
+        if (quiver != null && inventory.GetItemAt(0, QuiverRow) == null)
+        {
+            quiver.m_gridPos = GearSlot(QuiverIndex);
+            Notify(inventory);
+        }
         if (BetterArcheryCompat.Active) return;
         int gear = inventory.GetHeight(), provisions = gear + 1;
         bool moved = false;
@@ -211,16 +223,22 @@ internal static class CharacterSlots
     // (through the patch below, which adds theirs).
     internal static void SyncEffects(Player player)
     {
-        List<ItemDrop.ItemData> now = ActiveExtras(player).ToList();
-        if (now.SequenceEqual(appliedExtras)) return;
+        ItemDrop.ItemData? first = null, second = null;
+        foreach (ItemDrop.ItemData item in ActiveExtras(player))
+            if (first == null) first = item; else second = item;
+        int count = first == null ? 0 : second == null ? 1 : 2;
+        if (appliedExtras.Count == count && (count == 0 || appliedExtras[0] == first) &&
+            (count < 2 || appliedExtras[1] == second)) return;
         appliedExtras.Clear();
-        appliedExtras.AddRange(now);
+        if (first != null) appliedExtras.Add(first);
+        if (second != null) appliedExtras.Add(second);
         UpdateEffects.Invoke(player, null);
     }
 
     // On unload: drop the extra effects (the patch is gone, so Valheim's own pass removes them).
     internal static void ClearEffects()
     {
+        migrated = null;
         appliedExtras.Clear();
         if (Player.m_localPlayer) UpdateEffects.Invoke(Player.m_localPlayer, null);
     }
@@ -301,9 +319,20 @@ internal static class CharacterSlots
     new[] { typeof(ItemDrop.ItemData), typeof(int), typeof(int), typeof(int), typeof(bool) })]
 internal static class SlotAddItemPatch
 {
-    private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, int x, int y, ref bool skipValidPositionCheck, ref bool __result)
+    private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref int x, ref int y, ref bool skipValidPositionCheck, ref bool __result)
     {
         Vector2i pos = new(x, y);
+        // Native deserialization explicitly permits saved positions. Admission rules must
+        // never reject saved items; disabled slots drain safely after the inventory loads.
+        if (skipValidPositionCheck && CharacterSlots.IsSlot(pos))
+        {
+            if (CharacterSlots.IsQuiverSlot(pos))
+            {
+                x = 0;
+                y = CharacterSlots.QuiverRow;
+            }
+            return true;
+        }
         if (!CharacterSlots.IsSlot(pos) || !CharacterSlots.IsPlayer(__instance)) return true;
         if (!CharacterSlots.Allows(__instance, pos, item))
         {

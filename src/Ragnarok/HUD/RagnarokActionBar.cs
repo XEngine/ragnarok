@@ -39,9 +39,7 @@ internal sealed class RagnarokActionBar : IDisposable
     internal static float KeyDockInset { get; private set; }
     private static float requestedGuideSpace;
     private float guideLift, guideVelocity;
-    private TMP_Text? inventoryKey, switchKey;
-    private GameObject? switcher;
-    private Image? upper, lower;
+    private TMP_Text? inventoryKey;
     private float nextKeyRefresh;
 
     private sealed class Cell
@@ -112,17 +110,12 @@ internal sealed class RagnarokActionBar : IDisposable
         {
             nextKeyRefresh = Time.unscaledTime + 1f;
             inventoryKey!.text = KeyName("Inventory", "TAB");
-            switchKey!.text = Equipment.ProvisionKeys.Label(settings.Features.HotbarToggleKey.Value);
         }
-        // The row switch: the upper diamond lit for the equipment row, the lower for the consumables.
-        if (switcher!.activeSelf != HotbarRows.Enabled) switcher.SetActive(HotbarRows.Enabled);
-        upper!.color = HotbarRows.Row == 0 ? Palette.Key : Palette.GoldDim;
-        lower!.color = HotbarRows.Row == 1 ? Palette.Key : Palette.GoldDim;
         EquippedCard = null;
         for (int i = 0; i < cells.Count; i++)
         {
             Cell cell = cells[i];
-            var item = inventory.GetItemAt(i, HotbarRows.Row);
+            var item = inventory.GetItemAt(i, 0);
             bool equipped = item != null && player.IsItemEquiped(item);
             bool breaking = item != null && item.m_shared.m_useDurability && item.GetDurabilityPercentage() < 0.1f;
             if (equipped && (EquippedCard == null || item == player.GetCurrentWeapon())) EquippedCard = cell.Rect;
@@ -256,22 +249,6 @@ internal sealed class RagnarokActionBar : IDisposable
         inventoryKey.overflowMode = TextOverflowModes.Overflow;
         textOutlines.Add(new TextOutline(inventoryKey));
 
-        // The row switch, mirroring the badge at the left: the key, then two stacked diamonds.
-        RectTransform toggle = Ugui.Node(root, "Row Switch").At(Start - PaddingX - 86, middle - 24, 80, 48);
-        switcher = toggle.gameObject;
-        Image key = Ugui.Image(toggle, "Key", theme.Button, Color.white).At(0, 13, 40, 22);
-        switchKey = Ugui.Text(key.transform, "Label", "", theme.Strong, 12, Palette.Bone, TextAlignmentOptions.Center).Stretch(2, 0, 2, 0);
-        switchKey.overflowMode = TextOverflowModes.Overflow;
-        textOutlines.Add(new TextOutline(switchKey));
-        upper = Diamond(toggle, 50, 4);
-        lower = Diamond(toggle, 50, 24);
-    }
-
-    // A diamond with a gold rim around a lit or dark core.
-    private Image Diamond(Transform parent, float x, float y)
-    {
-        Ugui.Image(parent, "Rim", theme.Diamond, Palette.Gold).At(x, y, 20, 20);
-        return Ugui.Image(parent, "Core", theme.Diamond, Palette.GoldDim).At(x + 3, y + 3, 14, 14);
     }
 
     private static string KeyName(string action, string fallback)

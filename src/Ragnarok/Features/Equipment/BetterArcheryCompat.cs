@@ -87,3 +87,30 @@ internal static class BetterArcheryCompat
         }
     }
 }
+
+// Better Archery draws its own three arrow slots on Valheim's player grid while a quiver is worn.
+// A Ragnarök character panel (either style) already shows those slots, so skip its copy and
+// clear what it drew; otherwise the arrows appear twice. Its own code runs again once ours is off.
+[HarmonyPatch]
+internal static class BetterArcheryQuiverSlotsPatch
+{
+    // Set by the plugin: a Ragnarök character panel shows the quiver's arrow slots.
+    internal static Func<bool> ShownByRagnarok = () => false;
+
+    private static readonly MethodInfo? Remove =
+        AccessTools.Method("BetterArchery.InventoryGrid_UpdateGui_Patch:RemoveQuiverSlots");
+
+    private static MethodBase? Target() => AccessTools.Method("BetterArchery.InventoryGrid_UpdateGui_Patch:CreateQuiverSlots");
+
+    private static bool Prepare() => BetterArcheryCompat.Loaded && Target() != null && Remove != null;
+
+    private static MethodBase TargetMethod() => Target()!;
+
+    // Its parameters are (InventoryGrid __instance, List<InventoryElement> ___m_elements); pass them on as they are.
+    private static bool Prefix(object[] __args)
+    {
+        if (!ShownByRagnarok()) return true;
+        Remove!.Invoke(null, __args);
+        return false;
+    }
+}
