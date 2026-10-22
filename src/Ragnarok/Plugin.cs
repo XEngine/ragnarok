@@ -26,7 +26,7 @@ public sealed class Plugin : BaseUnityPlugin
 {
     public const string PluginGuid = "com.kernelpanic.ragnarok";
     public const string PluginName = "Ragnarök";
-    public const string PluginVersion = "0.5.4";
+    public const string PluginVersion = "0.5.5";
 
     private Harmony? harmony;
     private JotunnIntegration? jotunn;
@@ -55,6 +55,7 @@ public sealed class Plugin : BaseUnityPlugin
     private VanillaCharacterPanel? vanillaCharacter;
     private MinimapInfo? minimapInfo;
     private MinimapSkin? minimapSkin;
+    private LargeMapLayer? largeMapLayer;
     private TamedAnimalMarkers? tamedAnimals;
     private NotificationFeed? notifications;
     private PopupCommands? popupCommands;
@@ -203,6 +204,7 @@ public sealed class Plugin : BaseUnityPlugin
         vanillaCharacter = new VanillaCharacterPanel(ui, theme, inventoryPanel);
         minimapInfo = new MinimapInfo(ui, theme);
         minimapSkin = new MinimapSkin(ui, theme);
+        largeMapLayer = new LargeMapLayer();
         tamedAnimals = new TamedAnimalMarkers(ui);
         notifications = new NotificationFeed(ui, theme);
         popupCommands = new PopupCommands(notifications);
@@ -313,6 +315,7 @@ public sealed class Plugin : BaseUnityPlugin
         inventoryScale?.Tick();
         minimapInfo?.Tick();
         minimapSkin?.Tick();
+        largeMapLayer?.Tick();
         tamedAnimals?.Tick();
         notifications?.Tick();
         popupCommands?.Tick();
@@ -430,6 +433,7 @@ public sealed class Plugin : BaseUnityPlugin
         Release("vanillaCharacter", () => vanillaCharacter?.Dispose());
         Release("minimapInfo", () => minimapInfo?.Dispose());
         Release("minimapSkin", () => minimapSkin?.Dispose());
+        Release("largeMapLayer", () => largeMapLayer?.Dispose());
         Release("tamedAnimals", () => tamedAnimals?.Dispose());
         Release("popupCommands", () => popupCommands?.Dispose());
         Release("notifications", () => notifications?.Dispose());

@@ -1,0 +1,10 @@
+{
+  "name": "Ragnarok",
+  "version_number": "0.5.5",
+  "website_url": "https://github.com/XEngine/ragnarok",
+  "description": "Alpha: a configurable Valheim HUD and quality-of-life overhaul with unified storage, inventory tools and a Riding-based mount companion. Open source; feedback and pull requests welcome.",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2351",
+    "ValheimModding-Jotunn-2.30.2"
+  ]
+}

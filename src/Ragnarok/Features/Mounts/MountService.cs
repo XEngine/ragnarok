@@ -31,6 +31,8 @@ internal sealed class MountService : IDisposable
     private readonly Dictionary<long, double> cooldowns = new(), requests = new();
     private readonly HashSet<string> executed = new();
     private readonly Dictionary<ZDOID, double> combat = new();
+    private readonly Dictionary<ZDOID, double> temperamentGrace = new();
+    private readonly System.Random temperamentRandom = new();
     private readonly Dictionary<string, ZDO?> marked = new(StringComparer.Ordinal);
     private readonly Dictionary<long, Binding> binding = new();
     private readonly Dictionary<string, OwnerTask> ownerTasks = new();
@@ -75,7 +77,7 @@ internal sealed class MountService : IDisposable
         internal Quaternion Rotation;
         internal double Due, Deadline;
         internal bool Sent, Acknowledged;
-        internal bool Winding, AwaitingSpot, CommitReady;
+        internal bool Winding, AwaitingSpot, CommitReady, TemperamentChecked;
         internal string SpotToken = "";
         internal float Ride, Cost;
     }
@@ -125,6 +127,7 @@ internal sealed class MountService : IDisposable
             pruneAt = Time.unscaledTime + 30;
             double expired = net!.GetTimeSeconds() - Settings.CombatQuiet.Value - 5;
             foreach (ZDOID id in combat.Where(p => p.Value < expired).Select(p => p.Key).ToArray()) combat.Remove(id);
+            foreach (ZDOID id in temperamentGrace.Where(p => p.Value <= net.GetTimeSeconds()).Select(p => p.Key).ToArray()) temperamentGrace.Remove(id);
         }
         foreach (ZNetPeer peer in net!.GetPeers())
             if (peer.m_rpc != null && peer.m_uid != 0) Register(peer.m_rpc);
@@ -490,6 +493,27 @@ internal sealed class MountService : IDisposable
             }
             else if (!LocalSnapshot(tx, out reason) || !MountSafety.Arrival(tx.Player.Live!, tx.Animal, out tx.Destination, out reason))
             { Finish(user, tx, reason); return; }
+            if (!tx.TemperamentChecked)
+            {
+                tx.TemperamentChecked = true;
+                MountSafety.Temperament(tx.Animal, out bool hungry, out bool frightened);
+                bool grace = temperamentGrace.TryGetValue(tx.Animal.m_uid, out double graceUntil) && now < graceUntil;
+                MountResponse response = MountTemperament.Respond(hungry, frightened, tx.Ride, temperamentRandom.NextDouble(), grace);
+                if (response != MountResponse.Willing)
+                {
+                    temperamentGrace[tx.Animal.m_uid] = now + MountTemperament.GraceSeconds;
+                    string message = MountTemperament.Message(hungry, frightened, response);
+                    if (response == MountResponse.Refuse)
+                    {
+                        cooldowns[user] = now + MountTemperament.RetrySeconds;
+                        Finish(user, tx, message); return;
+                    }
+                    tx.Due = now + MountTemperament.HesitationSeconds;
+                    tx.Deadline += MountTemperament.HesitationSeconds;
+                    tx.CommitReady = false; // Fresh safety/stamina check after hesitation.
+                    Reply(tx.Requester, user, message); return;
+                }
+            }
             // From this point, a missing acknowledgment cannot trigger another move.
             tx.Sent = true; cooldowns[user] = now + Settings.Cooldown.Value;
             long owner = tx.Animal.GetOwner();
@@ -752,7 +776,13 @@ internal sealed class MountService : IDisposable
         float health = animal.GetFloat(ZDOVars.s_health, maximum);
         string state = health <= 0 ? "dead" : maximum > 0 ? $"{Mathf.Clamp01(health / maximum) * 100:0}% health" : "health unavailable";
         return state + (animal.GetBool(ZDOVars.s_haveSaddleHash) ? " · saddled" : " · no saddle") +
+            TemperamentDetails(animal) +
             (QuietForDetails(animal) ? "" : " · recent combat");
+    }
+    private static string TemperamentDetails(ZDO animal)
+    {
+        MountSafety.Temperament(animal, out bool hungry, out bool frightened);
+        return (hungry ? " · hungry" : "") + (frightened ? " · frightened" : "");
     }
     private bool QuietForDetails(ZDO animal) => MountSafety.Quiet(animal, Settings.CombatQuiet.Value);
 
@@ -840,7 +870,7 @@ internal sealed class MountService : IDisposable
     {
         foreach (ZRpc rpc in registered.ToArray()) Unregister(rpc);
         pending.Clear(); cooldowns.Clear(); requests.Clear(); executed.Clear(); combat.Clear(); store = null; progress = null; storeFailed = false;
-        marked.Clear(); binding.Clear(); ownerTasks.Clear();
+        marked.Clear(); binding.Clear(); ownerTasks.Clear(); temperamentGrace.Clear();
         protocols.Clear(); saveMarkersAt = 0;
         Available = false; serverSeen = false; Bound = ZDOID.None; BoundName = "No mount bound"; BoundCondition = ""; helloAt = 0;
     }

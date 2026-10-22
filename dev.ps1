@@ -95,15 +95,10 @@ switch ($Action) {
         $Configuration = 'Release'
         $output = Join-Path $projectRoot 'src/Ragnarok/bin/Release/net472'
         Build-Mod
-        $artifacts = Join-Path $projectRoot 'artifacts'
-        $staging = Join-Path $artifacts ('package-' + [Guid]::NewGuid().ToString('N'))
-        $pluginDir = Join-Path $staging 'BepInEx/plugins/Ragnarok'
-        New-Item -ItemType Directory -Path $pluginDir -Force | Out-Null
-        Copy-Item -LiteralPath (Join-Path $output 'Ragnarok.dll') -Destination $pluginDir
-        Copy-Item -LiteralPath (Join-Path $projectRoot 'docs/INSTALL.md') -Destination $staging
-        $zip = Join-Path $artifacts 'Ragnarok-local.zip'
-        Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $zip -Force
-        Write-Host "Created $zip (our plugin only; install BepInEx and Jotunn separately)."
+        & (Join-Path $projectRoot 'scripts/check-plugin-metadata.ps1') -Configuration Release
+        if (-not (Get-Command python -ErrorAction SilentlyContinue)) { throw 'Packaging requires Python 3 on PATH.' }
+        & python (Join-Path $projectRoot 'scripts/package-release.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Release archive validation failed.' }
     }
     'watch' {
         function Get-SourceFingerprint {

@@ -1,0 +1,18 @@
+name: Feature or improvement
+description: Suggest a focused gameplay or interface improvement.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would this improve?
+      description: Describe the gameplay or interface problem.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+      description: How should it work? Include examples, multiplayer implications or alternatives if useful.
+    validations:
+      required: true

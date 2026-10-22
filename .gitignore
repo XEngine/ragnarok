@@ -7,3 +7,4 @@ dev.local.json
 *.user
 *.suo
 Environment.props
+__pycache__/

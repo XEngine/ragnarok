@@ -1,4 +1,4 @@
-# Ragnarok 0.5.0 - friend installation
+# Ragnarok 0.5.5 alpha - installation
 
 This archive contains the Release build of Ragnarok, our Valheim plugin.
 It does not include Valheim, BepInEx, development tools, saves or personal settings.
@@ -53,7 +53,10 @@ have been removed; old settings are cleaned up automatically.
 The [Mount companion prototype](MOUNTS.md) adds one exclusive saddled mount per
 player. Hold Shift+H near a tamed, saddled mount to bind/release; press H outdoors
 to summon after combat. Mount rules are always server-controlled. Update both
-server and clients to 0.5.0; restart the server before trying the new controls.
+server and clients to 0.5.5; restart the server before trying the new controls.
+Summons use Riding-scaled stamina, award limited Riding experience, and may
+occasionally hesitate or refuse based on the mount's condition. See MOUNTS.md
+for the exact rules and known verification limits.
 
 Nearby-chest crafting, building and station supply use a default range of
 100 metres, subject to the server's settings and chest access/ownership checks.
@@ -69,6 +72,7 @@ and repeat the action.
   provision and inventory slots into ordinary inventory/chests first, then save
   and quit. Remove `BepInEx/plugins/Ragnarok` while Valheim is closed.
 
-This is a local sharing build. The package was compiled and its archive checked;
-this packaging run did not receive an in-game test. Multiplayer configuration
-locking and nearby-storage behavior still need testing with real peers.
+This is a alpha release. Builds and automated checks pass; the latest UI and mount
+temperament changes and every multiplayer ownership scenario have not all received
+an in-game test. Begin with a backed-up test world. Linux runtime and Vortex
+deployment have not been verified for this release.

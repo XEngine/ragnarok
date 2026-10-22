@@ -1,5 +1,160 @@
 # Development setup verification
 
+## Open-source alpha preparation, 2026-10-22
+
+- Marked the current distribution 0.5.5 alpha in public copy, archive names and
+  assembly informational version. Thunderstore/plugin numeric version remains
+  0.5.5 for its three-number manifest/compatibility format.
+- At the owner's request, original code/documentation/procedural artwork are now
+  MIT-licensed. Added contribution guidance, issue forms, a PR template and public
+  CI for game-independent regressions/packaging metadata. Third-party font terms
+  remain independent. Legacy undocumented power PNGs were removed from the current
+  tree; old commits retain them outside the MIT grant. All builds now resolve
+  power artwork through the installed ObjectDB and retain the procedural stag.
+- Scanned 1,052 historical text blobs for private-key/token/credential patterns;
+  no matches found. No tracked DLL/PDB/save/private-key/dev.local.json paths found.
+  This is a targeted scan, not a guarantee against all possible sensitive content.
+  Repository history is preserved rather than rewritten. No prior Actions runs
+  or GitHub releases existed at the preparation check.
+- Debug/Release builds, metadata checks, all C# regression suites and 12 packaging
+  validation checks passed. Alpha archives include the MIT LICENSE and five font
+  licenses. No new in-game test performed; native-icon fallback appearance and
+  previously recorded gameplay/UI scenarios still need live verification.
+
+## Public beta distribution preparation, 2026-10-22
+
+- Prepared versioned Thunderstore and manual/Nexus ZIPs for 0.5.5 beta, with
+  public feature/installation copy, compact changelog, dependency manifest,
+  original 256x256 procedural rune icon, font notices/license copies and SHA-256
+  checksums. Detailed handoff and Nexus BBCode are under release/.
+- Verified official Thunderstore manifest/icon/package rules and live dependency
+  pages (BepInExPack 5.4.2351, Jötunn 2.30.2). Reviewed Nexus submission/disclosure
+  requirements and included applicable AI tagging guidance in the upload handoff.
+- Public Release no longer embeds legacy power PNGs without recorded provenance;
+  existing displays use runtime native-icon fallbacks. Debug previews retain the
+  local assets. All five font license resources remain embedded and copied into
+  package notices. No external code/artwork was incorporated for the new icon.
+- Shared Python-standard-library packager verifies metadata/project/plugin version
+  agreement, PNG dimensions/chunk CRC, exact file allowlist, UTF-8 docs, ZIP CRC,
+  safe paths and Release DLL hash. Windows package command runs Release metadata
+  checks too. Cross-platform ZIP entries use forward slashes and fixed timestamps.
+- Release build and Debug/Release metadata checks passed; all C# regression suites
+  and 12 new packaging validation tests passed. Packager ran on Windows and WSL;
+  unpacked payloads match (compressed hashes may differ by zlib implementation).
+- This prepares upload artifacts only. No public mod page/upload/site-side
+  validation, Vortex deployment, Linux game runtime or new in-game test performed.
+  Latest HUD positioning, mount temperament and full multiplayer handoff tests
+  remain pending and are disclosed in both listings. Server/client left running.
+
+## Health and stamina regeneration numbers, 2026-10-22
+
+- Removed the ECG trace and unused hindrance state/reflection. Stamina's measured
+  per-second readout stays right of its bar; matching health text sits to the left
+  of the health bar. Both use muted 10-point text and inherited vitals scaling.
+- Health uses native food regen divided by its ten-second interval and the active
+  SEMan health-regen modifier; full health shows zero. This is sustained food
+  recovery, excluding instant heals and separate healing-over-time effects. It
+  stays readable with both vanilla healing ticks and installed Steady Regeneration,
+  which changes food healing frequency without changing its total amount.
+- Verified native UpdateFood/Heal through read-only Cecil inspection. No game
+  source/assets incorporated. Regeneration mechanics and network behavior unchanged.
+- Debug deployment, Release packaging and regression suites passed, including
+  health tick-unit conversion, status scaling, full-health/disabled recovery and
+  invalid input checks. In-game positioning test pending; F6 loads the update.
+
+## Stamina pulse graphic, 2026-10-22
+
+- Replaced visible hindrance text beside the regen number with a small frameless
+  ECG-style vector trace. Recovery drives pulse strength/speed; a hindrance gives
+  a muted amber reaction and reduces amplitude, settling to a line when recovery
+  stops. Full stamina uses a quiet muted line rather than a warning.
+- Mesh refresh is capped at 30 Hz with elapsed-time animation; no per-frame
+  GameObjects/textures or third-party assets. Graphic belongs to the vitals root,
+  does not intercept input and retains the existing read-only stamina observer.
+- Debug deployment and Release packaging passed with zero warnings/errors.
+  No in-game visual test performed. F6 loads it; no server restart required.
+
+## Stamina regeneration readout, 2026-10-22
+
+- Ragnarok vitals now show observed stamina recovered per second immediately to
+  the right of the stamina bar. Read-only instrumentation samples the local
+  Player.UpdateStats(float) before/after values over 0.2 seconds of game time;
+  zero/negative recovery immediately clears the rate. Full bars show +0.0/s.
+  This measures recovery within native stat updates, not arbitrary frame deltas
+  containing potion gains/action spending; unrelated later mod patches may still
+  alter stamina outside that sampling interval.
+- A small gold hindrance label pulses on action/state entry for 1.2 seconds:
+  encumbered, swimming, attacking, dodging, wall-running, sprinting, blocking,
+  native recovery delay, or the first active SE_Stats with a regen multiplier
+  below one. Ongoing causes remain visible without repeatedly flashing; short
+  causes remain readable for up to 2.5 seconds. Only one cause is shown at a time.
+- Labels/outline objects belong to the vitals root; observation unsubscribes on
+  style change, owner rebuild or unload. No stamina values, effects, authority,
+  config synchronization or network protocol are changed. Vanilla HUD is unchanged.
+- Debug deployment, Release packaging and all regression suites passed, including
+  new rate/interruption/non-finite-input and hint-lifetime checks. No in-game
+  visual test performed; verify right-side spacing at preferred HUD scale,
+  repeated sprint/attack/dodge transitions, Wet/Cold and full stamina. F6 loads
+  the client update; no server restart is required.
+
+## Skill milestone placement, 2026-10-22
+
+- Skill milestone cards now share recipe notifications' minimap-side placement,
+  following moved/scaled minimaps with compass avoidance and viewport clamping.
+  When a recipe card is active, the milestone sits below it with an eight-unit
+  gap. Ordinary skill progress toasts and central system messages retain their
+  existing positions. Shared placement removes duplicated recipe layout code.
+- Windows Debug deployment and Release packaging passed with zero warnings/errors.
+  F6 loads the UI update; no server restart needed. In-game visual check pending,
+  especially simultaneous recipe/milestone cards and narrow viewports.
+
+## Expanded map layering, 2026-10-22
+
+- Added a sorting Canvas on the native large-map root, above Ragnarok gameplay
+  HUD and windows. Its GraphicRaycaster retains native map pointer controls.
+  Applies with either minimap/HUD style and restores pre-existing Canvas settings
+  or removes owned components on scene replacement/F6 unload.
+- Windows Debug deployment and Release packaging passed with zero warnings/errors.
+  No in-game visual/input retest performed; check map pins, panning, zoom, closing
+  the map and F6 reload. This UI-only change requires no server restart.
+
+## Wrap-up audit, 2026-10-22
+
+- See [AUDIT-0.5.5.md](AUDIT-0.5.5.md) for scope, findings and remaining live checks.
+- Full regression suites, Debug/Release metadata, installed BepInEx migration and
+  Release packaging passed. Archive contents and DLL hash were checked; embedded
+  font license resources were retained. Linux packaging syntax parsed in WSL.
+- Fixed stale installation version and missing mount guide in both packaging
+  workflows. No in-game test, client shutdown or server restart during this audit.
+
+## Buff label and timer order, 2026-10-22
+
+- Passive/ongoing status tiles now show the name directly under the icon and
+  any timer below the name. Effects without icon text show no dash or timer text.
+  Resting retains its comfort level below its name; debuff layout is unchanged.
+- Windows Debug build/deployment passed with zero warnings/errors. F6 loads the
+  client update; no server restart is needed. No in-game visual test performed.
+
+## Mount temperament 0.5.5, 2026-10-22
+
+- Windows Debug deployment and Release build passed with zero warnings/errors.
+  Eager metadata checks passed for both configurations; all regression suites passed.
+- New deterministic checks cover all four mood probabilities, Riding reduction,
+  refusal/hesitation boundaries, their two-to-one distribution and grace override.
+  Reviewed the summon flow: one roll before movement; hesitation resets the final
+  arrival check and extends the deadline by two seconds. Refusal never enters the
+  movement or completion-receipt path. Combat checks continue during the delay.
+- Read installed native Tameable.IsHungry/GetStatusString with Mono.Cecil to verify
+  feeding timestamp units, feeding duration and live alert semantics. No game code
+  or assets were copied. Saved alert flags are excluded from temperament.
+- Deployed Debug to isolated client scripts (F6 required). Gracefully saved
+  RagnarokTest (_main.32.ok) and installed Release on the isolated dedicated server;
+  startup confirms Ragnarok 0.5.5, loaded mount bonds and UDP ports 2456/2457.
+  Backup: D:\RagnarokDev\deploy-backups\mount-restart-20261022-151058.
+- No in-game temperament test performed. The user previously requested keeping
+  the client open and skipping isolated-world tests. Fear is observed only for a
+  server-loaded mount; distant hunger works from persistent native feeding data.
+
 ## Native verification of scene-cleanup fixes, 2026-10-21
 
 - After the user closed the client, ran the real Unity startup/F6 smoke test.

@@ -1,6 +1,6 @@
-# Mount companion (0.5.4 prototype)
+# Mount companion (0.5.5 prototype)
 
-Install Ragnarok 0.5.4 and Jotunn 2.30.2 or newer on the host/server and clients.
+Install Ragnarok 0.5.5 and Jotunn 2.30.2 or newer on the host/server and clients.
 Restart a dedicated server after updating its DLL. Development clients can use F6
 after deployment. A local world acts as its own mount server. Earlier servers do
 not support the mount handshake; no animal moves without server approval.
@@ -37,6 +37,27 @@ dead. The server controls enable state, combat quiet period and success cooldown
 even with the general gameplay-settings lock off. HUD and key settings stay local.
 
 ## Riding progression
+
+### Temperament
+
+After the whistle and safety checks, the server rolls once for a small reaction:
+2% when content, 8% when hungry, 10% when frightened, or 15% when both. Riding
+reduces these chances linearly, reaching half at level 100. Two thirds of reactions
+add a two-second hesitation followed by another safety/stamina check; one third
+refuse the request. A refusal moves nothing, spends no stamina and grants no XP.
+Wait five seconds before retrying. Any reaction grants that animal a thirty-second
+grace period against further random reactions, including after releasing/rebinding.
+Combat and other safety requirements still apply during grace and hesitation.
+
+Hunger uses the native saved feeding time and prefab feeding duration, including
+unloaded mounts. Fear counts only when the server has a live alerted AI; an
+unloaded animal's saved alert flag is deliberately ignored because it can be stale.
+The companion summary includes hunger and observed fear. Rules and random rolls
+run on the host/server, with no new client-controlled gameplay options or RPCs.
+Grace and the short refusal cooldown clear on server/world reload; bonds and
+reward history are unaffected. Feeding helps by reducing the hunger probability.
+
+### Costs and experience
 
 The default summon cost is `maximum stamina * 0.10 * (1 - Riding / 100)`.
 Riding 0/25/50/75/100 costs 10/7.5/5/2.5/0 percent of maximum stamina. Enough stamina

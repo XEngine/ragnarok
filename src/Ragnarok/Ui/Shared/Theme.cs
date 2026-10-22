@@ -1005,35 +1005,12 @@ internal sealed class Theme : IDisposable
 
     private static float Circle(Vector2 p, Vector2 centre, float radius) => (p - centre).magnitude - radius;
 
-    private readonly Dictionary<string, Sprite?> powerGlyphs = new();
-
-    // Unity's PNG decoder. Its module targets a newer .NET Standard than this net472 build can reference,
-    // so it is looked up at runtime (it ships with the game).
-    private static readonly System.Reflection.MethodInfo? LoadImage =
-        Type.GetType("UnityEngine.ImageConversion, UnityEngine.ImageConversionModule")?
-            .GetMethod("LoadImage", new[] { typeof(Texture2D), typeof(byte[]) });
-
-    // White boss glyph for a Forsaken power, from the embedded Assets/Powers/<name>.png; null when
-    // there is none (the Queen, the Fader, modded powers), so the caller falls back to Valheim's icon.
+    // Resolve native art from the installed game, never redistribute copied icons.
     internal Sprite? PowerGlyph(string? name)
     {
-        if (string.IsNullOrEmpty(name)) return null;
-        if (powerGlyphs.TryGetValue(name!, out Sprite? cached)) return cached;
-        Sprite? sprite = null;
-        using (System.IO.Stream? stream = typeof(Theme).Assembly.GetManifestResourceStream("Ragnarok.Powers." + name + ".png"))
-        {
-            if (stream != null && LoadImage != null)
-            {
-                byte[] bytes = new byte[stream.Length];
-                int read = 0;
-                while (read < bytes.Length) read += stream.Read(bytes, read, bytes.Length - read);
-                Texture2D texture = new(2, 2, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
-                if (LoadImage.Invoke(null, new object[] { texture, bytes }) is true) sprite = Plain(texture);
-                else UnityEngine.Object.Destroy(texture);
-            }
-        }
-        powerGlyphs[name!] = sprite;
-        return sprite;
+        if (string.IsNullOrEmpty(name) || !ObjectDB.instance) return null;
+        StatusEffect effect = ObjectDB.instance.GetStatusEffect(name!.GetStableHashCode());
+        return effect ? effect.m_icon : null;
     }
 
     // Several separate outlines in one icon: each shape keeps its own stroke.

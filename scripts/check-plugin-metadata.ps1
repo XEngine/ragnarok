@@ -26,6 +26,12 @@ try {
     $assembly = [Mono.Cecil.AssemblyDefinition]::ReadAssembly(
         (Join-Path $root "src/Ragnarok/bin/$Configuration/net472/Ragnarok.dll"), $parameters)
     try {
+        if ($Configuration -eq 'Release' -and @($assembly.MainModule.Resources | Where-Object Name -like 'Ragnarok.Powers.*').Count -gt 0) {
+            throw 'Public Release must not embed legacy power images without recorded provenance.'
+        }
+        if (@($assembly.MainModule.Resources | Where-Object Name -like '*-OFL.txt').Count -ne 5) {
+            throw 'Embedded font license texts are missing.'
+        }
         $plugin = $assembly.MainModule.Types | Where-Object FullName -eq 'Ragnarok.Plugin'
         $dependencies = @($plugin.CustomAttributes | Where-Object {
             $_.AttributeType.FullName -eq 'BepInEx.BepInDependency' -and

@@ -1,5 +1,34 @@
 # Change record
 
+## Unreleased - Mount temperament 0.5.5, 2026-10-22
+
+- Mark distribution as alpha, license original project work under MIT, and add
+  community contribution/issue templates, announcement copy and game-independent CI.
+- Remove undocumented legacy power PNGs from current source/builds; resolve native
+  power art at runtime while preserving the procedural Eikthyr glyph.
+
+- Prepare Thunderstore and Nexus beta upload packages, public listing copy,
+  original package icon, dependency metadata, third-party notices, archive checks
+  and checksums. Exclude undocumented legacy power PNGs from public Release.
+
+- Add rare server-rolled summon hesitation or refusal, more likely for hungry or
+  live frightened mounts and less likely with higher Riding skill. Most reactions
+  add two seconds; refusals spend no stamina or XP and allow retry after five seconds.
+- A thirty-second grace period prevents repeated bad rolls. Safety and stamina
+  are checked again after hesitation; stale unloaded alert flags are ignored.
+- Show hunger and observed fear in the companion condition summary.
+- Passive/ongoing buffs show names below icons and timers below names; effects
+  without timer text no longer show a dash.
+- Render the expanded map above gameplay HUD and windows while preserving native
+  map pointer controls and restoring Canvas state on unload.
+- Move skill milestone cards beside the minimap like recipe notifications, stacking
+  below an active recipe card to avoid overlap.
+- Show stamina recovery per second to the right of its bar and sustained food/status
+  health regeneration per second to the left of the health bar. Muted numeric
+  readouts replace the earlier hindrance hints and ECG trace.
+- Correct installation version and include the mount guide/changelog in both
+  package workflows. Record the wrap-up audit and remaining live checks.
+
 ## Unreleased - Riding progression 0.5.4, 2026-10-21
 
 - Summons cost 10% maximum stamina at Riding 0, falling to zero at 100, charged

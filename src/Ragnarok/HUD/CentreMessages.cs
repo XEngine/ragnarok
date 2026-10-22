@@ -29,6 +29,7 @@ internal sealed class CentreMessages : IDisposable
     private readonly Image diamond, leftRule, rightRule;
     private readonly List<TextOutline> outlines = new();
     private readonly Queue<Banner> pending = new();
+    private readonly Vector3[] corners = new Vector3[4];
     private Banner? current;
     private float born, shortBorn = -10, skillBorn = -10;
     private GameObject? nativeBiome;
@@ -77,9 +78,7 @@ internal sealed class CentreMessages : IDisposable
             outlines.Add(new TextOutline(label, world: true));
 
         skill = Ugui.Node(root, "Skill milestone");
-        skill.anchorMin = skill.anchorMax = new Vector2(0.5f, 1);
-        skill.pivot = new Vector2(0.5f, 1);
-        skill.anchoredPosition = new Vector2(0, -150);
+        skill.anchorMin = skill.anchorMax = skill.pivot = new Vector2(1, 1);
         skill.sizeDelta = new Vector2(400, 78);
         skillFade = skill.gameObject.AddComponent<CanvasGroup>();
         skillFade.alpha = 0;
@@ -154,7 +153,7 @@ internal sealed class CentreMessages : IDisposable
         skillBorn = Time.unscaledTime;
     }
 
-    internal void Tick(float scale)
+    internal void Tick(float scale, RectTransform? recipe)
     {
         float now = Time.unscaledTime;
         bool visible = !global::Hud.IsUserHidden();
@@ -163,11 +162,13 @@ internal sealed class CentreMessages : IDisposable
         major.localScale = Vector3.one * Mathf.Min(scale, available / 760);
         minor.localScale = Vector3.one * Mathf.Min(scale, available / 780);
         skill.localScale = Vector3.one * Mathf.Min(scale, available / 400);
-        RectTransform? compass = CompassStrip.Shown;
-        if (compass && compass!.gameObject.activeInHierarchy)
-            skill.position = compass.TransformPoint(new Vector3(compass.rect.center.x, compass.rect.yMin - 12, 0));
-        else skill.anchoredPosition = new Vector2(0, -150);
-        Utils.ClampUIToScreen(skill);
+        NotificationPlacement.BesideMinimap(skill, root, corners);
+        if (recipe && recipe!.gameObject.activeInHierarchy)
+        {
+            recipe.GetWorldCorners(corners);
+            skill.position = corners[3] - root.TransformVector(new Vector3(0, 8, 0));
+            Utils.ClampUIToScreen(skill);
+        }
         PollDiscovery();
         PollProgression();
         if (current == null && pending.Count > 0)

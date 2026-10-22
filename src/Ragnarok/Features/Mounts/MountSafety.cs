@@ -73,6 +73,20 @@ internal static class MountSafety
     internal static bool Quiet(ZDO subject, float seconds) =>
         ZNet.instance.GetTimeSeconds() - subject.GetLong(CombatKey, -1000000000) / 1000d >= seconds;
 
+    internal static void Temperament(ZDO animal, out bool hungry, out bool frightened)
+    {
+        // Mirror native Tameable.IsHungry using saved feeding time so distance
+        // does not remove hunger. Read prefab duration, never mutate the animal.
+        GameObject prefab = ZNetScene.instance.GetPrefab(animal.GetPrefab());
+        var tame = prefab ? prefab.GetComponent<Tameable>() : null;
+        long fed = animal.GetLong(ZDOVars.s_tameLastFeeding, 0);
+        hungry = tame && (ZNet.instance.GetTime().Ticks - (double)fed) / TimeSpan.TicksPerSecond > tame.m_fedDuration;
+        GameObject loaded = ZNetScene.instance.FindInstance(animal.m_uid);
+        var ai = loaded ? loaded.GetComponent<BaseAI>() : null;
+        // A saved alert bit may be stale indefinitely in an unloaded sector.
+        frightened = ai && ai.IsAlerted();
+    }
+
     internal static bool PlayerReady(Player player, float quiet, out string reason)
     {
         reason = "";

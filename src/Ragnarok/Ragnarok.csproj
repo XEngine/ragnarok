@@ -6,7 +6,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>Ragnarok</AssemblyName>
     <RootNamespace>Ragnarok</RootNamespace>
-    <Version>0.5.4</Version>
+    <Version>0.5.5</Version>
+    <InformationalVersion>0.5.5-alpha</InformationalVersion>
     <Authors>KernelPanic</Authors>
     <Description>Ragnarök: a custom Valheim experience for friends.</Description>
     <DebugType>portable</DebugType>
@@ -23,8 +24,6 @@
       <HintPath Condition="'$(JotunnPath)' == ''">@(_InstalledJotunn)</HintPath>
       <Private>false</Private>
     </Reference>
-    <!-- Forsaken power glyphs, loaded by name: Ragnarok.Powers.GP_Eikthyr.png and so on. -->
-    <EmbeddedResource Include="Assets/Powers/*.png" LogicalName="Ragnarok.Powers.%(Filename)%(Extension)" />
     <!-- Rune & Iron fonts and their redistribution licenses; see Assets/Fonts/SOURCES.md. -->
     <EmbeddedResource Include="Assets/Fonts/*.ttf" LogicalName="Ragnarok.Fonts.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Assets/Fonts/*-OFL.txt" LogicalName="Ragnarok.Fonts.%(Filename)%(Extension)" />

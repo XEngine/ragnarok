@@ -1,0 +1,25 @@
+name: Community checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Game-independent regression suite
+        run: dotnet run --project tests/Ragnarok.Tests/Ragnarok.Tests.csproj --configuration Release
+      - name: Packaging metadata and rejection checks
+        run: python -B tests/test_release_package.py

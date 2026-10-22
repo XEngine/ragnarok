@@ -24,6 +24,7 @@ internal sealed class ItemNotifications : IDisposable
     private bool disposed;
     internal bool Alive => !disposed && pickupRoot && unlockRoot;
     internal bool HasPickup => pickups.HasItems;
+    internal RectTransform? ActiveUnlock => unlocking ? unlockRoot : null;
 
     internal ItemNotifications(Theme theme, Transform hud)
     {
@@ -130,26 +131,7 @@ internal sealed class ItemNotifications : IDisposable
             pickupRoot.position = vitals.TransformPoint(new Vector3(vitals.rect.center.x, vitals.rect.yMax + 18, 0));
         Utils.ClampUIToScreen(pickupRoot);
 
-        // Use actual HUD bounds so moved/scaled minimaps and narrow canvases remain usable.
-        float right = parent.rect.xMax - 230, top = parent.rect.yMax - 80;
-        Minimap map = Minimap.instance;
-        if (map && map.m_smallRoot.activeInHierarchy)
-        {
-            ((RectTransform)map.m_smallRoot.transform).GetWorldCorners(corners);
-            right = parent.InverseTransformPoint(corners[0]).x - 16;
-            top = parent.InverseTransformPoint(corners[1]).y - 16;
-        }
-        float left = right - unlockRoot.rect.width * unlockRoot.localScale.x;
-        RectTransform? compass = CompassStrip.Shown;
-        if (compass && compass!.gameObject.activeInHierarchy)
-        {
-            compass.GetWorldCorners(corners);
-            float compassRight = parent.InverseTransformPoint(corners[2]).x;
-            if (left < compassRight + 12)
-                top = Mathf.Min(top, parent.InverseTransformPoint(corners[0]).y - 16);
-        }
-        unlockRoot.position = parent.TransformPoint(new Vector3(right, top, 0));
-        Utils.ClampUIToScreen(unlockRoot);
+        NotificationPlacement.BesideMinimap(unlockRoot, parent, corners);
     }
 
     internal void Clear()

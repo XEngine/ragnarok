@@ -91,8 +91,8 @@ internal sealed class NotificationFeed : IDisposable
             if (now - skill.Born >= Life) { skill.Destroy(); skill = null; }
             else skill.Place(0, now, settings.SkillToast);
         }
-        centre!.Tick(settings.HudScale.Value);
         items!.Tick(settings.HudScale.Value);
+        centre!.Tick(settings.HudScale.Value, items.ActiveUnlock);
     }
 
     public void Dispose()

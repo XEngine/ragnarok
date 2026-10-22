@@ -125,6 +125,7 @@ internal sealed class RagnarokHud : IDisposable
     private Bar[] bars = Array.Empty<Bar>();
     private FoodSlot[] slots = Array.Empty<FoodSlot>();
     private PowerEmblem? emblem;
+    private VitalsRecoveryHud? recovery;
     private RectTransform? knot;
     private TextMeshProUGUI? weaponName;
     private Image? criticalVignette;
@@ -215,6 +216,7 @@ internal sealed class RagnarokHud : IDisposable
         Utils.ClampUIToScreen(foodRoot);
         bars[0].Set(data.Health, data.MaxHealth);
         bars[1].Set(data.Stamina, data.MaxStamina);
+        recovery!.Tick(Preview);
         bars[2].Root.gameObject.SetActive(data.MaxEitr > 0);
         if (data.MaxEitr > 0) bars[2].Set(data.Eitr, data.MaxEitr);
         foreach (Bar bar in bars) bar.ShowNumbers(settings.HudNumbers.Value);
@@ -252,6 +254,8 @@ internal sealed class RagnarokHud : IDisposable
 
     private void DestroyRoot()
     {
+        recovery?.Dispose();
+        recovery = null;
         if (root && ShownVitals == root!.transform) ShownVitals = null;
         if (root) UnityEngine.Object.Destroy(root);
         vitalsTextOutlines.Clear();
@@ -327,6 +331,7 @@ internal sealed class RagnarokHud : IDisposable
             new Bar(theme, rect, "Eitr", new Rect(0, 66, VitalsWidth, 6), Palette.Hex(0x9A7BEA), 2, OutlineVitalsText),
             new Bar(theme, rect, "Adrenaline", new Rect(0, 84, VitalsWidth, 6), Palette.Ember, 2, OutlineVitalsText)
         };
+        recovery = new VitalsRecoveryHud(theme, rect, VitalsWidth);
         knot = Ugui.Node(rect, "Vitals diamond").At(VitalsWidth / 2, 42, 0, 0);
         Ugui.Image(knot, "Rim", theme.Diamond, Palette.Gold).At(-16, -16, 32, 32);
         Ugui.Image(knot, "Core", theme.Diamond, Palette.Ink).At(-14, -14, 28, 28);

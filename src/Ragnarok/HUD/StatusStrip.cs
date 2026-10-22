@@ -134,13 +134,13 @@ internal sealed class StatusStrip : IDisposable
         tile.Icon = Ugui.ItemIcon(Ugui.Image(tile.Root, "Original status icon", null, Color.white)).At(iconX, 0, iconSize, iconSize);
         tile.Icon.preserveAspect = true;
         tile.Timer = Ugui.Text(tile.Root, "Timer", "", theme.Numbers, debuffStyle ? 16 : 11, Palette.Bone,
-            TextAlignmentOptions.Center).At(debuffStyle ? iconX : 0, debuffStyle ? 28 : 35,
+            TextAlignmentOptions.Center).At(debuffStyle ? iconX : 0, debuffStyle ? 28 : 54,
                 debuffStyle ? iconSize : TileWidth, debuffStyle ? 20 : 15);
         tile.Timer.enableAutoSizing = true;
         tile.Timer.fontSizeMin = debuffStyle ? 12 : 9;
         tile.Timer.fontSizeMax = debuffStyle ? 16 : 11;
         float labelWidth = TileWidth + 8, labelHeight = debuffStyle ? 22 : 18;
-        RectTransform bounds = Ugui.Node(tile.Root, "Label bounds").At(-4, debuffStyle ? 52 : 53, labelWidth, labelHeight);
+        RectTransform bounds = Ugui.Node(tile.Root, "Label bounds").At(-4, debuffStyle ? 52 : 35, labelWidth, labelHeight);
         bounds.gameObject.AddComponent<RectMask2D>();
         tile.Name = Ugui.Text(bounds, "Name", "", theme.Strong, debuffStyle ? 12 : 11, Palette.Bone,
             TextAlignmentOptions.Center).At(0, 0, labelWidth, labelHeight);
@@ -165,8 +165,8 @@ internal sealed class StatusStrip : IDisposable
         tile.Icon.enabled = status.Icon;
         tile.Icon.color = Color.white.WithAlpha(status.Flash ? 0.7f + 0.3f * Mathf.Sin(Time.unscaledTime * 8) : 1);
         tile.Timer.text = status.Key == SEMan.s_statusEffectResting ? comfort.ToString()
-            : string.IsNullOrEmpty(status.Value) ? "\u2014" : status.Value;
-        tile.Timer.enabled = !debuffStyle || !string.IsNullOrEmpty(status.Value);
+            : status.Value ?? "";
+        tile.Timer.enabled = !string.IsNullOrEmpty(tile.Timer.text);
         tile.Name.text = Localization.instance != null ? Localization.instance.Localize(status.Name) : status.Name;
         if (Time.unscaledTime >= tile.NextTooltip)
         {

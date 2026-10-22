@@ -1,7 +1,32 @@
 # Ragnarök
 
-A custom Valheim mod pack for KernelPanic and friends. This repository contains our
-own plugin and the development tools.
+![Ragnarök alpha](https://img.shields.io/badge/status-alpha-D4AF67)
+![License: MIT](https://img.shields.io/badge/license-MIT-4A8776)
+
+**An open-source Valheim HUD and quality-of-life overhaul. Testers and contributors welcome.**
+
+[Download the alpha](https://github.com/XEngine/ragnarok/releases/tag/v0.5.5-alpha)
+· [Report a bug or suggest a feature](https://github.com/XEngine/ragnarok/issues/new/choose)
+· [Contribute a pull request](CONTRIBUTING.md)
+
+Rune & Iron HUD, unified nearby storage, inventory/crafting tools and a mount
+companion with Riding progression. **0.5.5 is alpha software:** back up saves and
+start with a test profile. Feedback, compatibility reports, translations and PRs
+are welcome. If it helps your playthrough, share it with your Valheim group or
+star the repository so other players can find it.
+
+Original code and procedural artwork are MIT-licensed; font licenses remain
+independent. See [LICENSE](LICENSE), [third-party notices](release/THIRD_PARTY_NOTICES.md)
+and the [contribution guide](CONTRIBUTING.md).
+
+A configurable Valheim HUD and quality-of-life plugin by KernelPanic. This
+repository contains the standalone plugin and its development tools.
+
+**Public alpha packaging:** `./dev.ps1 package` (Windows, Python 3 required) or
+`./dev.sh package` (Linux) builds separate Thunderstore and Nexus upload ZIPs.
+See [the public feature guide](release/README.md) and
+[publishing handoff](release/PUBLISHING.md) for installation, dependencies,
+listing copy, licensing notices and verification limits.
 
 See [CHANGELOG.md](CHANGELOG.md) for the consolidated change record,
 [the Rune & Iron guide](docs/RUNE-IRON-HUD.md) for design details, and
@@ -22,11 +47,14 @@ bindings and styling stay in place. Mouse bindings retain direct Unity input
 polling to match the key picker. Registrations are removed on F6 unload/reload.
 See [dependency sources](docs/DEPENDENCIES.md) and [installation](docs/INSTALL.md).
 
-**Mount companion prototype (0.5.0):** hold **Shift+H** near a saddled, tamed mount
+**Mount companion prototype (0.5.5):** hold **Shift+H** near a saddled, tamed mount
 to bind or release it; press **H** outdoors to call it when both of you are out of
 combat. One exclusive mount per player, with server-owned rules and persistent
 bonds. Requires the updated server as well as the client. See the
 [controls, test steps and verification limits](docs/MOUNTS.md).
+
+The [0.5.5 wrap-up audit](docs/AUDIT-0.5.5.md) records release checks, fixes and
+the remaining multiplayer/in-game validation before wider distribution.
 
 The [Jotunn roadmap](docs/JOTUNN-ROADMAP.md) records the phased integration. Settings
 navigation and chest search have English/Turkish catalogs following the game's

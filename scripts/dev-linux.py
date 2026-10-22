@@ -339,14 +339,7 @@ def main():
             time.sleep(1)
     elif args.action == "package":
         build(local, "Release")
-        artifacts = ROOT / "artifacts"
-        artifacts.mkdir(exist_ok=True)
-        archive = artifacts / "Ragnarok-local.zip"
-        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
-            package.write(ROOT / "src/Ragnarok/bin/Release/net472/Ragnarok.dll",
-                          "BepInEx/plugins/Ragnarok/Ragnarok.dll")
-            package.write(ROOT / "docs/INSTALL.md", "INSTALL.md")
-        print(f"Created {archive} (our plugin only; install BepInEx and Jotunn separately).")
+        run([sys.executable, ROOT / "scripts/package-release.py"])
 
 
 if __name__ == "__main__":
