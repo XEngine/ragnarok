@@ -15,7 +15,7 @@ $result = Join-Path $Directory 'result.txt'
 $process = $null
 try {
     $process = Start-Process -FilePath (Join-Path $local.gamePath 'valheim.exe') -WorkingDirectory $local.gamePath -WindowStyle Hidden -PassThru -ArgumentList @(
-        '-batchmode', '-ragnarok-mount-checks', ('"' + $Directory + '"'), '-logFile', ('"' + (Join-Path $Directory 'player.log') + '"'))
+        '-batchmode', '-ironbound-mount-checks', ('"' + $Directory + '"'), '-logFile', ('"' + (Join-Path $Directory 'player.log') + '"'))
     Write-Host "Isolated mount checks: $Directory"
     if (-not $process.WaitForExit(240000)) { throw "Mount checks timed out; inspect $Directory/player.log" }
     if ([IO.File]::ReadAllText($result) -ne 'PASS') { throw "Mount checks failed; inspect $Directory/player.log" }

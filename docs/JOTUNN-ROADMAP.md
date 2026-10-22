@@ -8,7 +8,7 @@ overview captions and chest-search messages. The game language chooses the catal
 unsupported languages and untranslated individual setting labels/descriptions retain
 English. Other HUD/window text can be converted incrementally with the same API.
 
-Catalogs live in `src/Ragnarok/Assets/Translations`. Keys have the `ragnarok_ui_`
+Catalogs live in `src/Ironbound/Assets/Translations`. Keys have the `ironbound_ui_`
 prefix; retain identical format placeholders in each language. `UiLocalization.Text`
 and `Format` always take readable English fallbacks. Language changes rebuild the
 settings UI and close stale chest-search UI. F6 unload removes owned Jotunn/native
@@ -27,8 +27,8 @@ personal and are not synchronized to the server.
 ## Phase 3: multiplayer versions
 
 Release plugin metadata uses Jotunn `VersionCheckOnly` with `Minor` strictness:
-when both peers have Ragnarok, major/minor versions must match; patch differences
-are allowed. This preserves use on servers without Ragnarok. Shared settings still
+when both peers have Ironbound, major/minor versions must match; patch differences
+are allowed. This preserves use on servers without Ironbound. Shared settings still
 come exclusively from the connected server through the existing RPC protocol.
 
 Jotunn's dependent-mod registry is based on BepInEx's startup plugin list. ScriptEngine
@@ -56,7 +56,7 @@ public RemoveMapOverlay cleanup API in Jotunn 2.30.2.
 
 ## Phase 5: original content
 
-Deferred by the user: Ragnarok currently has no original items, building pieces,
+Deferred by the user: Ironbound currently has no original items, building pieces,
 status effects or skills to register. Use the relevant Jotunn managers when a future
 content request defines actual behavior. Do not add placeholder content or new save
 data solely to exercise registration APIs.

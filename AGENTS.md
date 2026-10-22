@@ -1,4 +1,4 @@
-# Ragnarök development
+# Ironbound development
 
 - This is a standalone Valheim C# project; source lives in D:\RagnarokDev\Source and builds run on Windows.
 - Run Windows builds with powershell -NoProfile -ExecutionPolicy Bypass -File ./dev.ps1 build.

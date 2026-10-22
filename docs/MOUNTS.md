@@ -1,6 +1,6 @@
-# Mount companion (0.5.5 prototype)
+# Mount companion (0.5.6 prototype)
 
-Install Ragnarok 0.5.5 and Jotunn 2.30.2 or newer on the host/server and clients.
+Install Ironbound 0.5.6 and Jotunn 2.30.2 or newer on the host/server and clients.
 Restart a dedicated server after updating its DLL. Development clients can use F6
 after deployment. A local world acts as its own mount server. Earlier servers do
 not support the mount handshake; no animal moves without server approval.
@@ -199,4 +199,4 @@ save/restart, a dead or unsaddled mount, roofs/water/wards, F6 reload and terrai
 No multiplayer runtime test has been performed for this prototype.
 
 The wave reuses the installed game's animation. The whistle is synthesized by
-Ragnarok's own code; no third-party animation, audio or source is bundled.
+Ironbound's own code; no third-party animation, audio or source is bundled.

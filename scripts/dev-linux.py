@@ -17,7 +17,7 @@ from xml.sax.saxutils import escape
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
-PROJECT = ROOT / "src/Ragnarok/Ragnarok.csproj"
+PROJECT = ROOT / "src/Ironbound/Ironbound.csproj"
 STEAM = Path.home() / ".var/app/com.valvesoftware.Steam/.local/share/Steam"
 os.environ.update(DOTNET_CLI_TELEMETRY_OPTOUT="1", DOTNET_NOLOGO="1")
 
@@ -154,16 +154,25 @@ def load():
 
 def build(local, configuration, deploy=False):
     game = Path(local["gamePath"])
-    if deploy and list((game / "BepInEx/plugins").rglob("Ragnarok.dll")):
-        raise RuntimeError("Remove the release Ragnarok.dll from plugins before ScriptEngine deployment.")
+    if deploy and any(list((game / "BepInEx/plugins").rglob(name)) for name in ("Ironbound.dll", "Ragnarok.dll")):
+        raise RuntimeError("Remove release Ironbound.dll or legacy Ragnarok.dll from plugins before ScriptEngine deployment.")
     run([local["dotnetPath"], "build", PROJECT, "--configuration", configuration,
          f"-p:GamePath={game}", "--nologo"])
     if deploy:
         destination = game / "BepInEx/scripts"
         destination.mkdir(exist_ok=True)
+        legacy = [destination / name for name in ("Ragnarok.dll", "Ragnarok.pdb") if (destination / name).is_file()]
+        if legacy:
+            backup = game.parent / "deploy-backups" / ("ironbound-rename-" + uuid.uuid4().hex)
+            backup.mkdir(parents=True)
+            for path in legacy:
+                if path.resolve().parent != destination.resolve():
+                    raise RuntimeError("Legacy plugin escaped scripts directory.")
+                shutil.move(str(path), str(backup / path.name))
+            print(f"Backed up legacy development plugin to {backup}.")
         for extension in ("pdb", "dll"):
-            shutil.copy2(ROOT / f"src/Ragnarok/bin/{configuration}/net472/Ragnarok.{extension}", destination)
-        print("Deployed. Press F6 in Valheim to reload Ragnarök.", flush=True)
+            shutil.copy2(ROOT / f"src/Ironbound/bin/{configuration}/net472/Ironbound.{extension}", destination)
+        print("Deployed. Press F6 in Valheim to reload Ironbound.", flush=True)
 
 
 def doctor(local):
@@ -208,7 +217,7 @@ def launch(local, extra):
         command = ["flatpak", "run", f"--filesystem={game}", f"--filesystem={saves}",
                    "--env=SteamAppId=892970", "--env=SteamGameId=892970", "--command=sh",
                    "com.valvesoftware.Steam", "-c", 'cd "$1" && shift && exec "$@"',
-                   "ragnarok", str(game), *command]
+                   "ironbound", str(game), *command]
     return subprocess.Popen(command, cwd=game, env=env,
                             start_new_session=True)
 
@@ -229,22 +238,22 @@ def smoke(local):
             shutil.copy2(log, game.parent / "LogOutput.before-smoke.log")
             log.unlink()
         # Keep graphics initialized: Valheim's menu uploads assets and decodes video.
-        process = launch(local, ["-batchmode", "-ragnarok-inventory-checks",
+        process = launch(local, ["-batchmode", "-ironbound-inventory-checks",
                                  "-logFile", str(smoke_log)])
         deadline = time.monotonic() + 60
         triggered = False
         while time.monotonic() < deadline:
             text = log.read_text(errors="replace") if log.exists() else ""
-            loads = len(re.findall(r"Ragnarok [0-9.]+ loaded", text))
+            loads = len(re.findall(r"Ironbound [0-9.]+ loaded", text))
             if loads and not triggered:
                 print("PASS: Plugin loaded inside Valheim. Triggering reload.", flush=True)
-                os.utime(game / "BepInEx/scripts/Ragnarok.dll", None)
+                os.utime(game / "BepInEx/scripts/Ironbound.dll", None)
                 triggered = True
-            if (loads >= 2 and "Ragnarok unloaded." in text and "Steam initialized" in text
+            if (loads >= 2 and "Ironbound unloaded." in text and "Steam initialized" in text
                     and "Starting music menu" in text):
                 if "[Error" in text or any(text.count(marker) < 2 for marker in (
-                        "Ragnarok inventory checks PASS", "Ragnarok station checks PASS",
-                        "Ragnarok skill XP checks PASS", "Ragnarok UI lifecycle checks PASS")):
+                        "Ironbound inventory checks PASS", "Ironbound station checks PASS",
+                        "Ironbound skill XP checks PASS", "Ironbound UI lifecycle checks PASS")):
                     raise RuntimeError(f"Runtime checks failed. Inspect {log}")
                 print("PASS: Steam initialization, initial load, inventory/station/XP checks and ScriptEngine unload/reload.", flush=True)
                 return
@@ -315,7 +324,7 @@ def main():
     elif args.action == "doctor":
         doctor(local)
     elif args.action == "test":
-        run([local["dotnetPath"], "run", "--project", ROOT / "tests/Ragnarok.Tests"])
+        run([local["dotnetPath"], "run", "--project", ROOT / "tests/Ironbound.Tests"])
     elif args.action == "play":
         require_stopped()
         build(local, args.configuration, deploy=True)

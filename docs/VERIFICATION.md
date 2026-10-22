@@ -1,5 +1,32 @@
 # Development setup verification
 
+## Ironbound rename and settings frame, 2026-10-22
+
+- Renamed source namespaces/projects, solution, assembly/DLL, plugin GUID, UI
+  strings/catalogs, preview commands, packaging, icon and repository references
+  to Ironbound 0.5.6 alpha. Local RagnarokDev paths and the existing test-world
+  name remain unchanged. See IRONBOUND-RENAME.md for the upgrade/data contracts.
+- F10 uses dedicated rounded charcoal frame/card/button/field sprites, iron
+  separators, restrained gold active states and HUD-style switch keycaps. Header
+  now uses the Ironbound seal/name/alpha version. Sprites follow Theme ownership;
+  settings behavior and synchronization are unchanged.
+- Config import copies the old GUID's file only when the new config is missing;
+  the old file is untouched. Legacy style enum names migrate before Bind while
+  unrelated settings/custom text stay intact. Save/receipt/reclaim/RPC identifiers
+  and mount-ledger folder/headers retain their original identity for compatibility.
+- Windows Debug/Release builds, eager metadata checks, full regression suites,
+  12 package validation checks and installed BepInEx migration checks passed.
+  New tests cover old config import, current-config precedence, preservation,
+  legacy enum values and real ConfigFile binding after import.
+- Debug deployed to the isolated client's scripts directory, with legacy scripts
+  backed up outside active plugin folders. User client remains open; F6 loads
+  Ironbound. No new in-game visual test performed. F10 page/control rendering,
+  scaling, scrolling, key capture and F6 unload/reload need live confirmation.
+- Dedicated server saved the same RagnarokTest world (_main.37.ok), backed up
+  old plugin/bonds, removed active old plugin copies and loaded Ironbound 0.5.6
+  using the renamed launcher. Startup confirms new GUID/config, loaded existing
+  mount bonds and network readiness. No mount rebinding or world replacement.
+
 ## Open-source alpha preparation, 2026-10-22
 
 - Marked the current distribution 0.5.5 alpha in public copy, archive names and
@@ -76,7 +103,7 @@
 
 ## Stamina regeneration readout, 2026-10-22
 
-- Ragnarok vitals now show observed stamina recovered per second immediately to
+- Ironbound vitals now show observed stamina recovered per second immediately to
   the right of the stamina bar. Read-only instrumentation samples the local
   Player.UpdateStats(float) before/after values over 0.2 seconds of game time;
   zero/negative recovery immediately clears the rate. Full bars show +0.0/s.
@@ -110,7 +137,7 @@
 
 ## Expanded map layering, 2026-10-22
 
-- Added a sorting Canvas on the native large-map root, above Ragnarok gameplay
+- Added a sorting Canvas on the native large-map root, above Ironbound gameplay
   HUD and windows. Its GraphicRaycaster retains native map pointer controls.
   Applies with either minimap/HUD style and restores pre-existing Canvas settings
   or removes owned components on scene replacement/F6 unload.
@@ -149,7 +176,7 @@
   or assets were copied. Saved alert flags are excluded from temperament.
 - Deployed Debug to isolated client scripts (F6 required). Gracefully saved
   RagnarokTest (_main.32.ok) and installed Release on the isolated dedicated server;
-  startup confirms Ragnarok 0.5.5, loaded mount bonds and UDP ports 2456/2457.
+  startup confirms Ironbound 0.5.5, loaded mount bonds and UDP ports 2456/2457.
   Backup: D:\RagnarokDev\deploy-backups\mount-restart-20261022-151058.
 - No in-game temperament test performed. The user previously requested keeping
   the client open and skipping isolated-world tests. Fear is observed only for a
@@ -180,7 +207,7 @@
   through the menu/server scene transition: CharacterPortrait.Dispose writes
   RawImage.texture after its scene was destroyed; ItemNotifications.Clear writes
   destroyed CanvasGroup.alpha. The latter repeats every frame and interrupts
-  OnDestroy. The next reload then fails with "Ragnarok localization is already
+  OnDestroy. The next reload then fails with "Ironbound localization is already
   registered", leaving custom rendering/native masks incompletely restored.
 - Added Unity lifetime guards for fade reset, portrait texture detach and owned
   root destruction. Notification disposal is idempotent and dead child roots force
@@ -339,7 +366,7 @@
 - Added pickup queue regressions for active/pending merges, FIFO, invalid amounts,
   overflow, cleanup and a 1,000-event randomized burst. All suites and Debug/Release
   builds passed. Development build deployed; no in-game visual test performed.
-- After F6, use `ragnarok_popup pickup` and `ragnarok_popup unlock` (close F5), then
+- After F6, use `ironbound_popup pickup` and `ironbound_popup unlock` (close F5), then
   real pickups/unlocks. Check +5 merged quantity, independent simultaneous channels,
   moved/scaled HUD, narrow resolutions, skill toast spacing, native log, Vanilla
   fallback and repeated F6 cleanup. Preview commands change no gameplay state.
@@ -453,7 +480,7 @@
 
 ## Required Jotunn dependency and typed APIs, 2026-10-21
 
-- User approved depending on Jotunn after confirming the mouse-dial fix. Ragnarok
+- User approved depending on Jotunn after confirming the mouse-dial fix. Ironbound
   now declares a hard BepInEx dependency on Jotunn 2.30.2+, with an explicit runtime
   check for ScriptEngine on clients and servers. This supersedes the earlier
   optional-integration notes below. InputManager/ButtonConfig/GUIManager calls are
@@ -503,7 +530,7 @@
   config listeners and the GUI event listener. The adapter is client-only and
   optional, with native fallback and diagnostics for unavailable APIs.
 - Checked the installed Jotunn 2.30.2 metadata and native ButtonAction getter.
-  The new `tests/Ragnarok.Jotunn.Tests` links the actual adapter and UI guards,
+  The new `tests/Ironbound.Jotunn.Tests` links the actual adapter and UI guards,
   uses the installed Harmony with Unity/Jotunn doubles, and passes 82 assertions:
   three unload/reload rounds, key rebinding/None, partial registration failure,
   absent Jotunn, name collisions, input initialization, scene replacement, E key
@@ -524,9 +551,9 @@
 - Typing E in the crafting search could close the inventory. Inspected the installed
   game and Jotunn assemblies: InventoryGui closes on the Use button; Jotunn's
   GetButton/GetButtonDown/GetButtonUp postfixes replace the result using reverse
-  patches, bypassing Ragnarok's prefix suppression.
+  patches, bypassing Ironbound's prefix suppression.
 - Added a last-priority postfix to reapply the existing typing/modal input guard.
-  It covers both crafting styles and other registered Ragnarok text fields, without
+  It covers both crafting styles and other registered Ironbound text fields, without
   adding a dependency. The patch uses the plugin's existing Harmony unload cleanup.
 - Windows Debug build passed with zero warnings/errors. A temporary .NET Framework
   harness compiled the actual BlockGameButtonsPatch against the installed Harmony:
@@ -541,7 +568,7 @@
 
 - User reported Delete not working and asked for drag-to-delete with a confirmation
   window. Root cause, found with temporary in-game click logging: the vanilla-style
-  panel's `Dispose` runs every frame while the Ragnarök inventory is shown, and it
+  panel's `Dispose` runs every frame while the Ironbound inventory is shown, and it
   called `ItemTrash.Reset()`, which cleared the two-press arm (and later closed the
   popup) on the next frame. Teardown no longer resets; only the Delete button's own
   `OnDisable` (inventory closed, panel rebuilt) and plugin unload do. Separately,
@@ -553,7 +580,7 @@
   instance exists. The answer re-checks that the item is still in its inventory
   and deletes at most the asked amount; closing the inventory or rebuilding the
   panel pops the window.
-- Tested in game (development install, Ragnarök inventory, joined to the local
+- Tested in game (development install, Ironbound inventory, joined to the local
   dedicated server): click Delete with an item held → popup above the inventory
   (raycasts hit `UnifiedPopup/.../FullscreenBlocker`); Yes deleted stone and iron
   and cleared the cursor; No kept the item held; press on an item and release
@@ -573,7 +600,7 @@
   (installed Steam and development assemblies are identical; the methods are not
   inlining candidates; no other installed mod patches the input path).
 - Defense in depth: `PlayerController.TakeInput` and `Player.TakeInput` now return
-  false while a Ragnarök field, or any focused field selected in the EventSystem,
+  false while a Ironbound field, or any focused field selected in the EventSystem,
   has focus. Movement/camera controls are zeroed and character actions stop
   regardless of how keys are read. Game buttons keep the narrower rule so Valheim's
   chat/console are unaffected.
@@ -593,7 +620,7 @@
 - Vanilla HUD provision row moved beside the Forsaken power icon (sized to it,
   clamped to 60-100% of the hotbar) with key labels at 60% size; the old
   placement remains as `HUD.Provisions.VanillaPlacement = AfterHotbar`.
-- Better Archery's own vanilla-grid arrow slots are skipped while a Ragnarök
+- Better Archery's own vanilla-grid arrow slots are skipped while a Ironbound
   character panel shows them, removing the duplicate.
 - Windows Debug/Release builds, `dev.ps1 test`, `check-config.ps1` and the config
   harness passed. A static Mono.Cecil check confirmed every new patch target and
@@ -638,7 +665,7 @@
   After eight seconds without a handoff, cancel with an explicit timeout message.
   Cancel/unload clears wait state. No resources are spent by the gate.
 - The running game was located in Gale's Cem profile; prior development deployments
-  did not update that profile. Its log has no matching Ragnarok withdrawal exception.
+  did not update that profile. Its log has no matching Ironbound withdrawal exception.
   Other mod errors are present and are not established causes of this report.
 - Windows Debug/Release builds and existing regression suites passed.
   Sharing archive rebuilt. No real-peer/in-game validation of
@@ -753,7 +780,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke.ps1
 This launches the isolated game hidden in batch mode, temporarily enables
 ScriptEngine's file watcher, verifies initial load and reload, stops only that
 process and restores the tool configurations. It does not load a world. The debug
-flag `-ragnarok-inventory-checks` runs isolated inventory checks on each plugin load;
+flag `-ironbound-inventory-checks` runs isolated inventory checks on each plugin load;
 these checks are absent from Release builds.
 
 The smoke test uses the same reload method as F6 through ScriptEngine's file
@@ -800,30 +827,30 @@ manual check in the visible game. Multiplayer is not tested.
 
 - Debug/Release builds passed with zero warnings/errors; Debug deployed to isolated scripts. Diff whitespace check passed.
 - Installed Terminal command registration, autocomplete and command dictionary APIs inspected read-only. UI-only registration needs no cheats/network/server authority; unload cancels queued samples and restores any displaced registration.
-- No in-game test performed. After F6, check `ragnarok_popup` help/tab completion, individual samples and `all`, console-close playback/pause, `clear`, style/world guards and F6 unload/re-registration. Previews do not test real event interception, discovery audio or actual progression.
+- No in-game test performed. After F6, check `ironbound_popup` help/tab completion, individual samples and `all`, console-close playback/pause, `clear`, style/world guards and F6 unload/re-registration. Previews do not test real event interception, discovery audio or actual progression.
 - Follow-up to reported pickup-only playback: no popup exception found in the running game's log. Added per-sample progress/next-sample reporting in the console and Unity log, explicit cadence/pause instructions, failure reporting, and preservation of the queue while the HUD is hidden or unavailable. Leaving/changing player sessions still cancels playback. Debug/Release builds passed; Debug deployed. No in-game reproduction or confirmation of the reported stop yet.
 - User subsequently confirmed `all` works; the sequence had not stopped.
 
 ## Notification glass opacity, 2026-10-19
 
 - Small notification cards now use 58% background opacity instead of 96%; wet uses a darker, muted blue tint. Card outlines are 45%, icon wells 40% and icon rims 65%; text/icon opacity is retained.
-- Debug/Release builds passed; Debug deployed to isolated scripts. Diff whitespace check passed. No in-game visual test performed; after F6 compare `ragnarok_popup pickup` and `ragnarok_popup wet` over bright/dark scenery.
+- Debug/Release builds passed; Debug deployed to isolated scripts. Diff whitespace check passed. No in-game visual test performed; after F6 compare `ironbound_popup pickup` and `ironbound_popup wet` over bright/dark scenery.
 
 ## Failure preview text, 2026-10-19
 
 - Replaced the unresolved `$msg_nostamina` preview token with explicit sample text, “Not enough stamina”, and an explicit failure color flag. Preview no longer depends on a nonexistent localization entry to select its red styling; real message routing is preserved.
-- Debug/Release builds passed; Debug deployed. Diff whitespace check passed. No in-game test performed; after F6 check `ragnarok_popup failure` displays readable red text.
+- Debug/Release builds passed; Debug deployed. Diff whitespace check passed. No in-game test performed; after F6 check `ironbound_popup failure` displays readable red text.
 
 ## Skill pill reference revision, 2026-10-19
 
 - Ordinary skill gains now use a 52-high capsule, gold circular up-arrow badge, muted 14-point caption and 18-point Cinzel skill/level line. Width follows measured text up to 560 units; long labels auto-size and the whole pill scales down to fit narrower screens. Smoked glass retains 58% opacity. Procedural sprites belong to Theme and unload with it; native skill icons no longer replace the arrow.
-- Debug/Release builds passed with zero warnings/errors; Debug deployed. Diff whitespace check passed. No in-game visual test performed; F6 then `ragnarok_popup skill`, real short/long skill names, localization, placement and small-screen fit remain manual.
+- Debug/Release builds passed with zero warnings/errors; Debug deployed. Diff whitespace check passed. No in-game visual test performed; F6 then `ironbound_popup skill`, real short/long skill names, localization, placement and small-screen fit remain manual.
 - User screenshot showed excess space after short skill names. Removed the 300-unit minimum width, increased the caption/name gap from 12 to 20 units and right-aligned the name/level with 20-unit end padding. Debug/Release builds passed; Debug deployed. In-game visual confirmation remains pending.
 
 ## Death banner diamond, 2026-10-19
 
 - Removed the death-only diamond suppression. Death now shows a crimson (#D64A3E) diamond; other banners reset it to gold.
-- Debug/Release builds passed; Debug deployed. Diff whitespace check passed. No in-game visual test performed; F6 then `ragnarok_popup death` verifies presentation without killing the player.
+- Debug/Release builds passed; Debug deployed. Diff whitespace check passed. No in-game visual test performed; F6 then `ironbound_popup death` verifies presentation without killing the player.
 
 ## Shared HUD glass, 2026-10-19
 
@@ -839,7 +866,7 @@ manual check in the visible game. Multiplayer is not tested.
 
 ## Minimap glass and HUD backdrop removal, 2026-10-19
 
-- Small Ragnarök map image color alpha set to 58% and restored on style switch/unload. Procedural rim/medallion fills use shared glass; map key uses glass with a muted border. Added world outlines/shadows to biome, cardinal, map key, day/clock and weather labels; next-weather text stays at 85% opacity. Pins/markers and large map are not retinted.
+- Small Ironbound map image color alpha set to 58% and restored on style switch/unload. Procedural rim/medallion fills use shared glass; map key uses glass with a muted border. Added world outlines/shadows to biome, cardinal, map key, day/clock and weather labels; next-weather text stays at 85% opacity. Pins/markers and large map are not retinted.
 - Removed HudBackdrop and all owned backdrop creation/update paths from vitals, compass, key guide, notifications/skill pill and minimap information strips. Legacy keys remain bound but ignored/hidden; inventory panel opacity remains exposed. Added configuration regression coverage for removed controls versus placement/inventory controls.
 - Fixed minimap info replacement cleanup and reset displayed-text caches on rebuild; added biome-mask cleanup for same-frame reload. Owned label silhouettes disappear with their HUD roots; original map color and native visibility restore.
 - Debug/Release builds passed with zero warnings/errors; Debug deployed. Existing suite passed (45,562 allocation checks, death boundaries, configuration migration/wire names and backdrop visibility checks). Diff whitespace check passed.
@@ -854,8 +881,8 @@ manual check in the visible game. Multiplayer is not tested.
 
 ## Skill popup vertical placement, 2026-10-19
 
-- Replaced the default equipped-hotbar-card docking target with the active Ragnarök vitals panel. The pill's bottom sits 12 scaled HUD units above that panel's top; screen clamping and narrow-screen scaling apply. The unchanged default placement tuple (BottomCenter, 0, 228) opts into docking, preserving custom placements and a fixed fallback when the Ragnarök HUD is absent. The live panel reference clears on owned-root disposal.
-- Debug/Release builds passed with zero warnings/errors; Debug deployed. Diff whitespace check passed. No in-game visual test performed: after F6 use `ragnarok_popup skill`, check no overlap with weapon/health labels, move/scale vitals and verify the pill follows, test custom placement and HUD style/unload restoration.
+- Replaced the default equipped-hotbar-card docking target with the active Ironbound vitals panel. The pill's bottom sits 12 scaled HUD units above that panel's top; screen clamping and narrow-screen scaling apply. The unchanged default placement tuple (BottomCenter, 0, 228) opts into docking, preserving custom placements and a fixed fallback when the Ironbound HUD is absent. The live panel reference clears on owned-root disposal.
+- Debug/Release builds passed with zero warnings/errors; Debug deployed. Diff whitespace check passed. No in-game visual test performed: after F6 use `ironbound_popup skill`, check no overlap with weapon/health labels, move/scale vitals and verify the pill follows, test custom placement and HUD style/unload restoration.
 
 ## Inventory glass, 2026-10-19
 
@@ -930,7 +957,7 @@ manual check in the visible game. Multiplayer is not tested.
 
 ## Inventory categories above Quick Stack, 2026-10-20
 
-- Moved the Ragnarok inventory category tabs below the grid and directly above the Quick Stack/sort row. Reduced the top header allocation by the same 40 units added below the grid, retaining panel height, slot size, footer and character-dashboard positions. Category selection and Quick Stack scope retain their existing handlers.
+- Moved the Ironbound inventory category tabs below the grid and directly above the Quick Stack/sort row. Reduced the top header allocation by the same 40 units added below the grid, retaining panel height, slot size, footer and character-dashboard positions. Category selection and Quick Stack scope retain their existing handlers.
 - Windows Debug build passed with zero warnings/errors and deployed to isolated BepInEx/scripts. Diff whitespace check passed. No in-game test performed; after F6 check category clicks, scoped Quick Stack, grid interactions, header spacing and character panel alignment. Chest and vanilla layouts retain their existing category positions.
 
 ## Portrait skin binding validation, 2026-10-20
@@ -956,12 +983,12 @@ manual check in the visible game. Multiplayer is not tested.
 
 ## Stronger radial opacity, 2026-10-20
 
-- Raised dial segment and center backgrounds to 90% opacity in both styles, including selected/equipped segment states. Ragnarok previously used shared 58% HUD glass; the dial now owns its opacity constant.
+- Raised dial segment and center backgrounds to 90% opacity in both styles, including selected/equipped segment states. Ironbound previously used shared 58% HUD glass; the dial now owns its opacity constant.
 - Windows Debug build passed with zero warnings/errors and deployed to isolated BepInEx/scripts. Diff whitespace check passed. No in-game visual test performed; after F6 check the radial against bright scenery and selected/equipped states.
 
 ## Combat key guide below hotbar, 2026-10-20
 
-- When Valheim's combat hint group is active and a carried weapon is equipped, dock the guide below the visible Ragnarok action bar. Combat hints flow into centered lines at the bar's width/scale with white bold keys, white native input icons and muted action labels, matching inventory footer styling without keycap backgrounds.
+- When Valheim's combat hint group is active and a carried weapon is equipped, dock the guide below the visible Ironbound action bar. Combat hints flow into centered lines at the bar's width/scale with white bold keys, white native input icons and muted action labels, matching inventory footer styling without keycap backgrounds.
 - Native hint reading retains bindings, translations and gamepad glyphs. Building and other contexts retain their normal placement; crafting docking takes priority while the inventory is open. Disabled/custom-hidden action bars fall back to configured guide placement.
 - Measure the rebuilt guide and raise the action bar only enough to fit it above the bottom edge; the saved bottom margin is unchanged and normal positioning resumes outside combat. The published action-bar reference clears on hide/dispose and guide objects retain HUD-owned cleanup.
 - Windows Debug build passed with zero warnings/errors and deployed to isolated BepInEx/scripts. Diff whitespace check passed. No in-game visual/input test performed; after F6 check weapon equip/unequip, bow/shield, hammer/building, inventory/crafting, mouse/gamepad bindings, long translations, hotbar scale/offsets, HUD toggles and reload restoration.
@@ -973,12 +1000,12 @@ manual check in the visible game. Multiplayer is not tested.
 
 ## Matching crafting key-guide style, 2026-10-20
 
-- The guide docked below the Ragnarok crafting panel now uses the shared compact combat-guide presentation: white bold keys, muted action labels, native input glyphs, matching typographic midline alignment and centered wrapping. Existing hint contents and crafting-panel docking are retained.
+- The guide docked below the Ironbound crafting panel now uses the shared compact combat-guide presentation: white bold keys, muted action labels, native input glyphs, matching typographic midline alignment and centered wrapping. Existing hint contents and crafting-panel docking are retained.
 - Windows Debug build passed with zero warnings/errors and deployed to isolated BepInEx/scripts. Diff whitespace check passed. No in-game visual test performed; after F6 inspect the guide below crafting, wrapping, modifier combinations, input glyphs, and switching between inventory/combat/building contexts.
 
 ## Tool key guide below hotbar, 2026-10-20
 
-- Building-tool and fishing hint contexts now join weapon combat hints below the Ragnarok hotbar with the shared white key / muted label style and aligned text. Native hint groups determine tool context: read-only inspection of the installed game confirms GetCurrentWeapon excludes ItemType.Tool, so checking that accessor alone misses building tools.
+- Building-tool and fishing hint contexts now join weapon combat hints below the Ironbound hotbar with the shared white key / muted label style and aligned text. Native hint groups determine tool context: read-only inspection of the installed game confirms GetCurrentWeapon excludes ItemType.Tool, so checking that accessor alone misses building tools.
 - Crafting docking retains priority; native binding/glyph/translation reading and automatic room beneath the hotbar are reused. No input, equipment or gameplay rules changed.
 - Windows Debug build passed with zero warnings/errors and deployed to isolated BepInEx/scripts. Diff whitespace check passed. No in-game visual/input test performed; after F6 check hammer/hoe/cultivator, fishing, axes/pickaxes, weapon/tool switching, wrapped building hints, hotbar scale/offsets and inventory/crafting docking.
 
@@ -991,7 +1018,7 @@ manual check in the visible game. Multiplayer is not tested.
 
 ## Building, leveling and cultivation task card, 2026-10-20
 
-- Added BuildTaskPanel, a Ragnarok-HUD-only presentation of the native selected building/terrain task. The 448-unit-wide card uses shared smoked glass, gold Cinzel title, Barlow tool/description labels, a 42-unit task icon, snapping indicator and up to three 38-unit material/station tiles per row. It renders at 85% of HUD scale and shrinks the text/icons from the native readout.
+- Added BuildTaskPanel, a Ironbound-HUD-only presentation of the native selected building/terrain task. The 448-unit-wide card uses shared smoked glass, gold Cinzel title, Barlow tool/description labels, a 42-unit task icon, snapping indicator and up to three 38-unit material/station tiles per row. It renders at 85% of HUD scale and shrinks the text/icons from the native readout.
 - Native Hud.UpdateBuild/SetupPieceInfo and InventoryGui.SetupRequirement were inspected read-only in the installed assembly. The card mirrors their localized text, icons, requirement visibility, amount/error colors and station results. No costs, availability calculations, resource withdrawal, authority or synchronized config changes were introduced; existing nearby-building scopes remain authoritative.
 - Only individual native readouts are masked with reversible CanvasGroups. The build picker, selection, input and native update routines remain active. Switching HUD style, replacing the HUD or unloading restores original group alpha/raycast/interactable settings and removes owned groups/card objects. The card hides with inventory, modal UI and weapon radial; it retains native HUD visibility.
 - Placement reads the current vitals/action-bar bounds after their update, keeps a gap above them and uses a compact description/requirement layout. If unusual HUD positions/scales would put the card in the reticle band, it moves left of center instead. At default 1080p/HUD scale, the no-material card is about 77 units high; a six-requirement card about 150, staying well below the central crosshair.
@@ -1060,7 +1087,7 @@ manual check in the visible game. Multiplayer is not tested.
 
 - Code inspection found CraftPanel.RebuildRows destroying/recreating all recipe UI objects whenever the logical recipe/availability signature changed. Replaced this with a visible row pool bounded by ceil(viewport height / 48) + 2. Full native recipe data/content height remain intact; scrolling rebinds pool slots to logical recipe indices. Click closures read the current bound row rather than capturing a stale recipe. Inactive pooled views drop item references; quality changes update upgrade labels.
 - Gamepad selection scrolls to the selected logical recipe before the visible pool is bound, so selection can move outside the currently rendered window. Availability-only changes keep scroll position; recipe/filter/order changes reset it. The pool is retained across ordinary closes and owned by the existing panel root for unload/rebuild cleanup.
-- The crafting panel's initial build used to immediately request another native UpdateCraftingPanel after inventory opening had already built/filtered/sorted the recipe list. The recipe-list postfix now records its owner and whether Ragnarök sorting was applied; panel construction requests a refresh only if that state is missing. Reset clears the tracked native reference. Native filtering, availability, recipe indices, costs and crafting/repair controls remain authoritative.
+- The crafting panel's initial build used to immediately request another native UpdateCraftingPanel after inventory opening had already built/filtered/sorted the recipe list. The recipe-list postfix now records its owner and whether Ironbound sorting was applied; panel construction requests a refresh only if that state is missing. Reset clears the tracked native reference. Native filtering, availability, recipe indices, costs and crafting/repair controls remain authoritative.
 - MonochromeIcons previously allocated/blitted an entire native texture atlas for every uncached small glyph. It now crops the sprite region directly into a render target bounded to 128 by 128 before readback/conversion. Existing per-source sprite caching and disposal remain active, with native-color fallback on conversion errors. No shaders, dependencies, external assets or gameplay/network changes.
 - Windows Debug and Release builds passed with zero warnings/errors. Existing offline regression checks passed, covering crafting search/detail formatting and the rest of the regression suite; these checks do not execute Unity pooling, GPU readback or measure actual frame times. Debug deployed to isolated scripts and diff whitespace check passed.
 - No in-game performance or interaction test performed, so the full one-second hitch cannot yet be attributed or its reduction quantified. After F6 compare first TAB and repeated close/open, hand crafting versus stations with large lists, long scrolling and scrollbar jumps, filter/search/sort/empty results, material availability changes/nearby chests, quantity changes, upgrades, controller navigation offscreen and repeated reload/style cleanup. Check info/status icon appearance after cropped readback as well.
@@ -1068,13 +1095,13 @@ manual check in the visible game. Multiplayer is not tested.
 ## Vanilla crafting functionality parity, 2026-10-20
 
 - Expanded the existing VanillaFilters add-on while retaining native wood/button sprites, fonts/colors, recipe list, selection, descriptions, repair/variant buttons and progress. Native recipe list data still passes through the shared filter/sort adapter; both styles now offer Name A-Z and Craftable-first sorting.
-- Search matches the same localized recipe/current-ingredient terms as Ragnarok, with 0.18-second debounce and slash focus (typed slash supports Turkish Q). Station/world context changes discard pending input and show the reset shared query. Added clear/reset controls and a native-font shortcut footer that reads the actual inventory close binding.
+- Search matches the same localized recipe/current-ingredient terms as Ironbound, with 0.18-second debounce and slash focus (typed slash supports Turkish Q). Station/world context changes discard pending input and show the reset shared query. Added clear/reset controls and a native-font shortcut footer that reads the actual inventory close binding.
 - Removed the old forced armor-slot reset in vanilla. Armor subfilter buttons use PresentSlots and shared ArmorSlot state; the native list reserves an additional row only while Armor is selected. Category/craftable icons repack together rather than leaving the craftable toggle at a fixed far-right position. Existing wheel-step components are reused and only an owned component is removed on unload.
 - Added native-art minus/typed-quantity/plus controls for new-item crafting. Quantity is bounded to 1-99 and native HaveRequirements affordability using a bounded binary search; upgrade selection resets to one and crafting-in-progress hides the stepper. Native craft button narrows to share its original row, then its exact geometry is restored for upgrades/progress/unload. This reuses existing CraftAmount/native multi-craft handling, with no new crafting or payment implementation.
 - Native requirement amounts show total available / required, with a bag/nearby source line and native UITooltip breakdown. Match visible native icon/name and station/upgrader/quality rules; requirements/page selection remain native. Count snapshots refresh at 5 Hz, immediately for recipe/storage-mode changes, using read-only existing ResourceScope and current server-controlled nearby-crafting settings. Native availability/cost/withdrawal remains authoritative between display refreshes.
 - Added cleanup of input listeners, typing registrations, quantity/source objects, native amount text sizing/tooltips and button/list geometry. The inactive custom panel no longer resets shared quantity every frame; switching feature off refreshes the unfiltered native list. No new dependency, external asset, RPC or synchronized gameplay rule.
 - Windows Debug and Release builds passed with zero warnings/errors. Existing offline regression checks passed, including shared crafting name/ingredient filters and tooltip formatting; they do not execute the new Unity controls/layout, GPU rendering or native crafting callbacks. Debug deployed to isolated scripts and diff whitespace check passed.
-- No in-game test performed. After F6 set HUD.Crafting.Style to Vanilla (or Vanilla HUD with FollowHud) and check existing wood/fonts, all-category/clear/craftable/sort/search, slash with Turkish Q and rebound close key, armor subfilter expansion/collapse, station/world reset, native list scrolling/controller selection, typed/minus/plus quantities with bag-only and nearby stock, material loss, upgrades, Shift crafting, variants, active crafting/cancel and style switching, counts/tooltips across requirement pages, nearby disabled/access denied, opening a chest, disabled VanillaFilters, resolution/HUD scales and repeated F6 cleanup. Native recipe rendering is retained; Ragnarok-only visible-row pooling is not applied to vanilla's native UI objects.
+- No in-game test performed. After F6 set HUD.Crafting.Style to Vanilla (or Vanilla HUD with FollowHud) and check existing wood/fonts, all-category/clear/craftable/sort/search, slash with Turkish Q and rebound close key, armor subfilter expansion/collapse, station/world reset, native list scrolling/controller selection, typed/minus/plus quantities with bag-only and nearby stock, material loss, upgrades, Shift crafting, variants, active crafting/cancel and style switching, counts/tooltips across requirement pages, nearby disabled/access denied, opening a chest, disabled VanillaFilters, resolution/HUD scales and repeated F6 cleanup. Native recipe rendering is retained; Ironbound-only visible-row pooling is not applied to vanilla's native UI objects.
 
 ## Vanilla crafting layout readability correction, 2026-10-20
 
@@ -1203,7 +1230,7 @@ manual check in the visible game. Multiplayer is not tested.
 - User reported the native panels remained visible after the theme refresh.
   Development LogOutput.log confirmed Unity rejected a duplicate CanvasGroup
   on Achievements; BookWindow.Open then threw NullReferenceException before
-  constructing the themed canvas. The style config correctly followed Ragnarok.
+  constructing the themed canvas. The style config correctly followed Ironbound.
 - BookWindow now reuses an existing CanvasGroup and snapshots/restores its alpha
   and raycast settings. Only groups created by this view are destroyed. Applied
   the same correction to InfoPanel's child masks; native interactability remains
@@ -1311,7 +1338,7 @@ manual check in the visible game. Multiplayer is not tested.
 
 ## Remove portrait provision row, 2026-10-21
 
-- Removed the carried provision shortcut row under the Ragnarok portrait and its
+- Removed the carried provision shortcut row under the Ironbound portrait and its
   unused renderer/root. Active food remains beside Forsaken power. Party layout
   no longer reserves space for the removed row. Inventory slots and provision
   shortcuts retain their existing behavior; the optional vanilla HUD row remains.
@@ -1325,7 +1352,7 @@ manual check in the visible game. Multiplayer is not tested.
   the mount quiet period. Reuse the same player combat predicate as summoning.
   The tile indicates player combat only; mount combat and other restrictions still
   apply independently.
-- Ragnarok HUD places it with ongoing effects near the character name. Vanilla
+- Ironbound HUD places it with ongoing effects near the character name. Vanilla
   HUD gets the same frameless tile near the top center/below the compass. No actual
   status effect, stat modifier, item, save data or network rule is added. All owned
   UI and static status state are cleared on unload/scene replacement.
@@ -1361,7 +1388,7 @@ manual check in the visible game. Multiplayer is not tested.
 
 ## Dedicated mount handshake correction (0.5.1), 2026-10-21
 
-- The live 0.5.0 server loaded Ragnarok successfully, but the mount handshake
+- The live 0.5.0 server loaded Ironbound successfully, but the mount handshake
   required resolving the peer's Player prefab via ZNetScene.FindInstance. Native
   ZNetScene only streams around its own reference position; a connected player
   can have an authenticated ZDO without a loaded Player on a dedicated server.
@@ -1378,13 +1405,13 @@ manual check in the visible game. Multiplayer is not tested.
   movement was injected into the user's session.
 - Sent normal Ctrl+C to the dev server's console, verified its orderly shutdown
   and new `_main.20.ok` save at 19:29:31, then installed the verified Release DLL.
-  Restarted RagnarokTest from that save; native logs confirm Ragnarok 0.5.1,
+  Restarted RagnarokTest from that save; native logs confirm Ironbound 0.5.1,
   `Mount server ready; world-scoped bond store loaded`, `Game server connected`
   and UDP 2456/2457. Client F6/reconnect and an actual bind/summon remain to verify.
 
 ## Riding HUD placement, 2026-10-21
 
-- Move the native mount name/health/stamina panel above Ragnarok vitals, leaving
+- Move the native mount name/health/stamina panel above Ironbound vitals, leaving
   clearance for the equipped-weapon title. Use measured HUD bounds and scale.
 - Fall back to right-center when the build task/equipped card overlaps that slot,
   pickups or skill messages use it, or the slot would crowd the reticle/screen edge.
@@ -1413,7 +1440,7 @@ manual check in the visible game. Multiplayer is not tested.
 - The live server DLL was Windows-mapped and refused replacement. Its original
   hash was verified against the backup; no server process was stopped. Release
   files and a guarded apply.ps1 are staged externally under
-  `D:\RagnarokDev\server-updates\Ragnarok-0.5.0`. Save/stop the dev server, apply the
+  `D:\RagnarokDev\server-updates\Ironbound-0.5.0`. Save/stop the dev server, apply the
   update, then start it before trying these controls on the dedicated server.
 
 ## Mount transport prototype, 2026-10-21
@@ -1510,7 +1537,7 @@ manual check in the visible game. Multiplayer is not tested.
 - Debug build/deploy passed with zero warnings/errors. No in-game hammer retest
   was performed; reload the client with F6. No server restart required.
 
-## Compact Ragnarok mount panel, 2026-10-21
+## Compact Ironbound mount panel, 2026-10-21
 
 - Replaced the relocated vanilla readout with an owned 280-by-52 frameless HUD:
   compact native name/status line, red health and yellow stamina tracks, current

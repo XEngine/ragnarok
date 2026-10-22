@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/Ironbound/HUD/PickupQueue.cs" Link="PickupQueue.cs" />
+    <Compile Include="../../src/Ironbound/HUD/HoverPromptLines.cs" Link="HoverPromptLines.cs" />
+    <Compile Include="../../src/Ironbound/HUD/StatusCategories.cs" Link="StatusCategories.cs" />
+    <Compile Include="../../src/Ironbound/HUD/StaminaRecoveryMeter.cs" Link="StaminaRecoveryMeter.cs" />
+    <Compile Include="../../src/Ironbound/HUD/HealthRecoveryRate.cs" Link="HealthRecoveryRate.cs" />
+    <Compile Include="../../src/Ironbound/Features/Mounts/MountBondLedger.cs" Link="MountBondLedger.cs" />
+    <Compile Include="../../src/Ironbound/Features/Mounts/MountBondStore.cs" Link="MountBondStore.cs" />
+    <Compile Include="../../src/Ironbound/Features/Mounts/MountArrivalPolicy.cs" Link="MountArrivalPolicy.cs" />
+    <Compile Include="../../src/Ironbound/Features/Mounts/MountRecordPolicy.cs" Link="MountRecordPolicy.cs" />
+    <Compile Include="../../src/Ironbound/Features/Mounts/MountProgression.cs" Link="MountProgression.cs" />
+    <Compile Include="../../src/Ironbound/Features/Mounts/MountTemperament.cs" Link="MountTemperament.cs" />
+    <Compile Include="../../src/Ironbound/Features/Mounts/MountProgressStore.cs" Link="MountProgressStore.cs" />
+    <Compile Include="../../src/Ironbound/Configuration/ConfigSliderValue.cs" Link="ConfigSliderValue.cs" />
+    <Compile Include="../../src/Ironbound/Configuration/BrandingMigration.cs" Link="BrandingMigration.cs" />
+    <Compile Include="../../src/Ironbound/Ui/Shared/BuildMenuRules.cs" Link="BuildMenuRules.cs" />
+    <Compile Include="../../src/Ironbound/Features/Equipment/GraveRecoveryPlan.cs" Link="GraveRecoveryPlan.cs" />
+    <Compile Include="../../src/Ironbound/Features/Equipment/GraveRecoveryTag.cs" Link="GraveRecoveryTag.cs" />
+    <Compile Include="../../src/Ironbound/Features/Gameplay/DeathPenalty.cs" Link="DeathPenalty.cs" />
+    <Compile Include="../../src/Ironbound/Features/NearbyStorage/WithdrawalPlan.cs" Link="WithdrawalPlan.cs" />
+    <Compile Include="../../src/Ironbound/Configuration/ConfigSchema.cs" Link="ConfigSchema.cs" />
+    <Compile Include="../../src/Ironbound/Features/QualityOfLife/CraftSearch.cs" Link="CraftSearch.cs" />
+    <Compile Include="../../src/Ironbound/Ui/Shared/CraftFrameShape.cs" Link="CraftFrameShape.cs" />
+    <Compile Include="../../src/Ironbound/Ui/Shared/RecipeDetails.cs" Link="RecipeDetails.cs" />
+  </ItemGroup>
+</Project>

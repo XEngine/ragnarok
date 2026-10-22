@@ -1,8 +1,12 @@
-# Ragnarök 0.5.5 alpha — testers and contributors welcome
+# Ironbound 0.5.6 alpha — testers and contributors welcome
 
-I'm opening up Ragnarök, a Valheim HUD and quality-of-life mod I've been building.
-It's now public under the MIT license, and I'd love feedback from other players
-and mod developers.
+Ironbound is the new name for my Valheim HUD and quality-of-life mod, previously
+called Ragnarök. The 0.5.6 alpha also gives the F10 settings window the same
+charcoal, iron and gold frame theme as the HUD. It's public under MIT, and I'd
+love feedback from other players and mod developers.
+
+Upgrading? Remove old Ragnarok.dll copies first. Existing config imports when no
+Ironbound config exists; mount bonds and progression stay intact.
 
 The alpha brings a charcoal-and-gold Rune & Iron HUD, inventory/crafting tools,
 one shared nearby-chest feature for crafting/quick-stack/search, and a mount
@@ -16,10 +20,10 @@ Automated checks pass, but the newest layouts, mount temperament and all
 multiplayer ownership scenarios still need live testing. BepInExPack and Jötunn
 are required; shared gameplay features need the same mod build on server and clients.
 
-- Download alpha packages: https://github.com/XEngine/ragnarok/releases/tag/v0.5.5-alpha
-- Source and feature guide: https://github.com/XEngine/ragnarok
-- Found a bug or compatibility issue? https://github.com/XEngine/ragnarok/issues/new/choose
-- Want to improve it? https://github.com/XEngine/ragnarok/blob/main/CONTRIBUTING.md
+- Download alpha packages: https://github.com/XEngine/ironbound/releases/tag/v0.5.6-alpha
+- Source and feature guide: https://github.com/XEngine/ironbound
+- Found a bug or compatibility issue? https://github.com/XEngine/ironbound/issues/new/choose
+- Want to improve it? https://github.com/XEngine/ironbound/blob/main/CONTRIBUTING.md
 
 Reproduction steps, screenshots, translations, usability feedback and pull
 requests are all welcome. Testing mount owner handoffs, distant summons and mod

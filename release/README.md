@@ -1,11 +1,11 @@
-# Ragnarök
+# Ironbound
 
 **A configurable HUD and quality-of-life overhaul for Valheim, by KernelPanic.**
 
 **Open source under MIT. Testers and contributors welcome!**
-[Report a bug or suggest a feature](https://github.com/XEngine/ragnarok/issues/new/choose),
-[send a pull request](https://github.com/XEngine/ragnarok/pulls), or read the
-[contribution guide](https://github.com/XEngine/ragnarok/blob/main/CONTRIBUTING.md).
+[Report a bug or suggest a feature](https://github.com/XEngine/ironbound/issues/new/choose),
+[send a pull request](https://github.com/XEngine/ironbound/pulls), or read the
+[contribution guide](https://github.com/XEngine/ironbound/blob/main/CONTRIBUTING.md).
 Testing reports, translations, compatibility fixes and UI improvements all help.
 If you enjoy the mod, share it with your Valheim group or star the repository.
 
@@ -13,10 +13,15 @@ Bring your vitals, inventory, storage and mount companion into one interface.
 Use the custom Rune & Iron style or keep the vanilla HUD and choose individual
 features in the settings.
 
-**0.5.5 is a alpha.** Automated checks and local development testing have been
+**Renamed from Ragnarök in 0.5.6.** Remove old `Ragnarok.dll` copies before installing
+`Ironbound.dll`. Your old config is copied forward on first start if an Ironbound
+config does not already exist. Existing mount bonds and progression are preserved.
+The F10 window now matches the HUD's charcoal, iron and gold frame theme.
+
+**0.5.6 is a alpha.** Automated checks and local development testing have been
 performed, but the latest HUD layouts, mount temperament and every multiplayer
 ownership scenario have not all received an in-game test. Back up saves and try
-a test world first. This package contains the Ragnarök plugin, not a modpack.
+a test world first. This package contains the Ironbound plugin, not a modpack.
 
 ## Features
 
@@ -34,7 +39,7 @@ a test world first. This package contains the Ragnarök plugin, not a modpack.
   and provision slots, sorting and a weapon dial. The hotbar uses its normal top row.
 - **Mount companion:** bind one living, tamed, saddle-equipped mount per player;
   whistle to summon that same animal onto safe outdoor ground, including from
-  unloaded areas. Requires Ragnarök on the server and clients.
+  unloaded areas. Requires Ironbound on the server and clients.
 - **Riding progression:** summon cost falls from 10% maximum stamina at Riding 0
   to zero at 100. First bonds and successful summons award limited Riding XP.
   Hungry or frightened mounts may occasionally hesitate or refuse; refusal costs
@@ -49,28 +54,28 @@ a test world first. This package contains the Ragnarök plugin, not a modpack.
 - [BepInExPack Valheim 5.4.2351](https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/).
 - [Jötunn 2.30.2 or newer](https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/).
 
-Install the same Ragnarök build on all participating clients and the dedicated
+Install the same Ironbound build on all participating clients and the dedicated
 server for shared gameplay features. The server runs the gameplay/synchronization
 side without creating the graphical interface. Other mods are optional and are
 not bundled. Compatibility with an arbitrary mod list is not guaranteed.
 
 ## Installation
 
-**Thunderstore/r2modman:** install Ragnarök into your Valheim profile, let the
+**Thunderstore/r2modman:** install Ironbound into your Valheim profile, let the
 manager install dependencies, and launch the modded game.
 
 **Manual/Nexus:** install BepInExPack and Jötunn first. Extract the archive into
 your Valheim directory so the DLL ends up at
-`BepInEx/plugins/Ragnarok/Ragnarok.dll`. For a managed profile, use that profile's
+`BepInEx/plugins/Ironbound/Ironbound.dll`. For a managed profile, use that profile's
 folder. For a dedicated server, use its installation folder.
 
-Keep only one Ragnarök DLL. Remove previous copies from both `BepInEx/plugins`
+Keep only one Ironbound DLL. Remove previous copies from both `BepInEx/plugins`
 and `BepInEx/scripts` while the game/server is closed. ScriptEngine is not required
 for this release. Restart after updating a release DLL.
 
-The default HUD is **Vanilla**. Open **F10 → HUD → Style → Ragnarok** to enable
+The default HUD is **Vanilla**. Open **F10 → HUD → Style → Ironbound** to enable
 the custom interface, then adjust feature pages to taste. The configuration file
-is `BepInEx/config/com.kernelpanic.ragnarok.cfg`.
+is `BepInEx/config/com.kernelpanic.ironbound.cfg`.
 
 ## Default controls
 
@@ -108,13 +113,13 @@ designed for cooperative play, not as an anti-cheat system.
 Back up characters, worlds and configuration before updating. Existing settings
 are migrated when supported; the server defines shared mount/storage rules.
 
-Before removing Ragnarök, move items out of additional equipment, provision or
+Before removing Ironbound, move items out of additional equipment, provision or
 inventory slots into normal inventory/chests, save, and close the game. Remove
 the DLL only after doing so. Removing the mod is not a substitute for a save backup.
 
 ## Support and credits
 
-Report issues at [GitHub Issues](https://github.com/XEngine/ragnarok/issues), with
+Report issues at [GitHub Issues](https://github.com/XEngine/ironbound/issues), with
 your game/mod versions, reproduction steps and `BepInEx/LogOutput.log`. Remove
 private connection details before sharing logs. Include your other mods when
 reporting a compatibility problem.

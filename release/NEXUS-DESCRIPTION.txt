@@ -1,7 +1,8 @@
-[size=5][b]RagnarÃ¶k â€” HUD and Quality of Life[/b][/size]
+[size=5][b]Ironbound — HUD and Quality of Life[/b][/size]
 A configurable Valheim interface and quality-of-life overhaul by KernelPanic.
 
-[b]Version 0.5.5 â€” public alpha[/b]
+[b]Version 0.5.6 — public alpha[/b]
+Formerly Ragnarök. Remove old Ragnarok.dll copies before installing Ironbound.dll. Existing settings import on first start if no Ironbound config exists; mount bonds and progression remain compatible. The F10 window now shares the HUD's charcoal, iron and gold frames.
 Builds and automated regression checks pass. The latest visual changes and every multiplayer/mount ownership scenario have not all received in-game testing. Back up your saves and begin with a test world.
 
 [b]Features[/b]
@@ -16,27 +17,27 @@ Builds and automated regression checks pass. The latest visual changes and every
 [/list]
 
 [b]Requirements[/b]
-Valheim (compiled against 1.0.20), BepInExPack Valheim 5.4.2351, JÃ¶tunn 2.30.2 or newer.
-Install dependencies separately. Install the same RagnarÃ¶k version on the server and all participating clients for shared gameplay features. This is a plugin, not a modpack; no other mods are bundled.
+Valheim (compiled against 1.0.20), BepInExPack Valheim 5.4.2351, Jötunn 2.30.2 or newer.
+Install dependencies separately. Install the same Ironbound version on the server and all participating clients for shared gameplay features. This is a plugin, not a modpack; no other mods are bundled.
 
 [b]Install[/b]
-Close the game/server. Extract the main archive into your Valheim folder so the plugin is at BepInEx/plugins/Ragnarok/Ragnarok.dll. Managed profiles use the profile folder instead. Keep only one copy: remove older DLLs from both plugins and scripts. Restart after updating. ScriptEngine is not required.
+Close the game/server. Extract the main archive into your Valheim folder so the plugin is at BepInEx/plugins/Ironbound/Ironbound.dll. Managed profiles use the profile folder instead. Keep only one copy: remove older DLLs from both plugins and scripts. Restart after updating. ScriptEngine is not required.
 
-Press F10, then HUD > Style > Ragnarok to enable the custom interface. Vanilla is the default. Hold Shift+H near a tamed saddled mount to bind/release; press H outdoors to whistle. Default provision shortcuts are Alt+4/5/6. Rebind controls in F10.
+Press F10, then HUD > Style > Ironbound to enable the custom interface. Vanilla is the default. Hold Shift+H near a tamed saddled mount to bind/release; press H outdoors to whistle. Default provision shortcuts are Alt+4/5/6. Rebind controls in F10.
 
 [b]Mounts[/b]
 Summoning preserves the same animal, health and saddle. It does not heal, clone or revive it. Your mount stays where left after portals. Combat, riders, wards and unsafe arrival locations can block a summon. Stamina is charged only after confirmed arrival; Riding lowers the cost from 10% at level 0 to zero at 100. Hungry/frightened mounts may occasionally delay or refuse; refusal costs no stamina and grace prevents repeated bad rolls. The included MOUNTS.md documents exact rules and limits.
 
 [b]Compatibility and removal[/b]
-Arbitrary mod combinations, Linux runtime and Vortex deployment are not verified for this alpha. Prefer testing in a separate profile. Before removing RagnarÃ¶k, move items out of added equipment/provision/inventory slots into ordinary inventory or chests, save, and quit. Back up saves before updating or removing.
+Arbitrary mod combinations, Linux runtime and Vortex deployment are not verified for this alpha. Prefer testing in a separate profile. Before removing Ironbound, move items out of added equipment/provision/inventory slots into ordinary inventory or chests, save, and quit. Back up saves before updating or removing.
 
 [b]Support[/b]
-Report problems at https://github.com/XEngine/ragnarok/issues with game/mod versions, reproduction steps and BepInEx/LogOutput.log. Remove private connection information before sharing logs.
+Report problems at https://github.com/XEngine/ironbound/issues with game/mod versions, reproduction steps and BepInEx/LogOutput.log. Remove private connection information before sharing logs.
 
 [b]Credits and permissions[/b]
-By KernelPanic. BepInEx and JÃ¶tunn are separate dependencies. Embedded fonts retain SIL Open Font Licenses; notices and license texts are included. Native game icons/effects are resolved from the installed game. No Valheim or dependency assemblies are bundled. Original rune package icon is procedural artwork. Code and page copy were developed with AI assistance; development history is available in the repository. Original project code, documentation and procedural artwork are MIT-licensed; the LICENSE is included. Third-party fonts retain their own licenses. Historical removed power images have undocumented provenance and are excluded from the MIT grant.
+By KernelPanic. BepInEx and Jötunn are separate dependencies. Embedded fonts retain SIL Open Font Licenses; notices and license texts are included. Native game icons/effects are resolved from the installed game. No Valheim or dependency assemblies are bundled. Original rune package icon is procedural artwork. Code and page copy were developed with AI assistance; development history is available in the repository. Original project code, documentation and procedural artwork are MIT-licensed; the LICENSE is included. Third-party fonts retain their own licenses. Historical removed power images have undocumented provenance and are excluded from the MIT grant.
 
 [b]Help shape the alpha[/b]
-Bug reports, feature suggestions, testing, translations and pull requests are welcome. Open an issue: https://github.com/XEngine/ragnarok/issues/new/choose
-Contribute a fix: https://github.com/XEngine/ragnarok/blob/main/CONTRIBUTING.md
+Bug reports, feature suggestions, testing, translations and pull requests are welcome. Open an issue: https://github.com/XEngine/ironbound/issues/new/choose
+Contribute a fix: https://github.com/XEngine/ironbound/blob/main/CONTRIBUTING.md
 If you find it useful, share the project with your Valheim group or star the repository so others can discover it.

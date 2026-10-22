@@ -1,16 +1,16 @@
-# Contributing to Ragnarök
+# Contributing to Ironbound
 
-Ragnarök is an **alpha**, and feedback, bug reports and pull requests are welcome.
+Ironbound is an **alpha**, and feedback, bug reports and pull requests are welcome.
 You do not need to write code to help: test a feature, reproduce a bug, improve
 translations, review a change or share a useful compatibility report.
 
 ## Report bugs and suggest features
 
-[Open an issue](https://github.com/XEngine/ragnarok/issues/new/choose). Include
-your Valheim/Ragnarök versions, other mods, the steps to reproduce the problem,
+[Open an issue](https://github.com/XEngine/ironbound/issues/new/choose). Include
+your Valheim/Ironbound versions, other mods, the steps to reproduce the problem,
 what you expected and what happened. Screenshots help with HUD problems. Attach
 the relevant `BepInEx/LogOutput.log` excerpt after removing private connection
-details. Mention whether the problem occurs in vanilla or Ragnarok HUD style,
+details. Mention whether the problem occurs in vanilla or Ironbound HUD style,
 single-player or a dedicated server, and after a fresh launch or F6 reload.
 
 For mount issues, tell us whether the mount was loaded nearby or far away,
@@ -51,5 +51,5 @@ the current tree remain in historical commits with undocumented provenance and
 are excluded from the MIT grant. Native icons are now resolved at runtime.
 
 Be constructive and specific in issues/reviews. Testing reports and small fixes
-are as welcome as larger features. If Ragnarök helps your playthrough, sharing
+are as welcome as larger features. If Ironbound helps your playthrough, sharing
 the project with other Valheim players or starring it helps people find it.

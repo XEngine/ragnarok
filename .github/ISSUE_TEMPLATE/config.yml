@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Contribution and testing guide
-    url: https://github.com/XEngine/ragnarok/blob/main/CONTRIBUTING.md
+    url: https://github.com/XEngine/ironbound/blob/main/CONTRIBUTING.md
     about: Setup, useful bug-report details and pull-request guidance.

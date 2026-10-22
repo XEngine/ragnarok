@@ -55,7 +55,7 @@ Cinzel 600, Barlow Semi Condensed 400/600/700 and italic, and Noto Sans Runic.
 Names/titles use Cinzel, labels use Barlow 600, primary numeric displays use 700,
 and character/companion rune badges use Noto Sans Runic. Font sources, static Cinzel
 conversion, file hashes and OFL licenses are recorded in
-`src/Ragnarok/Assets/Fonts/SOURCES.md`.
+`src/Ironbound/Assets/Fonts/SOURCES.md`.
 
 Vitals: full bars fade to 40% after four seconds idle; recent-loss segments wait
 0.6 seconds before draining; health below 25% has a pulsing outline and screen-edge
@@ -102,7 +102,7 @@ After development deployment, press F6 and check:
 2. Food timers, health/stamina/eitr and the character name; inspect companion health nearby and distance-only rows remotely, and verify hidden-position players stay absent.
 3. Use **Test notifications** in settings, then trigger a real pickup, unlock and skill gain (including level 1). Confirm the toast appears once and ordinary center messages remain vanilla.
 4. Forsaken ready, active and cooldown states and rebound activation key; map pins, wind and biome labels in the circular map.
-5. Toggle Vanilla/Ragnarok, hide the HUD, die/respawn, leave/rejoin a world and F6 reload. Check for duplicate objects, stale messages and restored vanilla map visuals.
+5. Toggle Vanilla/Ironbound, hide the HUD, die/respawn, leave/rejoin a world and F6 reload. Check for duplicate objects, stale messages and restored vanilla map visuals.
 
 ## Screenshot correction, 2026-10-18
 
@@ -880,7 +880,7 @@ After F6, select HUD.Inventory Style=Vanilla and inspect layout, each category,
 scoped stacking, sorting, chest take/place/scroll, side slots and bonus hover,
 different row counts/screen sizes, style switching and unload/reload.
 
-### Quieter Ragnarök empty slots, 2026-10-19
+### Quieter Ironbound empty slots, 2026-10-19
 
 Reduced idle empty-slot well opacity from 70% to 55%, dashed border from 80%
 light gray-green to 50% muted #737B72, label opacity from 65% to 42%, and glyph
@@ -893,7 +893,7 @@ Small follow-up: idle empty borders now 45% alpha (from 50%), labels 38%
 (from 42%), glyphs 41% (from 45%). Well opacity and focus treatment stay as
 before. Debug build/deploy passed; no in-game visual test performed.
 
-### Ragnarök set-bonus hover card, 2026-10-19
+### Ironbound set-bonus hover card, 2026-10-19
 
 The guide dashboard now uses ItemCard's dark rounded surface, gold outline,
 Cinzel heading and Barlow text for set-bonus hover details. Added a plain-detail
@@ -912,7 +912,7 @@ between inventory styles.
 
 ### Guide 02 — messages, tooltips and level-ups, 2026-10-19
 
-Applied the supplied Messages, Tooltips & Level-ups sheet to existing Ragnarök
+Applied the supplied Messages, Tooltips & Level-ups sheet to existing Ironbound
 presentation paths. No bitmap assets, external code, dependencies or gameplay/
 network/save changes were introduced. The native MessageHud, Player, Character,
 Skills, SEMan, ItemDrop and HitData APIs/tooltip formats were inspected from the
@@ -1019,7 +1019,7 @@ values rather than predicted skill/buff-adjusted hits.
 
 HUD Shade/Plate backdrop rendering and its settings controls have been removed.
 Existing local backdrop keys are retained but ignored; individual glass slot/card
-surfaces remain. The small Ragnarök minimap terrain uses 58% opacity, its rim and
+surfaces remain. The small Ironbound minimap terrain uses 58% opacity, its rim and
 medallion fills share HUD glass, and its key uses the same glass with a muted rim.
 Biome/cardinal/key/day/clock/weather labels use world outlines and shadows.
 Native map image color, frame objects, mask hierarchy and biome visibility restore
@@ -1042,8 +1042,8 @@ or breaking action-slot fills replace the base fill instead of stacking over it.
 Hotbar hover/press fills rise to 68%/72%, cooldown overlays use 35%, and state
 rings, artwork, text and duration/durability indicators retain their contrast.
 
-`ragnarok_popup <type>` previews guide 02 presentation in a loaded world with
-Ragnarök notifications enabled. Types: pickup, unlock, rested, wet, warning,
+`ironbound_popup <type>` previews guide 02 presentation in a loaded world with
+Ironbound notifications enabled. Types: pickup, unlock, rested, wet, warning,
 skill, milestone, system, blocked, failure, death, discovery, power, day.
 `all` sequences samples at 4.6-second intervals; `clear` cancels the queue and
 clears displayed popups. Close F5 to begin; opening it pauses subsequent samples.

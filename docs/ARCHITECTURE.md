@@ -11,15 +11,15 @@ locks mount rules; keys remain local. See [authority and verification limits](MO
 
 ## Code ownership
 
-- `HUD/`: character/vitals, hotbar, status effects, minimap, compass, prompts, provisions and notifications. Namespace `Ragnarok.HUD`.
-- `Ui/Shared/`: Unity UI builders, fonts, procedural sprites, input blocking and shared visual primitives. Namespace `Ragnarok.UI`.
-- `Ui/Windows/`: inventory, crafting, chests, item details and books. Namespace `Ragnarok.UI.Windows`.
+- `HUD/`: character/vitals, hotbar, status effects, minimap, compass, prompts, provisions and notifications. Namespace `Ironbound.HUD`.
+- `Ui/Shared/`: Unity UI builders, fonts, procedural sprites, input blocking and shared visual primitives. Namespace `Ironbound.UI`.
+- `Ui/Windows/`: inventory, crafting, chests, item details and books. Namespace `Ironbound.UI.Windows`.
 - `Features/Gameplay/`: skill XP/loss, resource costs, Forsaken powers, harvest yields, sailing, ballistas and station modifiers.
 - `Features/QualityOfLife/`: chest search/preview, weapon dial, planting information, inventory sorting/stacking controls, crafting filters and extra hotbar access.
 - `Features/Equipment/` and `Features/NearbyStorage/`: equipment slot rules, tombstone recovery and owner-approved resource transactions.
 - `Configuration/`: `InterfaceSettings` holds presentation options and composes `FeatureSettings`; `GameplaySettings` holds balance options. `HudPlacement` owns layout types. `ConfigSchema` defines migration and wire-name compatibility; `ConfigMigration` adapts saved BepInEx files. The settings window and controls live here as well.
 - `Networking/`: server setting synchronization, authority checks and local-value restoration.
-- `Development/`: optional runtime checks and isolated previews. Pure regression checks remain in `tests/Ragnarok.Tests`.
+- `Development/`: optional runtime checks and isolated previews. Pure regression checks remain in `tests/Ironbound.Tests`.
 
 ## Settings groups
 
@@ -44,15 +44,15 @@ through InputManager for keyboard bindings; callers retain their existing modifi
 Mouse bindings use the original Unity Input API, matching the key picker and avoiding
 side-button identity changes through Valheim's KeyCodeToPath conversion.
 Config changes replace only the relevant binding, including disabling with None.
-Only the settings toggle bypasses Ragnarok's modal/text game-button guard, allowing
+Only the settings toggle bypasses Ironbound's modal/text game-button guard, allowing
 F10 to close the window. The dial remains a native-style radial menu that permits
 walking; it does not acquire a GUI block.
 
-The adapter balances one GUIManager.BlockInput request across all Ragnarok modal
+The adapter balances one GUIManager.BlockInput request across all Ironbound modal
 windows and registered focused fields. Repeated ticks do not increment the counter;
 closing/unload releases just this request. OnCustomGUIAvailable resets local request
 ownership after Jotunn resets its counter, and closes settings across GUI recreation.
-Existing canvas/scaling and fallback input patches remain owned by Ragnarok.
+Existing canvas/scaling and fallback input patches remain owned by Ironbound.
 
 Jotunn 2.30.2 has no public RemoveButton. The adapter validates the private Buttons
 registry and native ZInput ButtonAction cleanup contract before enabling itself.

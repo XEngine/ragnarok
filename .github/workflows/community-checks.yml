@@ -20,6 +20,6 @@ jobs:
         with:
           python-version: '3.14'
       - name: Game-independent regression suite
-        run: dotnet run --project tests/Ragnarok.Tests/Ragnarok.Tests.csproj --configuration Release
+        run: dotnet run --project tests/Ironbound.Tests/Ironbound.Tests.csproj --configuration Release
       - name: Packaging metadata and rejection checks
         run: python -B tests/test_release_package.py

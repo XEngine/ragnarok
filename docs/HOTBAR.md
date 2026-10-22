@@ -1,10 +1,10 @@
-# Ragnarök action bar
+# Ironbound action bar
 
-With HUD.Style = Ragnarok, the hotbar becomes a bottom-centred eight-slot action panel: textured iron frame, brass rails, carved knot, recessed item wells, key numbers, stack counts, item quality, gold durability strips, crimson equipped marks and a light controller-selection border. Empty slots remain visible.
+With HUD.Style = Ironbound, the hotbar becomes a bottom-centred eight-slot action panel: textured iron frame, brass rails, carved knot, recessed item wells, key numbers, stack counts, item quality, gold durability strips, crimson equipped marks and a light controller-selection border. Empty slots remain visible.
 
 F10 → HUD → Hotbar:
 
-- Enabled: true by default. Off uses the original hotbar even with Ragnarök HUD.
+- Enabled: true by default. Off uses the original hotbar even with Ironbound HUD.
 - Scale: 0.5–1.5, default 1.
 - OffsetX: horizontal offset from bottom centre, default 0.
 - BottomMargin: distance above the bottom edge, default 24 HUD pixels.

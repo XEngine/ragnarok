@@ -21,9 +21,9 @@ try {
         (New-Object Drawing.PointF(128, 242)), (New-Object Drawing.PointF(14, 128)))
     $graphics.DrawPolygon($edge, $diamond)
     $graphics.DrawEllipse($inner, 38, 38, 180, 180)
-    $stem = [Drawing.PointF[]]@((New-Object Drawing.PointF(96, 66)), (New-Object Drawing.PointF(96, 193)))
-    $bowl = [Drawing.PointF[]]@((New-Object Drawing.PointF(96, 66)), (New-Object Drawing.PointF(164, 105)), (New-Object Drawing.PointF(96, 144)))
-    $leg = [Drawing.PointF[]]@((New-Object Drawing.PointF(96, 144)), (New-Object Drawing.PointF(165, 193)))
+    $stem = [Drawing.PointF[]]@((New-Object Drawing.PointF(128, 68)), (New-Object Drawing.PointF(128, 188)))
+    $bowl = [Drawing.PointF[]]@((New-Object Drawing.PointF(96, 68)), (New-Object Drawing.PointF(160, 68)))
+    $leg = [Drawing.PointF[]]@((New-Object Drawing.PointF(96, 188)), (New-Object Drawing.PointF(160, 188)))
     foreach ($points in @($stem, $bowl, $leg)) { $graphics.DrawLines($shadow, $points); $graphics.DrawLines($rune, $points) }
     foreach ($y in @(34, 222)) {
         $mark = [Drawing.PointF[]]@((New-Object Drawing.PointF(128, ($y - 4))), (New-Object Drawing.PointF(132, $y)),

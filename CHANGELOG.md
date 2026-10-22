@@ -1,5 +1,15 @@
 # Change record
 
+## Ironbound 0.5.6 alpha, 2026-10-22
+
+- Rename the mod, repository, source projects, plugin, configuration and releases
+  to Ironbound. New charcoal/gold I seal replaces the previous package/HUD rune.
+- Bring the configuration window into the HUD's charcoal/rune/iron theme with
+  quiet rounded frames, iron edges, matching keycaps and gold active/focus states.
+- Import legacy configuration and convert old style enum names before binding.
+  Keep mount bonds, reward/receipt history, tombstone markers and transport names
+  compatible. The old config remains a backup; existing Ironbound settings win.
+
 ## Unreleased - Mount temperament 0.5.5, 2026-10-22
 
 - Mark distribution as alpha, license original project work under MIT, and add
@@ -47,7 +57,7 @@
 
 - Add a local magical burst and short materialization animation after a confirmed
   mount arrival, using native game effects and preserving the original animal.
-- Add a compact frameless Ragnarok riding panel with health/stamina values and
+- Add a compact frameless Ironbound riding panel with health/stamina values and
   slim bars, above vitals or at right-center when that space is occupied.
 - Avoid indefinite summon rejection from a mount's saved alert/fear flag; retain
   the combat cooldown and verify loaded hostile targeting before movement.
@@ -178,7 +188,7 @@ published release. Later refinements supersede earlier trials in the dated
   fonts and button art, retaining its recipe list, descriptions and actions.
 - Reduce inventory/crafting opening work with pooled visible recipe rows, cropped
   icon conversion instead of full-atlas copies, and no redundant native recipe
-  rebuild when the opening list already has Ragnarök filtering/sorting applied.
+  rebuild when the opening list already has Ironbound filtering/sorting applied.
 - Slot-aware tombstone recovery restores previously worn gear into empty
   character slots before filling the bag, and restores saved provision positions
   for new deaths. Use reclaims directly when the combined inventory fits within
@@ -207,7 +217,7 @@ published release. Later refinements supersede earlier trials in the dated
   missing localization token fixed.
 - Compact skill pill sizes to content with spaced label/right-aligned name and level.
   Default placement docks above the complete vitals panel.
-- UI-only `ragnarok_popup` samples, `all`/`clear`, F5-paused queue and command cleanup.
+- UI-only `ironbound_popup` samples, `all`/`clear`, F5-paused queue and command cleanup.
   Previews do not change player resources/progression or native logs. The user
   confirmed sequential playback works.
 

@@ -1,6 +1,6 @@
 # Jotunn dependency
 
-Ragnarok requires Jotunn 2.30.2 or newer on clients and dedicated servers.
+Ironbound requires Jotunn 2.30.2 or newer on clients and dedicated servers.
 
 - Upstream: [Valheim-Modding/Jotunn](https://github.com/Valheim-Modding/Jotunn).
 - License: [MIT](https://github.com/Valheim-Modding/Jotunn/blob/master/LICENSE).
@@ -11,7 +11,7 @@ Ragnarok requires Jotunn 2.30.2 or newer on clients and dedicated servers.
 Windows/Linux setup installs this archive's plugin files under the isolated game's
 `BepInEx/plugins/Jotunn` only when no Jotunn DLL exists. Existing installations are
 preserved. Build references use the installed DLL with copy-local disabled. Neither
-Jotunn binaries nor upstream source are included in this repository or Ragnarok's
+Jotunn binaries nor upstream source are included in this repository or Ironbound's
 release archive; install the dependency separately for releases.
 
 Integration uses the public InputManager, ButtonConfig and GUIManager APIs. No

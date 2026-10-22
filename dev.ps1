@@ -16,8 +16,8 @@ if (-not (Test-Path -LiteralPath $configFile)) {
 $local = Get-Content -LiteralPath $configFile -Raw | ConvertFrom-Json
 $gamePath = [IO.Path]::GetFullPath($local.gamePath)
 $sdk = $local.dotnetPath
-$project = Join-Path $projectRoot 'src/Ragnarok/Ragnarok.csproj'
-$output = Join-Path $projectRoot "src/Ragnarok/bin/$Configuration/net472"
+$project = Join-Path $projectRoot 'src/Ironbound/Ironbound.csproj'
+$output = Join-Path $projectRoot "src/Ironbound/bin/$Configuration/net472"
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO = '1'
 $env:DOTNET_USE_POLLING_FILE_WATCHER = '1'
@@ -32,25 +32,36 @@ function Build-Mod {
 
 function Deploy-Mod {
     Build-Mod
-    $normalPlugin = Join-Path $gamePath 'BepInEx/plugins/Ragnarok/Ragnarok.dll'
-    if (Test-Path -LiteralPath $normalPlugin) {
-        throw 'Ragnarok is also installed in plugins. Remove that copy before using ScriptEngine.'
+    $normalPlugins = @(Get-ChildItem -LiteralPath (Join-Path $gamePath 'BepInEx/plugins') -Recurse -File |
+        Where-Object { $_.Name -in @('Ironbound.dll', 'Ragnarok.dll') })
+    if ($normalPlugins.Count -gt 0) {
+        throw 'Ironbound or legacy Ragnarok is also installed in plugins. Remove that copy before using ScriptEngine.'
     }
     $destination = Join-Path $gamePath 'BepInEx/scripts'
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
+    $legacyScripts = @('Ragnarok.dll','Ragnarok.pdb') | ForEach-Object { Join-Path $destination $_ } | Where-Object { Test-Path -LiteralPath $_ }
+    if ($legacyScripts) {
+        $backup = Join-Path (Split-Path -Parent $gamePath) ('deploy-backups/ironbound-rename-' + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $backup -Force | Out-Null
+        foreach ($legacyScript in $legacyScripts) {
+            if (-not ([IO.Path]::GetFullPath($legacyScript)).StartsWith([IO.Path]::GetFullPath($destination).TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Legacy plugin escaped the scripts directory.' }
+            Move-Item -LiteralPath $legacyScript -Destination $backup
+        }
+        Write-Host "Backed up legacy development plugin to $backup."
+    }
     # Copy symbols before the DLL. Auto-reload is disabled; press F6 after deployment.
-    Copy-Item -LiteralPath (Join-Path $output 'Ragnarok.pdb') -Destination $destination -Force
-    Copy-Item -LiteralPath (Join-Path $output 'Ragnarok.dll') -Destination $destination -Force
-    Write-Host 'Deployed. Press F6 in Valheim to reload Ragnarok.'
+    Copy-Item -LiteralPath (Join-Path $output 'Ironbound.pdb') -Destination $destination -Force
+    Copy-Item -LiteralPath (Join-Path $output 'Ironbound.dll') -Destination $destination -Force
+    Write-Host 'Deployed. Press F6 in Valheim to reload Ironbound.'
 }
 
 switch ($Action) {
     'test' {
         Push-Location $projectRoot
         try {
-            & $sdk run --project (Join-Path $projectRoot 'tests/Ragnarok.Tests/Ragnarok.Tests.csproj')
+            & $sdk run --project (Join-Path $projectRoot 'tests/Ironbound.Tests/Ironbound.Tests.csproj')
             if ($LASTEXITCODE -ne 0) { throw 'Regression tests failed.' }
-            & $sdk run --project (Join-Path $projectRoot 'tests/Ragnarok.Jotunn.Tests/Ragnarok.Jotunn.Tests.csproj')
+            & $sdk run --project (Join-Path $projectRoot 'tests/Ironbound.Jotunn.Tests/Ironbound.Jotunn.Tests.csproj')
             if ($LASTEXITCODE -ne 0) { throw 'Jotunn input/UI regression tests failed.' }
         } finally { Pop-Location }
     }
@@ -93,7 +104,7 @@ switch ($Action) {
     }
     'package' {
         $Configuration = 'Release'
-        $output = Join-Path $projectRoot 'src/Ragnarok/bin/Release/net472'
+        $output = Join-Path $projectRoot 'src/Ironbound/bin/Release/net472'
         Build-Mod
         & (Join-Path $projectRoot 'scripts/check-plugin-metadata.ps1') -Configuration Release
         if (-not (Get-Command python -ErrorAction SilentlyContinue)) { throw 'Packaging requires Python 3 on PATH.' }

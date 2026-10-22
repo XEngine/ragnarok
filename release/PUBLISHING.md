@@ -1,4 +1,4 @@
-# Upload handoff — Ragnarök 0.5.5 alpha
+# Upload handoff — Ironbound 0.5.6 alpha
 
 Run `./dev.ps1 package` on Windows or `./dev.sh package` on Linux after building
 against your isolated installed game. Windows packaging uses Python 3; Linux uses
@@ -11,9 +11,9 @@ between Python/zlib versions. Checksums describe the actual generated archives.
 
 ## Thunderstore
 
-- Upload `artifacts/Ragnarok-0.5.5-alpha-Thunderstore.zip` in the **Valheim** community.
+- Upload `artifacts/Ironbound-0.5.6-alpha-Thunderstore.zip` in the **Valheim** community.
 - Select your own author/team namespace at upload. It is not hardcoded in the manifest.
-- Package name: `Ragnarok`; display title: Ragnarök; version: `0.5.5`.
+- Package name: `Ironbound`; display title: Ironbound; version: `0.5.6`.
 - Root manifest, README, changelog and icon are included. Dependencies are pinned
   to verified package strings for BepInExPack 5.4.2351 and Jötunn 2.30.2.
 - Choose interface/quality-of-life/gameplay categories offered by the site, and
@@ -23,10 +23,10 @@ between Python/zlib versions. Checksums describe the actual generated archives.
 
 ## Nexus Mods
 
-- Create a Valheim mod named **Ragnarök — HUD and Quality of Life**.
+- Create a Valheim mod named **Ironbound — HUD and Quality of Life**.
 - Suggested summary: “A configurable HUD and quality-of-life overhaul with unified
   nearby storage, inventory tools, and a Riding-based mount companion.”
-- Upload `artifacts/Ragnarok-0.5.5-alpha-Nexus.zip` as the **0.5.5 alpha** main file.
+- Upload `artifacts/Ironbound-0.5.6-alpha-Nexus.zip` as the **0.5.6 alpha** main file.
 - Paste `release/NEXUS-DESCRIPTION.txt` into the BBCode editor. Use
   `release/icon.png` as the original branding image; add genuine current gameplay
   screenshots to the gallery. The icon is branding, not a gameplay screenshot.
@@ -47,7 +47,7 @@ between Python/zlib versions. Checksums describe the actual generated archives.
 The packager rejects version mismatch, malformed metadata/icon, missing licensing
 notices, unexpected archive files and DLL hash mismatches. It emits
 `artifacts/SHA256SUMS.txt` for the two versioned archives. The optional
-`Ragnarok-local.zip` is an alias of the manual/Nexus archive for the existing workflow.
+`Ironbound-local.zip` is an alias of the manual/Nexus archive for the existing workflow.
 
 Packaging validation is not site moderation approval, a virus-scan result or a
 substitute for in-game testing. Latest HUD positioning, temperament branches,
@@ -57,7 +57,7 @@ GitHub's alpha prerelease is the public download/announcement. Preparing these
 ZIPs does not submit them to Thunderstore/Nexus or change server state. Use
 ANNOUNCEMENT.md for community posts in channels where promotion is welcome.
 
-The numeric package/plugin version remains `0.5.5` for Thunderstore's required
+The numeric package/plugin version remains `0.5.6` for Thunderstore's required
 three-number manifest format. Filenames, public copy, assembly informational
 version and the GitHub prerelease/tag explicitly mark the build as alpha.
 

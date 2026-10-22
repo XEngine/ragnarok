@@ -21,14 +21,14 @@ class ReleaseChecks(unittest.TestCase):
     def reject_manifest(self, key, value):
         manifest = package.metadata()
         manifest[key] = value
-        with tempfile.TemporaryDirectory(prefix="Ragnarok-package-check-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="Ironbound-package-check-") as temporary:
             directory = Path(temporary)
             (directory / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
             with patch.object(package, "RELEASE", directory), self.assertRaises(ValueError):
                 package.metadata()
 
     def test_invalid_name(self):
-        self.reject_manifest("name", "Ragnarök has spaces")
+        self.reject_manifest("name", "Ironbound has spaces")
 
     def test_overlong_description(self):
         self.reject_manifest("description", "x" * 251)
@@ -60,7 +60,7 @@ class ReleaseChecks(unittest.TestCase):
             package.validate_icon(data)
 
     def test_archive_unexpected_dll(self):
-        with tempfile.TemporaryDirectory(prefix="Ragnarok-package-check-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="Ironbound-package-check-") as temporary:
             archive = Path(temporary) / "bad.zip"
             with zipfile.ZipFile(archive, "w") as contents:
                 contents.writestr(package.DLL_NAME, b"MZtest")
@@ -69,7 +69,7 @@ class ReleaseChecks(unittest.TestCase):
                 package.validate_archive(archive, {package.DLL_NAME}, package.metadata(), "wrong", False)
 
     def test_archive_hash_mismatch(self):
-        with tempfile.TemporaryDirectory(prefix="Ragnarok-package-check-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="Ironbound-package-check-") as temporary:
             archive = Path(temporary) / "wrong.zip"
             with zipfile.ZipFile(archive, "w") as contents:
                 contents.writestr(package.DLL_NAME, b"MZwrong build")
@@ -77,12 +77,12 @@ class ReleaseChecks(unittest.TestCase):
                 package.validate_archive(archive, {package.DLL_NAME}, package.metadata(), "wrong", False)
 
     def test_archive_path_traversal(self):
-        with tempfile.TemporaryDirectory(prefix="Ragnarok-package-check-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="Ironbound-package-check-") as temporary:
             archive = Path(temporary) / "unsafe.zip"
             with zipfile.ZipFile(archive, "w") as contents:
-                contents.writestr("../Ragnarok.dll", b"MZ")
+                contents.writestr("../Ironbound.dll", b"MZ")
             with self.assertRaises(ValueError):
-                package.validate_archive(archive, {"../Ragnarok.dll"}, package.metadata(), "wrong", False)
+                package.validate_archive(archive, {"../Ironbound.dll"}, package.metadata(), "wrong", False)
 
 
 if __name__ == "__main__":

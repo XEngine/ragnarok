@@ -24,15 +24,19 @@ try {
     $parameters.AssemblyResolver = $resolver
     $parameters.ReadingMode = [Mono.Cecil.ReadingMode]::Immediate
     $assembly = [Mono.Cecil.AssemblyDefinition]::ReadAssembly(
-        (Join-Path $root "src/Ragnarok/bin/$Configuration/net472/Ragnarok.dll"), $parameters)
+        (Join-Path $root "src/Ironbound/bin/$Configuration/net472/Ironbound.dll"), $parameters)
     try {
-        if ($Configuration -eq 'Release' -and @($assembly.MainModule.Resources | Where-Object Name -like 'Ragnarok.Powers.*').Count -gt 0) {
+        if ($Configuration -eq 'Release' -and @($assembly.MainModule.Resources | Where-Object Name -like 'Ironbound.Powers.*').Count -gt 0) {
             throw 'Public Release must not embed legacy power images without recorded provenance.'
         }
         if (@($assembly.MainModule.Resources | Where-Object Name -like '*-OFL.txt').Count -ne 5) {
             throw 'Embedded font license texts are missing.'
         }
-        $plugin = $assembly.MainModule.Types | Where-Object FullName -eq 'Ragnarok.Plugin'
+        $plugin = $assembly.MainModule.Types | Where-Object FullName -eq 'Ironbound.Plugin'
+        $identity = @($plugin.CustomAttributes | Where-Object { $_.AttributeType.FullName -eq 'BepInEx.BepInPlugin' })[0]
+        if ($identity.ConstructorArguments[0].Value -ne 'com.kernelpanic.ironbound' -or $identity.ConstructorArguments[1].Value -ne 'Ironbound') {
+            throw 'Plugin must identify as Ironbound.'
+        }
         $dependencies = @($plugin.CustomAttributes | Where-Object {
             $_.AttributeType.FullName -eq 'BepInEx.BepInDependency' -and
             $_.ConstructorArguments[0].Value -eq 'com.jotunn.jotunn'

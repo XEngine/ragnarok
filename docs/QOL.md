@@ -70,7 +70,7 @@ SkillLossModifierPercent = -50
 
 Default 0 preserves normal loss. -50 halves the normal level penalty, -100 disables it (also preserving partial skill XP), and +100 doubles it. The range is -100 to +100. This scales the loss after world difficulty modifiers: if the normal penalty is 5%, -50 makes it 2.5%, not 50% of total skill levels. With a nonzero penalty, vanilla still clears progress toward the next skill level. Death-protection checks are retained; the separate full skill-reset world rule is not overridden. The setting is synchronized and locked by the server like other QoL settings.
 
-Configure these in F10 under Quality of Life, or in `BepInEx/config/com.kernelpanic.ragnarok.cfg` on the host/server:
+Configure these in F10 under Quality of Life, or in `BepInEx/config/com.kernelpanic.ironbound.cfg` on the host/server:
 
 ```ini
 [Gameplay.ForsakenPowers]
@@ -86,7 +86,7 @@ LockSettings = true
 
 The power defaults are 10 and 15 minutes. Harvesting defaults to 1x; the example enables 3x (allowed range 1–10). Powers use minutes; duration accepts 0.1–60 and cooldown accepts 0.1–120. Changes to powers apply on the next activation, including the duration of buffs received by nearby players. Existing cooldowns are not reset.
 
-With LockSettings enabled (the default), the host's values are synchronized and locked for clients. Install Ragnarök on the server and all players: harvests execute on the network owner of the plant or hive, which can be a client. Dedicated servers reload edited configuration automatically; local hosts can use F10 or reload with F7.
+With LockSettings enabled (the default), the host's values are synchronized and locked for clients. Install Ironbound on the server and all players: harvests execute on the network owner of the plant or hive, which can be a client. Dedicated servers reload edited configuration automatically; local hosts can use F10 or reload with F7.
 
 The harvest multiplier covers harvestable crops plus berries, mushrooms, flowers, thistle and beehive honey. It multiplies primary yield after world resource modifiers and plant skill bonuses. Extra unrelated drops, mining, enemies, loose-item pickup, hive capacity and honey production speed are unchanged. Honey uses normal extraction and plants use normal drops/auto-pickup; inventory space and auto-pickup settings still apply. Picking up and dropping an existing stack does not multiply it again.
 
@@ -116,6 +116,6 @@ Capacity is an absolute item count (1–1000); **0 preserves the original capaci
 
 Wind, roof, smoke, fire and root-resource requirements remain in effect. Smelter fuel cost per product is unchanged. Oven fuel burn rate remains unchanged; cooking and burning deadlines both accelerate. Fermenter yield is unchanged. Beehive production speed and storage are separate from the harvesting yield multiplier.
 
-Lowering capacities does not delete saved contents while Ragnarök is active; stations must drain below their new limit before accepting more. Removing the mod returns to vanilla behavior, including vanilla's honey-storage clamping. All players and the server need the mod for consistent behavior when station ownership changes.
+Lowering capacities does not delete saved contents while Ironbound is active; stations must drain below their new limit before accepting more. Removing the mod returns to vanilla behavior, including vanilla's honey-storage clamping. All players and the server need the mod for consistent behavior when station ownership changes.
 
 Runtime checks exercise defaults, live smelter capacity edits, repeated speed changes, capacity reset and unload restoration on isolated components. Manual checks still needed: fill beyond vanilla capacity, reconnect/reload the world, transfer station ownership between clients, and time output for each station type.

@@ -16,7 +16,7 @@ REQUIRED_DEPENDENCIES = [
     "denikson-BepInExPack_Valheim-5.4.2351",
     "ValheimModding-Jotunn-2.30.2",
 ]
-DLL_NAME = "BepInEx/plugins/Ragnarok/Ragnarok.dll"
+DLL_NAME = "BepInEx/plugins/Ironbound/Ironbound.dll"
 RELEASE_CHANNEL = "alpha"
 
 
@@ -33,13 +33,13 @@ def metadata():
     version = manifest["version_number"]
     require(isinstance(version, str) and re.fullmatch(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)", version), "Invalid package version")
     require(isinstance(manifest["description"], str) and 0 < len(manifest["description"]) <= 250, "Description must be 1-250 characters")
-    require(manifest["website_url"] == "https://github.com/XEngine/ragnarok", "Unexpected website URL")
+    require(manifest["website_url"] == "https://github.com/XEngine/ironbound", "Unexpected website URL")
     require(manifest["dependencies"] == REQUIRED_DEPENDENCIES, "Dependency versions changed; verify official packages first")
-    project = ET.parse(ROOT / "src/Ragnarok/Ragnarok.csproj").getroot()
+    project = ET.parse(ROOT / "src/Ironbound/Ironbound.csproj").getroot()
     require(project.findtext("PropertyGroup/Version") == version, "Project/manifest version mismatch")
     require(project.findtext("PropertyGroup/InformationalVersion") == version + "-" + RELEASE_CHANNEL,
             "Assembly release-channel metadata mismatch")
-    plugin = (ROOT / "src/Ragnarok/Plugin.cs").read_text(encoding="utf-8-sig")
+    plugin = (ROOT / "src/Ironbound/Plugin.cs").read_text(encoding="utf-8-sig")
     require(f'PluginVersion = "{version}";' in plugin, "Plugin/manifest version mismatch")
     return manifest
 
@@ -66,7 +66,7 @@ def validate_icon(data):
 
 def payload():
     files = {
-        DLL_NAME: ROOT / "src/Ragnarok/bin/Release/net472/Ragnarok.dll",
+        DLL_NAME: ROOT / "src/Ironbound/bin/Release/net472/Ironbound.dll",
         "README.md": RELEASE / "README.md",
         "CHANGELOG.md": RELEASE / "CHANGELOG.md",
         "INSTALL.md": ROOT / "docs/INSTALL.md",
@@ -74,7 +74,7 @@ def payload():
         "THIRD_PARTY_NOTICES.md": RELEASE / "THIRD_PARTY_NOTICES.md",
         "LICENSE": ROOT / "LICENSE",
     }
-    fonts = ROOT / "src/Ragnarok/Assets/Fonts"
+    fonts = ROOT / "src/Ironbound/Assets/Fonts"
     licenses = sorted(fonts.glob("*-OFL.txt"))
     require(len(licenses) == 5, "Expected all five font license texts")
     for path in licenses:
@@ -92,7 +92,7 @@ def validate_archive(archive, expected, manifest, dll_hash, thunderstore):
         require(len(names) == len(set(names)) and set(names) == expected, "Unexpected, duplicate or missing package entries")
         require(contents.testzip() is None, "ZIP CRC check failed")
         require(all("\\" not in name and not name.startswith("/") and ".." not in name.split("/") for name in names), "Unsafe ZIP path")
-        require([name for name in names if name.lower().endswith(".dll")] == [DLL_NAME], "Only Ragnarok.dll may be distributed")
+        require([name for name in names if name.lower().endswith(".dll")] == [DLL_NAME], "Only Ironbound.dll may be distributed")
         require(hashlib.sha256(contents.read(DLL_NAME)).hexdigest() == dll_hash, "Release DLL hash mismatch")
         for name in names:
             if name.endswith((".md", ".txt", ".json")):
@@ -114,7 +114,7 @@ def package(output):
         selected = dict(files)
         if target == "Thunderstore":
             selected.update({"manifest.json": RELEASE / "manifest.json", "icon.png": RELEASE / "icon.png"})
-        archive = output / f"Ragnarok-{version}-{RELEASE_CHANNEL}-{target}.zip"
+        archive = output / f"Ironbound-{version}-{RELEASE_CHANNEL}-{target}.zip"
         # Explicit POSIX paths avoid Compress-Archive's backslash entries on Windows.
         with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as contents:
             for name, path in sorted(selected.items()):
@@ -126,7 +126,7 @@ def package(output):
         validate_archive(archive, set(selected), manifest, dll_hash, target == "Thunderstore")
         archives.append(archive)
         print(f"PASS: {archive.name}: metadata, file allowlist, licensing, ZIP CRC and DLL SHA-256")
-    shutil.copyfile(archives[1], output / "Ragnarok-local.zip")
+    shutil.copyfile(archives[1], output / "Ironbound-local.zip")
     sums = "".join(hashlib.sha256(path.read_bytes()).hexdigest() + "  " + path.name + "\n" for path in archives)
     (output / "SHA256SUMS.txt").write_text(sums, encoding="utf-8")
     print(f"Created both upload packages and SHA256SUMS.txt in {output}")

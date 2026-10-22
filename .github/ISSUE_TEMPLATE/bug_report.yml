@@ -6,7 +6,7 @@ body:
     id: environment
     attributes:
       label: Game and mod setup
-      description: Valheim/Ragnarök versions, other mods, HUD style, local or dedicated server, fresh launch or F6 reload.
+      description: Valheim/Ironbound versions, other mods, HUD style, local or dedicated server, fresh launch or F6 reload.
     validations:
       required: true
   - type: textarea

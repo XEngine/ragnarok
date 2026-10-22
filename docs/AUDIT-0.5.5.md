@@ -1,4 +1,4 @@
-# Ragnarök 0.5.5 wrap-up audit — 2026-10-22
+# Ironbound 0.5.5 wrap-up audit — 2026-10-22
 
 ## Assessment
 
@@ -52,7 +52,7 @@ Reviewed behavior:
 - Debug and Release eager metadata/dependency checks: passed.
 - Migration against installed BepInEx ConfigFile: passed, including repeat
   migration, precedence, backup preservation and shared chest range binding.
-- Archive file allowlist: exactly Ragnarok.dll, INSTALL.md, MOUNTS.md and
+- Archive file allowlist: exactly Ironbound.dll, INSTALL.md, MOUNTS.md and
   CHANGELOG.md (plus directory entries). DLL SHA-256 matches the Release build.
 - All five embedded font-license texts retained; no tracked DLL/PDB/save files or
   dev.local.json found. Git whitespace check passed.
@@ -83,4 +83,4 @@ Reviewed behavior:
 
 The user's running client was left open, consistent with their request to skip
 isolated-world testing. The dev server remains running; this audit did not restart
-it or touch the player's saves. Release package: artifacts/Ragnarok-local.zip.
+it or touch the player's saves. Release package: artifacts/Ironbound-local.zip.

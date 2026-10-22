@@ -1,6 +1,12 @@
-# Ragnarök 0.5.5 alpha
+# Ironbound 0.5.6 alpha
 
-Initial public alpha package of the current development build. Original code is
+- Rename Ragnarök to Ironbound across the plugin, source projects, UI, repository
+  and distribution. New plugin GUID/config filename and DLL include legacy config
+  import; mount, receipt and reclaim identifiers remain compatible.
+- Redesign F10's frame, cards, buttons, fields and toggles with quiet charcoal
+  surfaces, thin iron edges and restrained gold accents matching the HUD.
+
+Public alpha package of the current development build. Original code is
 MIT-licensed; issues, testing reports, translations and pull requests are welcome.
 
 - Rune & Iron HUD, inventory/crafting panels, weapon dial and provision slots.

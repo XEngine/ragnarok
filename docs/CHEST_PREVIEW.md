@@ -1,10 +1,10 @@
 # Crosshair chest preview
 
-Aim at an accessible chest within Valheim's normal interaction range to see its contents without opening it. The compact Ragnarök panel shows occupied slots as item icons with stack counts, plus the chest name and occupied/total slot count. Empty slots are omitted; an empty chest shows EMPTY. Tombstones are excluded.
+Aim at an accessible chest within Valheim's normal interaction range to see its contents without opening it. The compact Ironbound panel shows occupied slots as item icons with stack counts, plus the chest name and occupied/total slot count. Empty slots are omitted; an empty chest shows EMPTY. Tombstones are excluded.
 
 F10 → HUD → Chest Preview:
 
-- Enabled: on by default; works with either HUD style. Follows HUD.Style automatically: vanilla uses Valheim's panel, inventory slot artwork and text styles; Ragnarok uses the custom theme. Switching HUD style rebuilds the preview without restarting.
+- Enabled: on by default; works with either HUD style. Follows HUD.Style automatically: vanilla uses Valheim's panel, inventory slot artwork and text styles; Ironbound uses the custom theme. Switching HUD style rebuilds the preview without restarting.
 - OffsetX / OffsetY: panel top-left relative to screen centre. Positive X moves right; positive Y moves down. Both default to 80 HUD pixels.
 - Scale: 0.5–2, default 1 (36-pixel item cells).
 - Columns: 1–12, default 6.

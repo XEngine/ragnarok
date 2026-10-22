@@ -1,16 +1,16 @@
-# Ragnarök
+# Ironbound
 
-![Ragnarök alpha](https://img.shields.io/badge/status-alpha-D4AF67)
+![Ironbound alpha](https://img.shields.io/badge/status-alpha-D4AF67)
 ![License: MIT](https://img.shields.io/badge/license-MIT-4A8776)
 
 **An open-source Valheim HUD and quality-of-life overhaul. Testers and contributors welcome.**
 
-[Download the alpha](https://github.com/XEngine/ragnarok/releases/tag/v0.5.5-alpha)
-· [Report a bug or suggest a feature](https://github.com/XEngine/ragnarok/issues/new/choose)
+[Download the alpha](https://github.com/XEngine/ironbound/releases/tag/v0.5.6-alpha)
+· [Report a bug or suggest a feature](https://github.com/XEngine/ironbound/issues/new/choose)
 · [Contribute a pull request](CONTRIBUTING.md)
 
 Rune & Iron HUD, unified nearby storage, inventory/crafting tools and a mount
-companion with Riding progression. **0.5.5 is alpha software:** back up saves and
+companion with Riding progression. **0.5.6 is alpha software:** back up saves and
 start with a test profile. Feedback, compatibility reports, translations and PRs
 are welcome. If it helps your playthrough, share it with your Valheim group or
 star the repository so other players can find it.
@@ -18,6 +18,10 @@ star the repository so other players can find it.
 Original code and procedural artwork are MIT-licensed; font licenses remain
 independent. See [LICENSE](LICENSE), [third-party notices](release/THIRD_PARTY_NOTICES.md)
 and the [contribution guide](CONTRIBUTING.md).
+
+**Previously Ragnarök.** Version 0.5.6 renames the plugin and restyles the F10
+configuration window. See the [upgrade/migration guide](docs/IRONBOUND-RENAME.md)
+before replacing an older installation; remove old DLL copies to avoid duplicates.
 
 A configurable Valheim HUD and quality-of-life plugin by KernelPanic. This
 repository contains the standalone plugin and its development tools.
@@ -39,7 +43,7 @@ The Windows instructions below remain available for the original development PC.
 
 ## Settings window and HUD (0.3.0)
 
-Ragnarok requires **Jotunn 2.30.2 or newer** on clients and dedicated servers.
+Ironbound requires **Jotunn 2.30.2 or newer** on clients and dedicated servers.
 Development setup installs the pinned 2.30.2 build when no copy is present.
 Its input manager handles the settings toggle and weapon dial's keyboard bindings;
 windows and focused search fields share its GUI input blocking. Existing key
@@ -47,13 +51,13 @@ bindings and styling stay in place. Mouse bindings retain direct Unity input
 polling to match the key picker. Registrations are removed on F6 unload/reload.
 See [dependency sources](docs/DEPENDENCIES.md) and [installation](docs/INSTALL.md).
 
-**Mount companion prototype (0.5.5):** hold **Shift+H** near a saddled, tamed mount
+**Mount companion prototype (0.5.6):** hold **Shift+H** near a saddled, tamed mount
 to bind or release it; press **H** outdoors to call it when both of you are out of
 combat. One exclusive mount per player, with server-owned rules and persistent
 bonds. Requires the updated server as well as the client. See the
 [controls, test steps and verification limits](docs/MOUNTS.md).
 
-The [0.5.5 wrap-up audit](docs/AUDIT-0.5.5.md) records release checks, fixes and
+The [earlier wrap-up audit](docs/AUDIT-0.5.5.md) records release checks, fixes and
 the remaining multiplayer/in-game validation before wider distribution.
 
 The [Jotunn roadmap](docs/JOTUNN-ROADMAP.md) records the phased integration. Settings
@@ -61,7 +65,7 @@ navigation and chest search have English/Turkish catalogs following the game's
 language; untranslated setting descriptions retain English. Optional controller
 buttons are under HUD > Window and Quality Of Life > Weapon Dial (unassigned by
 default). Quality Of Life > Nearby Chests > Chest Search Marker enables a temporary map marker for
-the selected search result. Release installs check major/minor Ragnarok versions
+the selected search result. Release installs check major/minor Ironbound versions
 when both peers have the mod. New content is deferred until a feature is requested.
 
 **Tamed Animal Dots** (HUD > Minimap, on by default) show loaded, living tame
@@ -95,20 +99,20 @@ Restore Defaults skips those locked entries. HUD style, sizing and key bindings
 remain personal preferences.
 
 
-Press **F10** to open the Ragnarök settings window: a dashboard overview plus one page
+Press **F10** to open the Ironbound settings window: a dashboard overview plus one page
 per config section. Changes apply instantly and save to the config file. Escape or F10
 closes it. The key and the window size are under **HUD → Window**.
 
 The style ("Forge & Animus") mixes God of War's obsidian, gold filigree and ember with
 Assassin's Creed's hairlines, chamfered corners and crimson selection. Theme colours,
-generated sprites and font selection live in `src/Ragnarok/Ui/Shared/Theme.cs`.
+generated sprites and font selection live in `src/Ironbound/Ui/Shared/Theme.cs`.
 The Rune & Iron HUD uses embedded Cinzel, Barlow Semi Condensed and Noto Sans Runic;
-font sources and licenses are recorded in `src/Ragnarok/Assets/Fonts/SOURCES.md`.
+font sources and licenses are recorded in `src/Ironbound/Assets/Fonts/SOURCES.md`.
 Everything is built in code with Unity UI (uGUI); there are no asset bundles.
 While the window is open, game actions and camera input are blocked and clicks cannot
 reach game UI behind it.
 
-**HUD → Style** chooses `Vanilla` (default) or `Ragnarok`. The Ragnarök HUD replaces
+**HUD → Style** chooses `Vanilla` (default) or `Ironbound`. The Ironbound HUD replaces
 the native vitals with health/stamina bars above the bottom-center hotbar, an eitr
 strip when applicable, character information at top left and active food beside
 the Forsaken power display; switch back at any time.
@@ -137,7 +141,7 @@ New characters see an introductory empty state without an activation prompt.
 
 The key guide (`[HUD.Keys]`) replaces Valheim's bottom hint bar with a compact vertical
 list at the right centre by default. Combat, building-tool and fishing hints move below
-the Ragnarök hotbar as centered white keys and muted action labels. It mirrors whichever vanilla hint set is active
+the Ironbound hotbar as centered white keys and muted action labels. It mirrors whichever vanilla hint set is active
 (building, combat, inventory, fishing), so rebinds, gamepad layouts and translations
 carry over. `Enabled = false` restores the vanilla bar.
 
@@ -233,7 +237,7 @@ special zone overrides the weather (then it shows a dash). If the minimap sits t
 the screen for the clock strip, it is moved down just enough.
 
 **Minimap frame** (`[HUD.Minimap] Style`, FollowHud by default): Valheim's small map keeps working;
-its frame art is hidden (map picture, pins, markers, wind arrow and masks are kept) and a Ragnarök
+its frame art is hidden (map picture, pins, markers, wind arrow and masks are kept) and a Ironbound
 round gold-rimmed frame drawn around translucent terrain, with smoked-glass medallions and map key.
 Biome, cardinal, key, day/clock and weather labels have outlines and shadows.
 Everything is restored on Vanilla or unload.
@@ -249,17 +253,17 @@ an active pickup line. Centre messages, larger banners and native logs remain.
 The settings page has a **Test notifications** button.
 
 In a world, use the F5 console for UI-only popup previews:
-`ragnarok_popup all` plays every sample in sequence; close F5 to start playback.
-Use `ragnarok_popup clear` to cancel, or choose `pickup`, `unlock`, `rested`, `wet`,
+`ironbound_popup all` plays every sample in sequence; close F5 to start playback.
+Use `ironbound_popup clear` to cancel, or choose `pickup`, `unlock`, `rested`, `wet`,
 `warning`, `skill`, `milestone`, `system`, `blocked`, `failure`, `death`, `discovery`,
 `power` or `day`. Tab completion lists the options. No `devcommands` needed;
-Ragnarök notifications must be enabled. Samples do not change skills, powers,
+Ironbound notifications must be enabled. Samples do not change skills, powers,
 inventory, health or world progression, or enter the native message log.
 Skill gains use compact pills; untouched default placement docks above the health/vitals panel.
 Every tenth level gets a banner below the compass, with the game's skill description. Custom toast
 positions are retained. All of this follows the notification style; Vanilla uses native messages.
 
-Ragnarök **tooltips** appear after 250 ms, sit 16 HUD units to the right of the pointer, and flip/clamp
+Ironbound **tooltips** appear after 250 ms, sit 16 HUD units to the right of the pointer, and flip/clamp
 at screen edges. Item cards show quality stars and native durability/effects. Hold **Shift** to compare
 supported numeric stats against comparable equipped gear; green/red deltas use the native displayed
 base values, while stamina/eitr costs treat lower values as improvements. Status tiles also show
@@ -314,7 +318,7 @@ over the hidden original (`Ui/Windows/InfoPanel.cs`). Each Valheim button gets a
 that presses the original, so buttons added by other mods appear too.
 
 **Compendium** (`[HUD.Compendium] Style`, FollowHud by default): Valheim's texts dialog redrawn
-as a Ragnarök screen over the (hidden, still running) original. Tabs to Skills and Trophies on top;
+as a Ironbound screen over the (hidden, still running) original. Tabs to Skills and Trophies on top;
 chapters on the left (Journal: active effects, log, stats; Hugin's Lessons; Runestones; Notes), the
 open chapter expanded; the entry in the middle; a rounded preview card on the right
 with the glyph of the boss the entry mentions (else your Forsaken power). All four
@@ -349,13 +353,13 @@ asks first (Delete / Cancel); a click elsewhere, Escape or closing the inventory
 (`Features/QualityOfLife/ItemTrash.cs`).
 
 **Provision bar** (`[QualityOfLife.Provisions]`): filled provision slots show beside the food circles
-in the Ragnarök HUD with their hotkeys (default Left Alt+1…6, rebindable in the settings window).
+in the Ironbound HUD with their hotkeys (default Left Alt+1…6, rebindable in the settings window).
 A key eats or drinks from its slot like a hotbar key; Valheim's hotbar does not also fire on it.
 
 **Better Archery** (optional, soft dependency): when its quiver is enabled, the character panel shows
-the worn leather quiver and its three **Arrows** slots (a row in the Ragnarök dashboard,
+the worn leather quiver and its three **Arrows** slots (a row in the Ironbound dashboard,
 a column in the vanilla panel) (Better Archery's own rows; its ammo-only rule and Alt+1-3 keys apply). The grid is its base
-rows only. While a Ragnarök character panel shows the arrow slots, Better Archery's own copy of them on
+rows only. While a Ironbound character panel shows the arrow slots, Better Archery's own copy of them on
 Valheim's grid is skipped, so they appear once. Character slots live at fixed rows 64/65 (the quiver at 0,66), and are shielded from Valheim's
 `DropInvalidItems` (which runs on every spawn) and from Better Archery's hidden-row repairs, which
 would otherwise drop them.
@@ -367,7 +371,7 @@ effect is added to the player's equipment effects (a transpiler on
 the first shows on the character. Right-clicking an extra item makes it the worn one (they swap).
 
 Debug builds can capture a preview from the main menu, then quit:
-`valheim.exe -ragnarok-ui-preview D:\RagnarokDev\preview`.
+`valheim.exe -ironbound-ui-preview D:\RagnarokDev\preview`.
 
 ## Tombstone recovery
 
@@ -392,11 +396,11 @@ server-controlled even with the general lock off; other gameplay settings become
 
 Players' own values stay in their config file: the file is always written with them, never with the
 server's, and they come back on leaving. A dedicated server re-reads its config file whenever it is
-saved, so edits reach players without a restart. A server without Ragnarök controls nothing. Every
+saved, so edits reach players without a restart. A server without Ironbound controls nothing. Every
 other setting (HUD, styles, keys, scale) stays with each player. Admins are not exempt.
 
-Server side: `ServerConfig.cs`. It uses Valheim's own peer RPCs (`Ragnarok_ServerConfig`, plus
-`Ragnarok_ServerConfigRequest` so an F6 reload mid-session asks again), with no extra library.
+Server side: `ServerConfig.cs`. It uses Valheim's own peer RPCs (`Ironbound_ServerConfig`, plus
+`Ironbound_ServerConfigRequest` so an F6 reload mid-session asks again), with no extra library.
 
 ## Nearby Chests (0.4.0)
 
@@ -414,7 +418,7 @@ automatically. Normal capacities, recipe knowledge and station requirements stil
 Chest access respects wards and private ownership. Open/in-use chests, tombstones,
 world-loot containers, carts and ship inventories are excluded.
 
-For multiplayer, install the same Ragnarök version on every client and the dedicated
+For multiplayer, install the same Ironbound version on every client and the dedicated
 server, if used. Remote chest owners must approve an ownership handoff before spending.
 If you see "waiting for a shared chest", wait briefly and press Use/craft/build again.
 This prevents writing to another player's stale chest inventory. The server decides these
@@ -463,7 +467,7 @@ Or open PowerShell in this folder and run:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\dev.ps1 play
 ```
 
-The plugin shows a small Ragnarök status badge. Create a new test character
+The plugin shows a small Ironbound status badge. Create a new test character
 and world using local saves. The launcher passes a separate `-savedir`; Steam Cloud
 is not a substitute for local test-save isolation.
 
@@ -475,7 +479,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\dev.ps1 deploy
 
 Then press **F6** in the game. **F7** reloads settings and **F8** toggles the badge.
 Settings live at
-`D:\RagnarokDev\Valheim\BepInEx\config\com.kernelpanic.ragnarok.cfg`.
+`D:\RagnarokDev\Valheim\BepInEx\config\com.kernelpanic.ironbound.cfg`.
 Try changing `BadgeText`, save, and press F7.
 
 Other commands:
@@ -490,13 +494,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\dev.ps1 test
 ```
 
 `watch` rebuilds and deploys after source edits; F6 still controls when code reloads.
-Stop watch/logs with Ctrl+C. `package` creates `artifacts/Ragnarok-local.zip` containing
+Stop watch/logs with Ctrl+C. `package` creates `artifacts/Ironbound-local.zip` containing
 our Release plugin and installation instructions, without game DLLs or development tools.
 This is a local sharing archive, not a published Thunderstore package.
 
 ## Editor
 
-Open `Ragnarok.sln` in a C# editor. Configure its .NET CLI path to
+Open `Ironbound.sln` in a C# editor. Configure its .NET CLI path to
 `D:\RagnarokDev\dotnet\dotnet.exe` if it does not find the local SDK.
 `Environment.props` gives IDE builds the local game path.
 The scripts work without installing a full IDE.
@@ -544,11 +548,11 @@ See [docs/VERIFICATION.md](docs/VERIFICATION.md) for completed checks and the ru
 
 See [module architecture and configuration migration](docs/ARCHITECTURE.md) for ownership, settings groups, migration behavior and verification commands.
 
-- `src/Ragnarok/HUD`: live HUD elements and their vanilla replacement/restoration logic.
-- `src/Ragnarok/Ui/Shared` and `Ui/Windows`: shared rendering and inventory/crafting/book windows.
-- `src/Ragnarok/Features`: gameplay modifiers, quality-of-life tools, equipment and nearby storage.
-- `src/Ragnarok/Configuration`: presentation/feature settings, schema migration and settings window.
-- `src/Ragnarok/Networking`: server configuration authority and transport.
-- `src/Ragnarok/Development`: opt-in runtime checks and isolated preview helpers.
+- `src/Ironbound/HUD`: live HUD elements and their vanilla replacement/restoration logic.
+- `src/Ironbound/Ui/Shared` and `Ui/Windows`: shared rendering and inventory/crafting/book windows.
+- `src/Ironbound/Features`: gameplay modifiers, quality-of-life tools, equipment and nearby storage.
+- `src/Ironbound/Configuration`: presentation/feature settings, schema migration and settings window.
+- `src/Ironbound/Networking`: server configuration authority and transport.
+- `src/Ironbound/Development`: opt-in runtime checks and isolated preview helpers.
 
 The F10 settings window now groups options under **Gameplay**, **Quality Of Life**, and **HUD**. Window and inventory appearance belong to HUD; convenience behaviors have their own Quality Of Life pages. Existing configuration values migrate automatically with a `.before-modules.bak` backup.

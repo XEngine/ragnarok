@@ -3,7 +3,7 @@
 Original project code, documentation and procedural artwork are MIT-licensed;
 see the included LICENSE. Third-party materials retain their respective terms.
 
-## Fonts distributed in Ragnarok.dll
+## Fonts distributed in Ironbound.dll
 
 The following font families and their license texts are embedded in the plugin.
 Copies of the license texts and source/derivation notes are also provided under
@@ -15,7 +15,7 @@ Copies of the license texts and source/derivation notes are also provided under
 - Barlow Semi Condensed — SIL Open Font License 1.1; see BarlowSemiCondensed-OFL.txt.
 - Noto Sans Runic — SIL Open Font License 1.1; see NotoSansRunic-OFL.txt.
 
-Source notes: https://github.com/XEngine/ragnarok/blob/main/src/Ragnarok/Assets/Fonts/SOURCES.md
+Source notes: https://github.com/XEngine/ironbound/blob/main/src/Ironbound/Assets/Fonts/SOURCES.md
 
 ## Dependencies installed separately
 

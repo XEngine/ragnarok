@@ -8,6 +8,6 @@ Selecting a result closes search and reveals a curved golden guide from the char
 
 Only accessible player-built chests are searched. Personal chest privacy and ward rules apply; tombstones, natural loot, carts and ship/root inventories are excluded. Server-controlled defaults under QualityOfLife.ChestSearch: Enabled=true and Range=40 metres (5–100 allowed). Shortcut is a personal setting. The settings page is F10 → HUD → Chest Search.
 
-The search panel follows HUD.Style, using native panel/button artwork and fonts for vanilla, and the Ragnarök theme for the custom HUD. While open, gameplay buttons are blocked and the cursor is released; the world continues running.
+The search panel follows HUD.Style, using native panel/button artwork and fonts for vanilla, and the Ironbound theme for the custom HUD. While open, gameplay buttons are blocked and the cursor is released; the world continues running.
 
 Validation: build/startup/reload checks. Manual gameplay checks remain: shortcut/input suppression, selecting with keyboard or mouse, both skins, private/warded chests, remote inventory updates, guide tracking, timeout, opening the selected chest and scene changes.

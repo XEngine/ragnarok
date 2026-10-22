@@ -1,0 +1,113 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>Ironbound</AssemblyName>
+    <RootNamespace>Ironbound</RootNamespace>
+    <Version>0.5.6</Version>
+    <InformationalVersion>0.5.6-alpha</InformationalVersion>
+    <Authors>KernelPanic</Authors>
+    <Description>Ironbound: a custom Valheim experience for friends.</Description>
+    <DebugType>portable</DebugType>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/Translations/*.json" LogicalName="Ironbound.Translations.%(Filename)%(Extension)" />
+    <!-- Resolve the user's installed library in either manual or mod-manager layouts. -->
+    <_InstalledJotunn Include="$(GamePath)/BepInEx/plugins/**/Jotunn.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Jotunn">
+      <HintPath Condition="'$(JotunnPath)' != ''">$(JotunnPath)</HintPath>
+      <HintPath Condition="'$(JotunnPath)' == ''">@(_InstalledJotunn)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Rune & Iron fonts and their redistribution licenses; see Assets/Fonts/SOURCES.md. -->
+    <EmbeddedResource Include="Assets/Fonts/*.ttf" LogicalName="Ironbound.Fonts.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets/Fonts/*-OFL.txt" LogicalName="Ironbound.Fonts.%(Filename)%(Extension)" />
+    <Reference Include="assembly_utils">
+      <HintPath>$(GamePath)/valheim_Data/Managed/assembly_utils.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_guiutils">
+      <HintPath>$(GamePath)/valheim_Data/Managed/assembly_guiutils.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="BepInEx">
+      <HintPath>$(GamePath)/BepInEx/core/BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GamePath)/BepInEx/core/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_valheim">
+      <HintPath>$(GamePath)/valheim_Data/Managed/assembly_valheim.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Splatform">
+      <HintPath>$(GamePath)/valheim_Data/Managed/Splatform.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.AudioModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ParticleSystemModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.ParticleSystemModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ScreenCaptureModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.ScreenCaptureModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextCoreFontEngineModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.TextCoreFontEngineModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(GamePath)/valheim_Data/Managed/Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(GamePath)/valheim_Data/Managed/UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="ValidateGamePath" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(JotunnPath)' == '' and '@(_InstalledJotunn->Count())' != '1'" Text="Install Jotunn 2.30.2 or newer in the development game's BepInEx/plugins (one copy), or set JotunnPath to its installed DLL." />
+    <Error Condition="'$(JotunnPath)' != '' and !Exists('$(JotunnPath)')" Text="JotunnPath does not point to an installed Jotunn DLL." />
+    <Error Condition="!Exists('$(GamePath)/BepInEx/core/BepInEx.dll')" Text="Set GamePath to the development Valheim installation. Use dev.ps1 build." />
+    <Error Condition="!Exists('$(GamePath)/valheim_Data/Managed/assembly_valheim.dll')" Text="Valheim managed assemblies are missing from GamePath." />
+  </Target>
+</Project>

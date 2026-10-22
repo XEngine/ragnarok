@@ -5,19 +5,21 @@ $local = Get-Content -LiteralPath (Join-Path $projectRoot 'dev.local.json') -Raw
 $core = Join-Path $local.gamePath 'BepInEx/core'
 [void][Reflection.Assembly]::LoadFrom((Join-Path $core 'BepInEx.dll'))
 [void][Reflection.Assembly]::LoadFrom((Join-Path $core '0Harmony.dll'))
-$assembly = [Reflection.Assembly]::LoadFrom((Join-Path $projectRoot 'src/Ragnarok/bin/Debug/net472/Ragnarok.dll'))
-$migration = $assembly.GetType('Ragnarok.Configuration.ConfigMigration', $true).GetMethod('Upgrade', [Reflection.BindingFlags]'NonPublic,Static')
-$scratch = Join-Path ([IO.Path]::GetTempPath()) ('Ragnarok-config-check-' + [Guid]::NewGuid().ToString('N'))
+$assembly = [Reflection.Assembly]::LoadFrom((Join-Path $projectRoot 'src/Ironbound/bin/Debug/net472/Ironbound.dll'))
+$migration = $assembly.GetType('Ironbound.Configuration.ConfigMigration', $true).GetMethod('Upgrade', [Reflection.BindingFlags]'NonPublic,Static')
+$scratch = Join-Path ([IO.Path]::GetTempPath()) ('Ironbound-config-check-' + [Guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($scratch)
 $path = Join-Path $scratch 'migration.cfg'
 $backup = $path + '.before-modules.bak'
+$brandLegacy = Join-Path $scratch 'com.kernelpanic.ragnarok.cfg'
+$brandCurrent = Join-Path $scratch 'com.kernelpanic.ironbound.cfg'
 try {
     $legacy = @'
 [Interface]
 Scale = 1.2
 [Inventory]
 CharacterSlots = false
-Style = Ragnarok
+Style = Ironbound
 [HUD.Inventory]
 Style = Vanilla
 [QoL.Skills]
@@ -57,7 +59,7 @@ KeepMe = custom
     foreach ($expected in @('[HUD.Window]', 'Scale = 1.2', '[Gameplay.Equipment]', 'CharacterSlots = false', '[HUD.Inventory]', 'Style = Vanilla', '[Gameplay.Skills]', 'ExperienceGainModifierPercent = 75', '[UnknownModSection]', 'KeepMe = custom', '[QualityOfLife.NearbyChests]', 'Enabled = false', 'Range = 80', 'PersonalRange = 60', 'Shortcut = F + LeftControl', '[HUD.Hotbar]')) {
         if (-not $text.Contains($expected)) { throw "Migration lost: $expected" }
     }
-    foreach ($removed in @('[Interface]', '[Inventory]', '[QoL.Skills]', 'Style = Ragnarok', '[QualityOfLife.ChestSearch]', '[QualityOfLife.QuickStack]', 'Crafting =', 'Building =', 'Stations =', 'Range = 20', 'PersonalRange = 10', 'KeepTools =', 'KeepWeapons =', 'KeepConsumables =', 'SecondRow =', 'SwitchRowKey =', '[QualityOfLife.Hotbar]')) {
+    foreach ($removed in @('[Interface]', '[Inventory]', '[QoL.Skills]', 'Style = Ironbound', '[QualityOfLife.ChestSearch]', '[QualityOfLife.QuickStack]', 'Crafting =', 'Building =', 'Stations =', 'Range = 20', 'PersonalRange = 10', 'KeepTools =', 'KeepWeapons =', 'KeepConsumables =', 'SecondRow =', 'SwitchRowKey =', '[QualityOfLife.Hotbar]')) {
         if ($text.Contains($removed)) { throw "Legacy value survived: $removed" }
     }
     if ([IO.File]::ReadAllText($backup) -ne $legacy) { throw 'Migration backup was changed.' }
@@ -65,7 +67,7 @@ KeepMe = custom
     foreach ($name in @('UnityEngine.CoreModule.dll', 'UnityEngine.InputLegacyModule.dll', 'UnityEngine.dll')) {
         [void][Reflection.Assembly]::LoadFrom((Join-Path $local.gamePath "valheim_Data/Managed/$name"))
     }
-    $storageType = $assembly.GetType('Ragnarok.Features.NearbyStorage.StorageSettings', $true)
+    $storageType = $assembly.GetType('Ironbound.Features.NearbyStorage.StorageSettings', $true)
     $flags = [Reflection.BindingFlags]'NonPublic,Instance'
     $storage = $storageType.GetConstructors($flags)[0].Invoke((,$config.PSObject.BaseObject))
     $enabled = $storageType.GetField('Enabled', $flags).GetValue($storage)
@@ -81,9 +83,24 @@ KeepMe = custom
         if ($null -ne $storageType.GetField($removed, $flags)) { throw "Separate chest policy remains: $removed" }
     }
     Write-Host 'PASS: combined chest settings bind preserved values and apply one shared personal/server radius.'
+    $legacyBrandText = "[HUD]`nStyle = Ragnarok`n[HUD.Window]`nScale = 1.25`n"
+    [IO.File]::WriteAllText($brandLegacy, $legacyBrandText)
+    $imported = New-Object BepInEx.Configuration.ConfigFile($brandCurrent, $false)
+    $imported.SaveOnConfigSet = $false
+    [void]$migration.Invoke($null, (,$imported.PSObject.BaseObject))
+    $bind = [BepInEx.Configuration.ConfigFile].GetMethods() | Where-Object {
+        $_.Name -eq 'Bind' -and $_.IsGenericMethodDefinition -and $_.GetParameters().Count -eq 4 -and
+        $_.GetParameters()[0].ParameterType -eq [string] -and $_.GetParameters()[3].ParameterType -eq [string]
+    } | Select-Object -First 1
+    $style = $bind.MakeGenericMethod([string]).Invoke($imported, @('HUD','Style','Vanilla',''))
+    if ($style.Value -ne 'Ironbound' -or [IO.File]::ReadAllText($brandLegacy) -ne $legacyBrandText) { throw 'Brand migration lost style or changed the source config.' }
+    $style.Value = 'Vanilla'; $imported.Save()
+    [void]$migration.Invoke($null, (,$imported.PSObject.BaseObject))
+    if ($style.Value -ne 'Vanilla') { throw 'Brand migration overwrote current preferences.' }
+    Write-Host 'PASS: installed BepInEx imports old GUID config before binding, converts old style and preserves both source and newer preferences.'
 } finally {
     # Only the explicit files created above are removed; no recursive deletion.
-    foreach ($file in @($path, $backup)) {
+    foreach ($file in @($path, $backup, $brandLegacy, $brandCurrent, ($brandCurrent + '.before-modules.bak'))) {
         if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file -Force }
     }
     Remove-Item -LiteralPath $scratch

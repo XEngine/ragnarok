@@ -15,10 +15,10 @@ by .NET and Valheim. No PowerShell, Wine, global SDK installation or root access
 required. Setup installs the exact SDK from `global.json` locally and uses the same
 SHA-256-verified BepInExPack 5.4.2351 and ScriptEngine r11.2 archives as Windows.
 Setup also installs checksum-verified Jotunn 2.30.2 if no copy exists in the isolated
-game. Jotunn 2.30.2+ is required to build and run Ragnarok; existing installations
+game. Jotunn 2.30.2+ is required to build and run Ironbound; existing installations
 are preserved. Keep exactly one Jotunn.dll under the development BepInEx/plugins.
 Builds discover it recursively; an explicit `JotunnPath` MSBuild property can point
-to another installed copy. Dependencies are not bundled in Ragnarok release archives.
+to another installed copy. Dependencies are not bundled in Ironbound release archives.
 The SDK resolves .NET Framework reference assemblies during restore; the game runs
 the resulting net472 plugin with its own Unity/Mono runtime.
 
@@ -63,7 +63,7 @@ Keep Steam running and signed in before `play` or `smoke`. `play` builds, deploy
 launches the isolated game; close Valheim before using it. `deploy` and `watch` copy
 the plugin to `BepInEx/scripts`; press F6 in game to reload. F7 reloads configuration,
 F8 toggles the development badge, and F10 opens settings. The configuration is in
-`~/RagnarokDev/Valheim/BepInEx/config/com.kernelpanic.ragnarok.cfg`.
+`~/RagnarokDev/Valheim/BepInEx/config/com.kernelpanic.ironbound.cfg`.
 
 For a Flatpak Steam installation, the launcher runs inside Steam's Flatpak runtime
 so Steamworks can find the client. It grants access to the development game and saves
@@ -82,7 +82,7 @@ temporarily, checks initial plugin load, runtime inventory checks and unload/rel
 and Steam initialization, then stops its process and restores the watcher configuration. Logs are
 `Valheim/BepInEx/LogOutput.log` and `Valheim/startup-smoke.log`. It does not load a
 world or establish visual/gameplay/multiplayer correctness. `package` creates
-`artifacts/Ragnarok-local.zip` with only our Release DLL and installation instructions.
+`artifacts/Ironbound-local.zip` with only our Release DLL and installation instructions.
 
 The Windows migration check `scripts/check-config.ps1` remains Windows-only; the
 portable `test` command covers pure configuration migration and wire-name checks.
