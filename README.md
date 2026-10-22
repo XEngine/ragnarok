@@ -1,5 +1,7 @@
 # Ironbound
 
+![Ironbound — Valheim UI & Quality of Life](release/banner-v1.png)
+
 ![Ironbound alpha](https://img.shields.io/badge/status-alpha-D4AF67)
 ![License: MIT](https://img.shields.io/badge/license-MIT-4A8776)
 
